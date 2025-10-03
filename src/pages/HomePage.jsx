@@ -5,11 +5,9 @@ import {
   Target,
   Zap,
   Award,
-  Users,
   TrendingUp,
   CheckCircle,
   ArrowRight,
-  Star,
   ShieldCheck,
   GraduationCap,
   ClipboardList,
@@ -19,6 +17,7 @@ import {
   HelpCircle
 } from 'lucide-react'
 import { HeroGeometric } from '@/components/ui/shape-landing-hero'
+import ClientFeedback from '@/components/ui/testimonial'
 
 const HomePage = () => {
   const features = [
@@ -49,23 +48,6 @@ const HomePage = () => {
     'Industry-recognized certifications',
     'Live interactive training sessions',
     'Immediate skill assessment and feedback'
-  ]
-
-  const testimonials = [
-    {
-      name: 'Sarah Chen',
-      role: 'Marketing Director',
-      company: 'TechCorp',
-      content: 'The AI literacy assessment helped me identify exactly where to focus my learning. Within 3 weeks, I was building AI tools for our marketing campaigns.',
-      rating: 5
-    },
-    {
-      name: 'Michael Rodriguez',
-      role: 'Sales Manager',
-      company: 'InnovateCo',
-      content: 'The role-specific training was perfect. I learned AI applications directly relevant to sales processes and saw immediate results.',
-      rating: 5
-    }
   ]
 
   return (
@@ -474,34 +456,8 @@ const HomePage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Success Stories
-            </h2>
-            <p className="text-xl text-gray-600">
-              See how professionals are transforming their careers with AI literacy
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="card">
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-700 mb-6 italic">"{testimonial.content}"</p>
-                <div>
-                  <div className="font-semibold text-gray-900">{testimonial.name}</div>
-                  <div className="text-gray-600">{testimonial.role} at {testimonial.company}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <section className="bg-white">
+        <ClientFeedback />
       </section>
 
       {/* CTA Section */}

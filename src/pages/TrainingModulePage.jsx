@@ -97,8 +97,13 @@ const TrainingModulePage = () => {
 
   const isCompleted = progress?.status === 'completed'
 
+  const metadata = module?.metadata || {}
+
   const watchUrl = useMemo(() => {
     if (!module?.content_url) return null
+    if (module.content_type && ['external', 'partner', 'affiliate'].includes(module.content_type)) {
+      return null
+    }
     if (module.content_url.includes('youtube.com') && !module.content_url.includes('/embed/')) {
       const videoId = module.content_url.split('v=')[1]?.split('&')[0]
       if (videoId) {
@@ -106,7 +111,7 @@ const TrainingModulePage = () => {
       }
     }
     return module.content_url
-  }, [module?.content_url])
+  }, [module?.content_type, module?.content_url])
 
   if (loading) {
     return (
@@ -142,6 +147,8 @@ const TrainingModulePage = () => {
   }
 
   const { learning_objectives = [], content_sections = [], prerequisites = [], resources = [] } = module
+  const externalUrl = metadata.external_url || module.content_url
+  const accessTier = metadata.access_tier?.replace(/\b\w/g, l => l.toUpperCase())
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -164,9 +171,25 @@ const TrainingModulePage = () => {
               />
             </div>
           ) : (
-            <div className="bg-gray-200 py-16 text-center">
-              <Play className="h-10 w-10 text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-600">Video coming soon</p>
+            <div className="bg-gray-900 py-16 text-center text-white">
+              <div className="space-y-4">
+                <Play className="h-10 w-10 mx-auto text-primary-400" />
+                <h3 className="text-xl font-semibold">Explore this course on {metadata.provider || 'our partner platform'}</h3>
+                <p className="max-w-2xl mx-auto text-white/70">
+                  This experience is delivered externally. Follow the link below to access the full curriculum and track completion through the partner platform.
+                </p>
+                {externalUrl && (
+                  <a
+                    href={externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 font-semibold text-gray-900 shadow-lg hover:bg-white/90"
+                  >
+                    {metadata.cta_text || 'Open course'}
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
             </div>
           )}
 
@@ -186,7 +209,7 @@ const TrainingModulePage = () => {
                 <p className="text-gray-600 max-w-2xl">{module.description}</p>
               </div>
               <div className="flex flex-col items-stretch gap-3 min-w-[200px]">
-                {isAuthenticated ? (
+                {isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
                   <button
                     onClick={handleEnroll}
                     disabled={enrolling}
@@ -194,15 +217,26 @@ const TrainingModulePage = () => {
                   >
                     {progress ? 'Resume Module' : enrolling ? 'Enrolling...' : 'Enroll & Start'}
                   </button>
-                ) : (
+                ) : !isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
                   <button
                     onClick={() => navigate('/login', { state: { from: `/training/modules/${moduleId}` } })}
                     className="btn-primary"
                   >
                     Sign in to Track Progress
                   </button>
+                ) : null}
+                {['external', 'partner', 'affiliate'].includes(module.content_type) && externalUrl && (
+                  <a
+                    href={externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary inline-flex items-center justify-center gap-2"
+                  >
+                    {metadata.cta_text || 'Visit course site'}
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
                 )}
-                {isAuthenticated && (
+                {isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) && (
                   <button
                     onClick={handleMarkComplete}
                     disabled={progressUpdating || isCompleted}
@@ -214,7 +248,7 @@ const TrainingModulePage = () => {
               </div>
             </div>
 
-            {isAuthenticated && progress && (
+            {isAuthenticated && progress && !['external', 'partner', 'affiliate'].includes(module.content_type) && (
               <div className="mb-8 rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800">
                 {isCompleted ? (
                   <span>
@@ -303,16 +337,26 @@ const TrainingModulePage = () => {
               </div>
             )}
 
-            <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-sm text-gray-500">
-              <div>
-                <span className="font-medium text-gray-700">Content type:</span>
-                <span className="ml-2 capitalize">{module.content_type}</span>
+            <div className="mt-10 flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-700">Provider:</span>
+                <span>{metadata.provider || 'AI Literacy Platform'}</span>
               </div>
-              <div>
-                <span className="font-medium text-gray-700">Access:</span>
-                <span className="ml-2">{module.is_premium ? 'Professional & Enterprise members' : 'Available to all members'}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-700">Access tier:</span>
+                <span className="capitalize">{accessTier || (module.is_premium ? 'Professional' : 'Free')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-700">Format:</span>
+                <span className="capitalize">{metadata.format || module.content_type}</span>
               </div>
             </div>
+
+            {metadata.attribution && (
+              <p className="mt-4 text-xs text-gray-400">
+                {metadata.attribution}
+              </p>
+            )}
           </div>
         </div>
       </div>

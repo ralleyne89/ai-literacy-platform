@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity } from 'lucide-react'
+import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -69,8 +69,12 @@ const TrainingPage = () => {
     return colors[level] || 'text-gray-600 bg-gray-100'
   }
 
-  const getProgressBadge = (moduleId) => {
-    const progress = progressMap[moduleId]
+  const getProgressBadge = (module) => {
+    if (['external', 'partner', 'affiliate'].includes(module.content_type)) {
+      return null
+    }
+
+    const progress = progressMap[module.id]
     if (!progress) {
       return null
     }
@@ -111,6 +115,12 @@ const TrainingPage = () => {
         return <Users className="w-5 h-5" />
       case 'exercise':
         return <CheckCircle className="w-5 h-5" />
+      case 'external':
+        return <ExternalLink className="w-5 h-5" />
+      case 'partner':
+        return <Building2 className="w-5 h-5" />
+      case 'affiliate':
+        return <TrendingUp className="w-5 h-5" />
       default:
         return <Play className="w-5 h-5" />
     }
@@ -187,7 +197,11 @@ const TrainingPage = () => {
 
         {/* Training Modules Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {modules.map(module => (
+          {modules.map(module => {
+            const metadata = module.metadata || {}
+            const accessLabel = metadata.access_tier ? metadata.access_tier.replace(/\b\w/g, l => l.toUpperCase()) : module.is_premium ? 'Professional' : 'Free'
+
+            return (
             <div key={module.id} className="card hover:shadow-lg transition-shadow duration-200 flex flex-col">
               {/* Module Header */}
               <div className="flex items-start justify-between mb-4">
@@ -197,7 +211,7 @@ const TrainingPage = () => {
                   </div>
                   <span className="text-sm text-gray-600 capitalize">{module.content_type}</span>
                 </div>
-                {module.is_premium && (
+                {module.is_premium && !['external', 'partner', 'affiliate'].includes(module.content_type) && (
                   <div className="flex items-center space-x-1 text-yellow-600">
                     <Lock className="w-4 h-4" />
                     <span className="text-xs font-medium">Premium</span>
@@ -205,9 +219,9 @@ const TrainingPage = () => {
                 )}
               </div>
 
-              {getProgressBadge(module.id) && (
+              {getProgressBadge(module) && (
                 <div className="mb-3">
-                  {getProgressBadge(module.id)}
+                  {getProgressBadge(module)}
                 </div>
               )}
 
@@ -230,10 +244,18 @@ const TrainingPage = () => {
 
               {/* Role Badge */}
               {module.role_specific && (
-                <div className="mb-4">
-                  <span className="inline-block px-3 py-1 bg-secondary-100 text-secondary-700 text-sm font-medium rounded-full">
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-secondary-100 text-secondary-700 text-sm font-medium rounded-full">
                     {module.role_specific}
                   </span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">
+                    {accessLabel}
+                  </span>
+                  {metadata.provider && (
+                    <span className="inline-flex items-center gap-2 px-3 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                      {metadata.provider}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -259,10 +281,16 @@ const TrainingPage = () => {
                     : 'btn-primary'
                 }`}
               >
-                {module.is_premium ? 'Preview Module' : progressMap[module.id]?.status === 'completed' ? 'Review Module' : progressMap[module.id] ? 'Continue Learning' : 'Start Module'}
+                {['external', 'partner', 'affiliate'].includes(module.content_type)
+                  ? metadata.cta_text || 'View details'
+                  : progressMap[module.id]?.status === 'completed'
+                    ? 'Review Module'
+                    : progressMap[module.id]
+                      ? 'Continue Learning'
+                      : 'Start Module'}
               </Link>
             </div>
-          ))}
+          )})}
         </div>
 
         {/* Empty State */}
