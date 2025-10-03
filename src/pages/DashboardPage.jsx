@@ -113,7 +113,7 @@ const DashboardPage = () => {
 
                 {latestAssessment.score_band && (
                   <div className="mb-4 rounded-lg bg-primary-50 border border-primary-100 px-4 py-3">
-                    <span className="text-sm font-semibold text-primary-700">AI Literacy Level:</span>
+                    <span className="text-sm font-semibold text-primary-700">LitmusAI Level:</span>
                     <span className="ml-2 text-sm text-primary-700 uppercase tracking-wide">{latestAssessment.score_band}</span>
                   </div>
                 )}

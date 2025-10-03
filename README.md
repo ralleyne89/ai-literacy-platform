@@ -1,4 +1,4 @@
-# AI Literacy Platform
+# LitmusAI
 
 A comprehensive web application that combines the proven Assess → Activate → Certify methodology with modern, engaging design. Built to transform individuals and organizations from AI-curious to AI-proficient through assessment-driven, personalized learning experiences.
 

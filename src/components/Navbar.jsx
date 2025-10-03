@@ -34,7 +34,7 @@ const Navbar = () => {
               <div className="w-9 h-9 bg-gradient-primary rounded-xl flex items-center justify-center shadow-sm">
                 <Brain className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">AI Literacy Platform</span>
+              <span className="text-xl font-bold text-gray-900">LitmusAI</span>
             </Link>
           </div>
 

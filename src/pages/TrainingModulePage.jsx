@@ -340,7 +340,7 @@ const TrainingModulePage = () => {
             <div className="mt-10 flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-700">Provider:</span>
-                <span>{metadata.provider || 'AI Literacy Platform'}</span>
+                <span>{metadata.provider || 'LitmusAI'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-700">Access tier:</span>

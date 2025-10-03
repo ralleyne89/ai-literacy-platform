@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database initialization script for AI Literacy Platform
+Database initialization script for LitmusAI
 """
 
 from app import app

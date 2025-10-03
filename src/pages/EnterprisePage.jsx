@@ -84,7 +84,7 @@ const EnterprisePage = () => {
 
   const testimonials = [
     {
-      quote: "The AI Literacy Platform transformed our organization in just 6 weeks. Our teams are now confidently using AI tools, and we've seen a 40% increase in productivity.",
+      quote: "LitmusAI transformed our organization in just 6 weeks. Our teams are now confidently using AI tools, and we've seen a 40% increase in productivity.",
       author: "Sarah Chen",
       title: "Chief Technology Officer",
       company: "TechCorp Industries"
@@ -246,7 +246,7 @@ const EnterprisePage = () => {
             Ready to Transform Your Organization?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Schedule a demo to see how the AI Literacy Platform can accelerate your organization's AI adoption.
+            Schedule a demo to see how LitmusAI can accelerate your organization's AI adoption.
           </p>
           
           <div className="grid md:grid-cols-3 gap-6 mb-8">

@@ -361,7 +361,7 @@ def generate_recommendations(domain_scores, domain_totals, total_correct, score_
     course_list = '; '.join(course_map[score_band])
     recommendations.append({
         'type': 'overall',
-        'title': f'{score_band} AI Literacy',
+        'title': f'{score_band} LitmusAI Readiness',
         'description': description,
         'priority': priority,
         'action': f'Recommended next steps: {course_list}'

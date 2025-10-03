@@ -37,7 +37,7 @@ DEFAULT_MODULES = [
             {'title': 'Hands-on Lab: Build a Sales Playbook', 'summary': 'Guided exercise to build a multi-touch campaign using generative AI.', 'duration_minutes': 18}
         ],
         'metadata': {
-            'provider': 'AI Literacy Platform Originals',
+            'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
@@ -72,7 +72,7 @@ DEFAULT_MODULES = [
             {'title': 'Designing Transparent Employee Communication', 'summary': 'How to explain AI decisions to candidates and employees.', 'duration_minutes': 15}
         ],
         'metadata': {
-            'provider': 'AI Literacy Platform Originals',
+            'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
@@ -106,7 +106,7 @@ DEFAULT_MODULES = [
             {'title': 'Measurement & Iteration', 'summary': 'Instrument AI-assisted campaign dashboards for rapid iteration.', 'duration_minutes': 17}
         ],
         'metadata': {
-            'provider': 'AI Literacy Platform Originals',
+            'provider': 'LitmusAI Originals',
             'access_tier': 'enterprise',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
@@ -140,7 +140,7 @@ DEFAULT_MODULES = [
             {'title': 'Governance and Monitoring', 'summary': 'Set success metrics and ongoing monitoring routines.', 'duration_minutes': 18}
         ],
         'metadata': {
-            'provider': 'AI Literacy Platform Originals',
+            'provider': 'LitmusAI Originals',
             'access_tier': 'enterprise',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'
@@ -174,7 +174,7 @@ DEFAULT_MODULES = [
             {'title': 'Evaluation & Refinement Lab', 'summary': 'Hands-on exercises with scoring rubrics and rapid iteration cycles.', 'duration_minutes': 18}
         ],
         'metadata': {
-            'provider': 'AI Literacy Platform Originals',
+            'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'

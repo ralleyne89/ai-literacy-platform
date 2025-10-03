@@ -84,7 +84,7 @@ class UserProgress(db.Model):
 class Certification(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
-    certification_type = db.Column(db.String(100), nullable=False)  # AI Literacy Professional, etc.
+    certification_type = db.Column(db.String(100), nullable=False)  # LitmusAI Professional, etc.
     verification_code = db.Column(db.String(50), unique=True, nullable=False)
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=True)

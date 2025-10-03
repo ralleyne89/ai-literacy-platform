@@ -17,8 +17,8 @@ def get_available_certifications():
     try:
         certifications = [
             {
-                'id': 'ai-literacy-professional',
-                'title': 'AI Literacy Professional',
+                'id': 'litmusai-professional',
+                'title': 'LitmusAI Professional',
                 'description': 'Validates comprehensive AI literacy across all domains with practical application skills.',
                 'requirements': [
                     'Complete AI readiness assessment with 70% or higher',

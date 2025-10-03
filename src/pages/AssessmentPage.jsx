@@ -254,7 +254,7 @@ const AssessmentPage = () => {
               <p className="opacity-90">{results.total_score} out of {results.max_score} questions correct</p>
               {results.score_band && (
                 <p className="mt-2 text-sm uppercase tracking-wide text-white/80">
-                  AI Literacy Level: {results.score_band}
+                  LitmusAI Level: {results.score_band}
                 </p>
               )}
             </div>
@@ -362,7 +362,7 @@ const AssessmentPage = () => {
       <div className="relative min-h-screen bg-gray-50 py-12 flex items-center justify-center">
         <div className="max-w-2xl mx-auto text-center px-4">
           <Brain className="w-16 h-16 text-primary-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Literacy Assessment</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">LitmusAI Assessment</h1>
           <p className="text-gray-600">
             When you’re ready, start the assessment to discover your AI proficiency across critical dimensions.
             {resumeDetected && ' We saved your progress from a previous session—pick up where you left off.'}
@@ -436,7 +436,7 @@ const AssessmentPage = () => {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Literacy Assessment</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">LitmusAI Assessment</h1>
           <p className="text-gray-600">Discover your AI readiness across all domains</p>
         </div>
 
