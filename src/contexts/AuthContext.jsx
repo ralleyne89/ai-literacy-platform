@@ -36,6 +36,18 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const syncBackendProfile = async (profile) => {
+    if (!profile) {
+      return
+    }
+
+    try {
+      await axios.post('/api/auth/sync', profile)
+    } catch (err) {
+      console.warn('Failed to sync profile with backend:', err?.response?.data || err)
+    }
+  }
+
   useEffect(() => {
     if (!supabase) {
       console.error('Supabase client is not initialized. Check environment variables.')
@@ -50,7 +62,18 @@ export const AuthProvider = ({ children }) => {
           console.error('Failed to retrieve Supabase session:', error)
         } else {
           setSession(data.session)
-          setUser(mapSupabaseUser(data.session?.user))
+          const mapped = mapSupabaseUser(data.session?.user)
+          setUser(mapped)
+          if (data.session?.user) {
+            await syncBackendProfile({
+              id: mapped?.id,
+              email: mapped?.email,
+              first_name: mapped?.first_name,
+              last_name: mapped?.last_name,
+              role: mapped?.role,
+              organization: mapped?.organization
+            })
+          }
         }
       } catch (err) {
         console.error('Unexpected Supabase auth error:', err)
@@ -61,9 +84,21 @@ export const AuthProvider = ({ children }) => {
 
     initialize()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession)
-      setUser(mapSupabaseUser(newSession?.user))
+      const mappedUser = mapSupabaseUser(newSession?.user)
+      setUser(mappedUser)
+
+      if (newSession?.user) {
+        await syncBackendProfile({
+          id: mappedUser?.id,
+          email: mappedUser?.email,
+          first_name: mappedUser?.first_name,
+          last_name: mappedUser?.last_name,
+          role: mappedUser?.role,
+          organization: mappedUser?.organization
+        })
+      }
     })
 
     return () => {
@@ -79,18 +114,6 @@ export const AuthProvider = ({ children }) => {
       delete axios.defaults.headers.common['Authorization']
     }
   }, [session])
-
-  const syncBackendProfile = async (profile) => {
-    if (!profile) {
-      return
-    }
-
-    try {
-      await axios.post('/api/auth/sync', profile)
-    } catch (err) {
-      console.warn('Failed to sync profile with backend:', err?.response?.data || err)
-    }
-  }
 
   const login = async (email, password) => {
     if (!supabase) {
@@ -216,6 +239,46 @@ export const AuthProvider = ({ children }) => {
     return { success: true, user: mappedUser }
   }
 
+  const loginWithProvider = async (provider) => {
+    if (!supabase) {
+      return { success: false, error: 'Supabase is not configured' }
+    }
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data }
+  }
+
+  const syncBackendAfterLogin = async () => {
+    if (!supabase) return
+    try {
+      const { data } = await supabase.auth.getSession()
+      const mapped = mapSupabaseUser(data.session?.user)
+      if (!mapped) return
+      await syncBackendProfile({
+        id: mapped.id,
+        email: mapped.email,
+        first_name: mapped.first_name,
+        last_name: mapped.last_name,
+        role: mapped.role,
+        organization: mapped.organization
+      })
+      setSession(data.session)
+      setUser(mapped)
+    } catch (err) {
+      console.warn('Failed to finalize login sync:', err)
+    }
+  }
+
   const value = {
     user,
     token: session?.access_token || null,
@@ -224,6 +287,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    loginWithProvider,
+    syncBackendAfterLogin,
     isAuthenticated: !!user
   }
 

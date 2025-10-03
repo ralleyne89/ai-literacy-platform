@@ -12,6 +12,8 @@ import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
+import AuthCallback from './pages/AuthCallback'
+import BillingPage from './pages/BillingPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -27,6 +29,8 @@ function App() {
             <Route path="/training/modules/:moduleId" element={<TrainingModulePage />} />
             <Route path="/certification" element={<CertificationPage />} />
             <Route path="/enterprise" element={<EnterprisePage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/billing" element={<BillingPage />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardPage />

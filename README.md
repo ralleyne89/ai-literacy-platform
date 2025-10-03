@@ -154,6 +154,15 @@ ai-literacy-platform/
 - [ ] Mobile app
 - [ ] API documentation
 
+## 🔐 Social Sign-In Setup
+
+LitmusAI uses Supabase authentication with optional Google and Facebook OAuth providers.
+
+1. In Supabase → Authentication → Providers, enable Google and Facebook.
+2. Supply each provider’s client ID and secret. Add both your local URL (`http://localhost:5173`) and deployed domain (e.g., Netlify) to the authorized redirect list.
+3. Supabase automatically handles the OAuth callback at `/auth/callback`. No additional frontend configuration is needed beyond the environment variables already in place.
+4. After issuing new keys, redeploy so the environment has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
 ## 🧪 Testing the Application
 
 ### Frontend Testing
@@ -197,6 +206,11 @@ VITE_API_URL=http://localhost:5001
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+# Optional: Stripe (populate once your Stripe account is ready)
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
+STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+FRONTEND_URL=https://your-netlify-site.netlify.app
 ```
 
 Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.

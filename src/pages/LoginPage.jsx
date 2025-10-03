@@ -12,7 +12,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, loginWithProvider } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -46,6 +46,14 @@ const LoginPage = () => {
     }
 
     setLoading(false)
+  }
+
+  const handleProviderLogin = async (provider) => {
+    setError('')
+    const result = await loginWithProvider(provider)
+    if (!result.success && result.error) {
+      setError(result.error)
+    }
   }
 
   return (
@@ -142,6 +150,23 @@ const LoginPage = () => {
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('google')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('facebook')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Facebook
+            </button>
+          </div>
 
           <div className="text-center">
             <p className="text-sm text-gray-600">

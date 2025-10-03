@@ -30,7 +30,7 @@ function ClientFeedback() {
             animationNum={0}
             customVariants={revealVariants}
           >
-            Trusted by startups and the world&apos;s largest companies
+            What our customers think of the LitmusAI experience
           </TimelineContent>
           <TimelineContent
             as="p"
@@ -38,7 +38,7 @@ function ClientFeedback() {
             animationNum={1}
             customVariants={revealVariants}
           >
-            Hear how Hypersphere clients describe our impact on their teams.
+            Hear how Litmus AI clients describe our impact on their upskilling journey.
           </TimelineContent>
         </article>
 
@@ -52,7 +52,7 @@ function ClientFeedback() {
               <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:50px_56px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
               <article className="relative mt-auto space-y-4">
                 <p className="text-sm leading-relaxed md:text-base">
-                  “Hypersphere has been a game-changer for us. Their service is top-notch and the team is incredibly responsive.”
+                  LitmusAI has been a game-changer for us. Their service is top-notch and the team is incredibly responsive.”
                 </p>
                 <div className="flex items-center justify-between">
                   <div>
@@ -75,7 +75,7 @@ function ClientFeedback() {
             >
               <article className="mt-auto space-y-4">
                 <p>
-                  “We&apos;ve seen incredible results with Hypersphere. Their expertise and dedication keep us ahead.”
+                  “We&apos;ve seen incredible results with LitmusAI. Their expertise and dedication keep us ahead.”
                 </p>
                 <div className="flex items-center justify-between">
                   <div>
@@ -123,7 +123,7 @@ function ClientFeedback() {
             >
               <article className="mt-auto space-y-4">
                 <p className="text-sm md:text-base">
-                  “We&apos;re extremely satisfied with Hypersphere. Their expertise and dedication have exceeded expectations.”
+                  “We&apos;re extremely satisfied with LitmusAI. Their expertise and dedication have exceeded expectations.”
                 </p>
                 <div className="flex items-end justify-between pt-2">
                   <div>
@@ -170,7 +170,7 @@ function ClientFeedback() {
               className="flex flex-[4] flex-col justify-between rounded-lg border border-gray-200 bg-blue-600 p-5 text-white lg:flex-[3]"
             >
               <article className="mt-auto space-y-4">
-                <p>“Hypersphere has been a key partner in our growth journey.”</p>
+                <p>LitmusAI has been a key partner in our growth journey.”</p>
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold md:text-xl text-white">Guillermo Rauch</h2>
@@ -193,7 +193,7 @@ function ClientFeedback() {
               <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:50px_56px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
               <article className="relative mt-auto space-y-4">
                 <p>
-                  “Hypersphere has been a true game-changer for us. Their exceptional service and deep expertise have made a significant impact on our business.”
+                  LitmusAI has been a true game-changer for us. Their exceptional service and deep expertise have made a significant impact on our business.”
                 </p>
                 <div className="flex items-center justify-between">
                   <div>
