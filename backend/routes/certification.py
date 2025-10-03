@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, g
+from routes import supabase_jwt_required, get_supabase_identity
 from models import db, Certification, User
 import uuid
 import random
@@ -76,11 +76,11 @@ def get_available_certifications():
         return jsonify({'error': 'Failed to get certifications', 'details': str(e)}), 500
 
 @certification_bp.route('/earned', methods=['GET'])
-@jwt_required()
+@supabase_jwt_required()
 def get_earned_certifications():
     """Get user's earned certifications"""
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         
         # In production, this would query the database
         # For now, return sample data
@@ -137,11 +137,11 @@ def verify_certification(verification_code):
         return jsonify({'error': 'Failed to verify certification', 'details': str(e)}), 500
 
 @certification_bp.route('/apply/<certification_id>', methods=['POST'])
-@jwt_required()
+@supabase_jwt_required()
 def apply_for_certification(certification_id):
     """Apply for a certification"""
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         user = User.query.get(user_id)
         
         if not user:

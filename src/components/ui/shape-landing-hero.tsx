@@ -112,11 +112,11 @@ function HeroGeometric({
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#030303]">
       <motion.div
-        className="absolute inset-0 blur-3xl bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05]"
+        className="pointer-events-none absolute inset-0 blur-3xl bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05]"
         style={{ opacity: isMounted ? glowOpacity : 0 }}
       />
 
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <ElegantShape
           delay={0.3}
           width={600}

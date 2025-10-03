@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
+from flask import Blueprint, request, jsonify, g
 from models import db, Assessment, AssessmentResult, User
 from datetime import datetime
 import json
+import random
+from routes import get_supabase_identity, supabase_jwt_required
 
 assessment_bp = Blueprint('assessment', __name__)
 
@@ -43,10 +44,10 @@ SAMPLE_QUESTIONS = [
         "domain": "AI Fundamentals",
         "question_text": "What causes AI “hallucinations”?",
         "option_a": "Hardware malfunctions",
-        "option_b": "The AI generating plausible but false information",
-        "option_c": "User input errors",
+        "option_b": "User input errors",
+        "option_c": "The AI generating plausible but false information",
         "option_d": "Internet connectivity issues",
-        "correct_answer": "B",
+        "correct_answer": "C",
         "explanation": "Hallucinations happen when AI fills gaps with confident but incorrect information based on patterns it has learned."
     },
     {
@@ -195,7 +196,23 @@ def get_assessment_questions():
         # In production, this would query the database
         # For now, return sample questions
         questions = []
-        for q in SAMPLE_QUESTIONS:
+        for base in SAMPLE_QUESTIONS:
+            q = base.copy()
+            option_pairs = [
+                ('A', base['option_a']),
+                ('B', base['option_b']),
+                ('C', base['option_c']),
+                ('D', base['option_d'])
+            ]
+            original_correct_text = dict(option_pairs)[q['correct_answer'].upper()]
+            random.shuffle(option_pairs)
+
+            for idx, (_, text) in enumerate(option_pairs):
+                letter = chr(ord('A') + idx)
+                q[f'option_{letter.lower()}'] = text
+                if text == original_correct_text:
+                    q['correct_answer'] = letter
+
             questions.append({
                 'id': q['id'],
                 'domain': q['domain'],
@@ -204,8 +221,9 @@ def get_assessment_questions():
                 'option_b': q['option_b'],
                 'option_c': q['option_c'],
                 'option_d': q['option_d']
-                # correct_answer and explanation intentionally omitted from payload
             })
+
+        random.shuffle(questions)
 
         return jsonify({
             'questions': questions,
@@ -217,6 +235,7 @@ def get_assessment_questions():
         return jsonify({'error': 'Failed to get questions', 'details': str(e)}), 500
 
 @assessment_bp.route('/submit', methods=['POST'])
+@supabase_jwt_required(optional=True)
 def submit_assessment():
     """Submit assessment answers and get results"""
     try:
@@ -265,12 +284,9 @@ def submit_assessment():
         recommendations = generate_recommendations(domain_scores, domain_totals, total_score, score_band)
         
         # Save results if user is authenticated
-        user_id = None
-        try:
-            verify_jwt_in_request(optional=True)
-            user_id = get_jwt_identity()
-        except:
-            pass  # User not authenticated, continue without saving
+        user_id = g.get('current_user_id')
+        if user_id is None:
+            user_id = get_supabase_identity(optional=True)
         
         if user_id:
             # Persisting the first four domain scores to fit the current schema
@@ -392,11 +408,11 @@ def generate_recommendations(domain_scores, domain_totals, total_correct, score_
     return recommendations
 
 @assessment_bp.route('/history', methods=['GET'])
-@jwt_required()
+@supabase_jwt_required()
 def get_assessment_history():
     """Get user's assessment history"""
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         
         results = AssessmentResult.query.filter_by(user_id=user_id)\
                                       .order_by(AssessmentResult.completed_at.desc())\

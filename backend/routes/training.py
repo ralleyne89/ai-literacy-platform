@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify, g
+from routes import supabase_jwt_required, get_supabase_identity
 from models import db, TrainingModule, UserProgress
 from datetime import datetime
 import json
@@ -639,10 +639,10 @@ def get_training_module_detail(module_id):
 
 
 @training_bp.route('/progress', methods=['GET'])
-@jwt_required()
+@supabase_jwt_required()
 def get_user_progress():
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         ensure_training_modules_seeded()
 
         records = (UserProgress.query
@@ -670,10 +670,10 @@ def get_user_progress():
 
 
 @training_bp.route('/enroll/<module_id>', methods=['POST'])
-@jwt_required()
+@supabase_jwt_required()
 def enroll_in_module(module_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         ensure_training_modules_seeded()
 
         module = TrainingModule.query.get(module_id)
@@ -712,10 +712,10 @@ def enroll_in_module(module_id):
 
 
 @training_bp.route('/progress/<module_id>', methods=['PUT'])
-@jwt_required()
+@supabase_jwt_required()
 def update_progress(module_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         data = request.get_json() or {}
 
         progress_percentage = data.get('progress_percentage', 0)

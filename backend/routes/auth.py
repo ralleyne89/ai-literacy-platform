@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
+from flask import Blueprint, request, jsonify, g
+from flask_jwt_extended import create_access_token
 from models import db, User
 import bcrypt
 import re
+from routes import supabase_jwt_required, get_supabase_identity, get_supabase_claims
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -133,10 +134,10 @@ def login():
         return jsonify({'error': 'Login failed', 'details': str(e)}), 500
 
 @auth_bp.route('/profile', methods=['GET'])
-@jwt_required()
+@supabase_jwt_required()
 def get_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         user = User.query.get(user_id)
         
         if not user:
@@ -159,10 +160,10 @@ def get_profile():
         return jsonify({'error': 'Failed to get profile', 'details': str(e)}), 500
 
 @auth_bp.route('/profile', methods=['PUT'])
-@jwt_required()
+@supabase_jwt_required()
 def update_profile():
     try:
-        user_id = get_jwt_identity()
+        user_id = g.get('current_user_id') or get_supabase_identity()
         user = User.query.get(user_id)
         
         if not user:
@@ -201,12 +202,12 @@ def update_profile():
 
 
 @auth_bp.route('/sync', methods=['POST'])
-@jwt_required()
+@supabase_jwt_required()
 def sync_user():
     """Ensure a corresponding user record exists in the local database for Supabase-authenticated users."""
     try:
-        supabase_user_id = get_jwt_identity()
-        claims = get_jwt()
+        supabase_user_id = g.get('current_user_id') or get_supabase_identity()
+        claims = g.get('supabase_claims') or get_supabase_claims()
         payload = request.get_json() or {}
 
         email = (payload.get('email') or claims.get('email') or '').strip().lower()
