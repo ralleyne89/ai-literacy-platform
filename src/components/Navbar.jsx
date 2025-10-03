@@ -26,12 +26,12 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 shadow-sm border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+              <div className="w-9 h-9 bg-gradient-primary rounded-xl flex items-center justify-center shadow-sm">
                 <Brain className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900">AI Literacy Platform</span>
@@ -106,7 +106,7 @@ const Navbar = () => {
                   to="/assessment"
                   className="btn-primary text-sm"
                 >
-                  Start Free Assessment
+                  Start free assessment
                 </Link>
               </>
             )}
@@ -155,7 +155,7 @@ const Navbar = () => {
                 className="block mx-3 mt-2 btn-primary text-center text-sm"
                 onClick={() => setIsOpen(false)}
               >
-                Start Free Assessment
+                Start free assessment
               </Link>
             </div>
           </div>

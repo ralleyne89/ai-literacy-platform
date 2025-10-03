@@ -5,7 +5,9 @@ import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import AssessmentPage from './pages/AssessmentPage'
 import TrainingPage from './pages/TrainingPage'
+import TrainingModulePage from './pages/TrainingModulePage'
 import CertificationPage from './pages/CertificationPage'
+import EnterprisePage from './pages/EnterprisePage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -22,7 +24,9 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/assessment" element={<AssessmentPage />} />
             <Route path="/training" element={<TrainingPage />} />
+            <Route path="/training/modules/:moduleId" element={<TrainingModulePage />} />
             <Route path="/certification" element={<CertificationPage />} />
+            <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardPage />

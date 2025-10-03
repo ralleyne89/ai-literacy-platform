@@ -26,7 +26,7 @@ class Assessment(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    domain = db.Column(db.String(50), nullable=False)  # Functional, Ethical, Rhetorical, Pedagogical
+    domain = db.Column(db.String(50), nullable=False)  # AI Fundamentals, Practical Usage, Ethics & Critical Thinking, AI Impact & Applications, Strategic Understanding
     question_text = db.Column(db.Text, nullable=False)
     option_a = db.Column(db.String(500), nullable=False)
     option_b = db.Column(db.String(500), nullable=False)

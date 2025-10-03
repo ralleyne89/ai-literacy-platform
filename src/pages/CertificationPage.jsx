@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Award, CheckCircle, Clock, Star, Shield, ExternalLink } from 'lucide-react'
+import { Award, CheckCircle, Clock, Star, Shield, ExternalLink, AlertCircle } from 'lucide-react'
 import axios from 'axios'
 
 const CertificationPage = () => {
@@ -18,15 +18,18 @@ const CertificationPage = () => {
         axios.get('/api/certification/available'),
         axios.get('/api/certification/earned').catch(() => ({ data: { certifications: [] } }))
       ])
-      
+
       setAvailableCerts(availableResponse.data.certifications)
       setEarnedCerts(earnedResponse.data.certifications)
       setLoading(false)
     } catch (error) {
       console.error('Failed to fetch certifications:', error)
       setLoading(false)
+      alert('Failed to load certifications. Please try again later.')
     }
   }
+
+
 
   const handleApply = async (certId) => {
     try {
@@ -56,11 +59,13 @@ const CertificationPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">AI Certifications</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Validate your AI skills with industry-recognized certifications. 
+            Validate your AI skills with industry-recognized certifications.
             Advance your career with credentials that prove practical AI proficiency.
           </p>
         </div>

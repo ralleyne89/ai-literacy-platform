@@ -7,63 +7,186 @@ import json
 assessment_bp = Blueprint('assessment', __name__)
 
 # Sample assessment questions - in production, these would be in the database
+DOMAINS = [
+    'AI Fundamentals',
+    'Practical Usage',
+    'Ethics & Critical Thinking',
+    'AI Impact & Applications',
+    'Strategic Understanding'
+]
+
 SAMPLE_QUESTIONS = [
     {
         "id": "1",
-        "domain": "Functional",
-        "question_text": "Which of the following best describes the primary function of a Large Language Model (LLM)?",
-        "option_a": "To store and retrieve large amounts of data efficiently",
-        "option_b": "To generate human-like text based on patterns learned from training data",
-        "option_c": "To perform complex mathematical calculations at high speed",
-        "option_d": "To create visual representations of data and information",
-        "correct_answer": "B",
-        "explanation": "LLMs are designed to understand and generate human-like text by learning patterns from vast amounts of text data during training."
+        "domain": "AI Fundamentals",
+        "question_text": "What is the primary difference between AI and traditional software?",
+        "option_a": "AI can learn and adapt from data",
+        "option_b": "AI is faster than traditional software",
+        "option_c": "AI uses more memory",
+        "option_d": "AI is more expensive",
+        "correct_answer": "A",
+        "explanation": "Unlike traditional software, AI systems can learn from data and improve performance without explicit programming for every scenario."
     },
     {
         "id": "2",
-        "domain": "Ethical",
-        "question_text": "What is the most important consideration when using AI tools for hiring decisions?",
-        "option_a": "Ensuring the AI can process applications faster than humans",
-        "option_b": "Making sure the AI reduces hiring costs significantly",
-        "option_c": "Checking for bias and ensuring fair treatment of all candidates",
-        "option_d": "Implementing AI that can work without any human oversight",
-        "correct_answer": "C",
-        "explanation": "Bias detection and fair treatment are crucial ethical considerations when using AI in hiring to avoid discrimination."
+        "domain": "AI Fundamentals",
+        "question_text": "What does “machine learning” mean?",
+        "option_a": "Teaching humans about machines",
+        "option_b": "A type of AI that learns patterns from data",
+        "option_c": "Programming robots to move",
+        "option_d": "Computer maintenance procedures",
+        "correct_answer": "B",
+        "explanation": "Machine learning is a subset of AI focused on algorithms that learn patterns from data to make predictions or decisions."
     },
     {
         "id": "3",
-        "domain": "Rhetorical",
-        "question_text": "When communicating AI-generated content to stakeholders, what should you prioritize?",
-        "option_a": "Hiding the fact that AI was used to maintain credibility",
-        "option_b": "Emphasizing the speed at which the content was created",
-        "option_c": "Being transparent about AI use and explaining the value it provides",
-        "option_d": "Focusing only on the technical capabilities of the AI system",
-        "correct_answer": "C",
-        "explanation": "Transparency about AI use builds trust and helps stakeholders understand the value and limitations of AI-generated content."
+        "domain": "AI Fundamentals",
+        "question_text": "What causes AI “hallucinations”?",
+        "option_a": "Hardware malfunctions",
+        "option_b": "The AI generating plausible but false information",
+        "option_c": "User input errors",
+        "option_d": "Internet connectivity issues",
+        "correct_answer": "B",
+        "explanation": "Hallucinations happen when AI fills gaps with confident but incorrect information based on patterns it has learned."
     },
     {
         "id": "4",
-        "domain": "Pedagogical",
-        "question_text": "What is the most effective approach to learning AI tools in a workplace setting?",
-        "option_a": "Reading comprehensive technical documentation independently",
-        "option_b": "Watching online tutorials without hands-on practice",
-        "option_c": "Combining theoretical knowledge with practical, role-specific applications",
-        "option_d": "Focusing exclusively on the latest AI trends and technologies",
-        "correct_answer": "C",
-        "explanation": "Effective AI learning combines understanding concepts with practical application in real workplace scenarios."
+        "domain": "Practical Usage",
+        "question_text": "When writing a prompt for an AI tool, you should:",
+        "option_a": "Be vague to let AI be creative",
+        "option_b": "Be specific and clear about what you want",
+        "option_c": "Use only technical jargon",
+        "option_d": "Keep it to one word",
+        "correct_answer": "B",
+        "explanation": "Clear, specific prompts give AI models the context they need to produce accurate, useful outputs."
     },
     {
         "id": "5",
-        "domain": "Functional",
-        "question_text": "Which prompt engineering technique is most effective for getting specific, actionable outputs from AI?",
-        "option_a": "Using very short, one-word prompts",
-        "option_b": "Providing clear context, specific instructions, and desired output format",
-        "option_c": "Writing extremely long prompts with every possible detail",
-        "option_d": "Using technical jargon and complex terminology",
+        "domain": "Practical Usage",
+        "question_text": "What’s the best practice when using AI for research or work?",
+        "option_a": "Accept all AI results without checking",
+        "option_b": "Verify important information with reliable sources",
+        "option_c": "Only use AI-generated sources",
+        "option_d": "Never use AI for professional work",
         "correct_answer": "B",
-        "explanation": "Clear context, specific instructions, and format specifications help AI generate more useful and actionable outputs."
+        "explanation": "AI outputs should be validated, especially for critical work—treat them as a starting point, not the final answer."
+    },
+    {
+        "id": "6",
+        "domain": "Practical Usage",
+        "question_text": "An AI tool gives you conflicting information on the same topic. You should:",
+        "option_a": "Use the first response",
+        "option_b": "Research the topic independently to verify",
+        "option_c": "Choose the longer response",
+        "option_d": "Ask the same question again",
+        "correct_answer": "B",
+        "explanation": "When AI responses conflict, cross-checking with trustworthy human-vetted sources ensures accuracy."
+    },
+    {
+        "id": "7",
+        "domain": "Ethics & Critical Thinking",
+        "question_text": "What is “algorithmic bias”?",
+        "option_a": "AI systems running slowly",
+        "option_b": "AI systems making unfair decisions based on training data",
+        "option_c": "Programming syntax errors",
+        "option_d": "Hardware processing limitations",
+        "correct_answer": "B",
+        "explanation": "Algorithmic bias occurs when AI models inherit or amplify unfair patterns found in their training data."
+    },
+    {
+        "id": "8",
+        "domain": "Ethics & Critical Thinking",
+        "question_text": "You notice an AI hiring tool consistently rejects qualified candidates from certain groups. This indicates:",
+        "option_a": "The system is working efficiently",
+        "option_b": "Potential discriminatory bias that needs investigation",
+        "option_c": "Normal performance variation",
+        "option_d": "Cost-saving optimization",
+        "correct_answer": "B",
+        "explanation": "Consistent rejection of specific groups is a warning sign of bias that requires immediate review and mitigation."
+    },
+    {
+        "id": "9",
+        "domain": "Ethics & Critical Thinking",
+        "question_text": "Before trusting AI-generated content, you should:",
+        "option_a": "Always trust it completely",
+        "option_b": "Consider the source, context, and verify key facts",
+        "option_c": "Only check if it looks suspicious",
+        "option_d": "Never trust AI content",
+        "correct_answer": "B",
+        "explanation": "Evaluating source credibility and validating important details prevents misinformation from spreading."
+    },
+    {
+        "id": "10",
+        "domain": "AI Impact & Applications",
+        "question_text": "Which task is current AI BEST suited for?",
+        "option_a": "Providing emotional counseling",
+        "option_b": "Recognizing patterns in large amounts of data",
+        "option_c": "Making complex ethical decisions",
+        "option_d": "Replacing all human judgment",
+        "correct_answer": "B",
+        "explanation": "AI excels at analyzing large datasets to surface patterns, trends, and insights quickly."
+    },
+    {
+        "id": "11",
+        "domain": "AI Impact & Applications",
+        "question_text": "How is AI most likely to affect jobs in the next 5 years?",
+        "option_a": "Eliminate all human jobs",
+        "option_b": "Automate some tasks while creating new types of work",
+        "option_c": "Only affect technology jobs",
+        "option_d": "Have no impact on employment",
+        "correct_answer": "B",
+        "explanation": "AI will automate repetitive tasks but also create new opportunities that require human oversight and strategic thinking."
+    },
+    {
+        "id": "12",
+        "domain": "AI Impact & Applications",
+        "question_text": "What’s a realistic expectation for AI tools today?",
+        "option_a": "They can solve any business problem perfectly",
+        "option_b": "They can assist with analysis and draft generation",
+        "option_c": "They always provide 100% accurate information",
+        "option_d": "They can replace human creativity entirely",
+        "correct_answer": "B",
+        "explanation": "Modern AI is a powerful assistant for analysis and content creation, but still requires human oversight."
+    },
+    {
+        "id": "13",
+        "domain": "Strategic Understanding",
+        "question_text": "When should you choose NOT to use AI for a task?",
+        "option_a": "When it costs money",
+        "option_b": "When human empathy, ethics, or critical judgment are essential",
+        "option_c": "When the technology is new",
+        "option_d": "Never - AI should be used for everything",
+        "correct_answer": "B",
+        "explanation": "Tasks that depend on empathy, ethical nuance, or high-stakes judgment should remain human-led."
+    },
+    {
+        "id": "14",
+        "domain": "Strategic Understanding",
+        "question_text": "What does successful human-AI collaboration look like?",
+        "option_a": "Humans competing against AI",
+        "option_b": "AI and humans complementing each other’s strengths",
+        "option_c": "AI doing all the work",
+        "option_d": "Humans avoiding AI entirely",
+        "correct_answer": "B",
+        "explanation": "The strongest outcomes happen when humans and AI combine strengths—strategy and creativity with speed and scale."
+    },
+    {
+        "id": "15",
+        "domain": "Strategic Understanding",
+        "question_text": "You’re implementing AI in your organization. What’s most important?",
+        "option_a": "Choosing the most expensive AI solution",
+        "option_b": "Training employees and establishing ethical guidelines",
+        "option_c": "Replacing as many human workers as possible",
+        "option_d": "Focusing only on cost savings",
+        "correct_answer": "B",
+        "explanation": "Successful AI adoption depends on skilled people and clear ethical guardrails, not just technology investments."
     }
 ]
+
+DOMAIN_TOTALS = {
+    domain: sum(1 for question in SAMPLE_QUESTIONS if question['domain'] == domain)
+    for domain in DOMAINS
+}
 
 @assessment_bp.route('/questions', methods=['GET'])
 def get_assessment_questions():
@@ -81,13 +204,13 @@ def get_assessment_questions():
                 'option_b': q['option_b'],
                 'option_c': q['option_c'],
                 'option_d': q['option_d']
-                # Note: correct_answer and explanation are not included in the response
+                # correct_answer and explanation intentionally omitted from payload
             })
-        
+
         return jsonify({
             'questions': questions,
             'total_questions': len(questions),
-            'domains': ['Functional', 'Ethical', 'Rhetorical', 'Pedagogical']
+            'domains': DOMAINS
         }), 200
         
     except Exception as e:
@@ -108,8 +231,8 @@ def submit_assessment():
         # Calculate scores
         total_score = 0
         max_score = len(SAMPLE_QUESTIONS)
-        domain_scores = {'Functional': 0, 'Ethical': 0, 'Rhetorical': 0, 'Pedagogical': 0}
-        domain_totals = {'Functional': 0, 'Ethical': 0, 'Rhetorical': 0, 'Pedagogical': 0}
+        domain_scores = {domain: 0 for domain in DOMAINS}
+        domain_totals = {domain: 0 for domain in DOMAINS}
         
         detailed_results = []
         
@@ -138,7 +261,8 @@ def submit_assessment():
         percentage = (total_score / max_score) * 100 if max_score > 0 else 0
         
         # Generate recommendations based on performance
-        recommendations = generate_recommendations(domain_scores, domain_totals, percentage)
+        score_band = classify_score(total_score)
+        recommendations = generate_recommendations(domain_scores, domain_totals, total_score, score_band)
         
         # Save results if user is authenticated
         user_id = None
@@ -149,34 +273,44 @@ def submit_assessment():
             pass  # User not authenticated, continue without saving
         
         if user_id:
+            # Persisting the first four domain scores to fit the current schema
+            domain_values = [domain_scores.get(domain, 0) for domain in DOMAINS]
+            padded_values = domain_values + [0] * (4 - len(domain_values))
+
             result = AssessmentResult(
                 user_id=user_id,
                 total_score=total_score,
                 max_score=max_score,
                 percentage=percentage,
-                functional_score=domain_scores['Functional'],
-                ethical_score=domain_scores['Ethical'],
-                rhetorical_score=domain_scores['Rhetorical'],
-                pedagogical_score=domain_scores['Pedagogical'],
+                functional_score=padded_values[0],
+                ethical_score=padded_values[1],
+                rhetorical_score=padded_values[2],
+                pedagogical_score=padded_values[3],
                 time_taken_minutes=time_taken,
-                recommendations=json.dumps(recommendations)
+                recommendations=json.dumps({
+                    'insights': recommendations,
+                    'strategic_score': domain_scores.get('Strategic Understanding', 0)
+                })
             )
             db.session.add(result)
             db.session.commit()
-        
+
+        domain_scores_response = {}
+        for domain in DOMAINS:
+            domain_scores_response[domain] = {
+                'score': domain_scores[domain],
+                'total': domain_totals[domain]
+            }
+
         return jsonify({
             'total_score': total_score,
             'max_score': max_score,
             'percentage': round(percentage, 1),
-            'domain_scores': {
-                'functional': {'score': domain_scores['Functional'], 'total': domain_totals['Functional']},
-                'ethical': {'score': domain_scores['Ethical'], 'total': domain_totals['Ethical']},
-                'rhetorical': {'score': domain_scores['Rhetorical'], 'total': domain_totals['Rhetorical']},
-                'pedagogical': {'score': domain_scores['Pedagogical'], 'total': domain_totals['Pedagogical']}
-            },
+            'domain_scores': domain_scores_response,
             'recommendations': recommendations,
             'detailed_results': detailed_results,
             'time_taken_minutes': time_taken,
+            'score_band': score_band,
             'saved': user_id is not None
         }), 200
         
@@ -185,51 +319,76 @@ def submit_assessment():
             db.session.rollback()
         return jsonify({'error': 'Failed to submit assessment', 'details': str(e)}), 500
 
-def generate_recommendations(domain_scores, domain_totals, overall_percentage):
+def classify_score(total_correct):
+    if total_correct <= 6:
+        return 'Beginner'
+    if total_correct <= 11:
+        return 'Intermediate'
+    return 'Advanced'
+
+
+def generate_recommendations(domain_scores, domain_totals, total_correct, score_band):
     """Generate personalized recommendations based on assessment results"""
     recommendations = []
-    
-    # Overall performance recommendations
-    if overall_percentage >= 80:
-        recommendations.append({
-            'type': 'overall',
-            'title': 'Excellent AI Literacy Foundation',
-            'description': 'You demonstrate strong AI literacy across all domains. Consider advanced training modules and certification.',
-            'priority': 'high',
-            'action': 'Explore our Professional certification track'
-        })
-    elif overall_percentage >= 60:
-        recommendations.append({
-            'type': 'overall',
-            'title': 'Good AI Understanding',
-            'description': 'You have a solid foundation. Focus on strengthening weaker areas for comprehensive AI literacy.',
-            'priority': 'medium',
-            'action': 'Take targeted training modules in lower-scoring domains'
-        })
+    course_map = {
+        'Beginner': [
+            'Google AI Essentials (Free)',
+            'Coursera "AI for Everyone" by Andrew Ng',
+            'LinkedIn Learning "AI Foundations"'
+        ],
+        'Intermediate': [
+            'IBM Applied AI Professional Certificate',
+            'Microsoft AI Business School courses',
+            '“Ethics in AI” specialization'
+        ],
+        'Advanced': [
+            'Wharton AI Strategy for Business',
+            'MIT AI Leadership programs',
+            'Advanced prompt engineering courses'
+        ]
+    }
+
+    if score_band == 'Beginner':
+        priority = 'high'
+        description = 'You’re building your AI literacy. Start with foundational concepts before moving to advanced use cases.'
+    elif score_band == 'Intermediate':
+        priority = 'medium'
+        description = 'Solid baseline understanding. Focus on applied practice and ethical considerations to level up.'
     else:
-        recommendations.append({
-            'type': 'overall',
-            'title': 'Building AI Literacy',
-            'description': 'Great start! Focus on foundational concepts and practical applications to build your AI skills.',
-            'priority': 'high',
-            'action': 'Start with our beginner-friendly training modules'
-        })
-    
-    # Domain-specific recommendations
-    for domain, score in domain_scores.items():
-        total = domain_totals[domain]
-        percentage = (score / total) * 100 if total > 0 else 0
-        
-        if percentage < 50:
+        priority = 'medium'
+        description = 'You demonstrate strong AI literacy. Continue refining strategic application and leadership skills.'
+
+    course_list = '; '.join(course_map[score_band])
+    recommendations.append({
+        'type': 'overall',
+        'title': f'{score_band} AI Literacy',
+        'description': description,
+        'priority': priority,
+        'action': f'Recommended next steps: {course_list}'
+    })
+
+    domain_actions = {
+        'AI Fundamentals': 'Review core AI terminology, model types, and common pitfalls.',
+        'Practical Usage': 'Practice structured prompting and workflows that combine AI with human review.',
+        'Ethics & Critical Thinking': 'Deepen your understanding of bias, governance, and responsible use policies.',
+        'AI Impact & Applications': 'Explore industry case studies to connect AI capabilities with high-value outcomes.',
+        'Strategic Understanding': 'Align AI initiatives with business strategy, training, and ethical guardrails.'
+    }
+
+    for domain, total in domain_totals.items():
+        if total == 0:
+            continue
+        score = domain_scores[domain]
+        if score <= 1:
             recommendations.append({
                 'type': 'domain',
-                'domain': domain.lower(),
-                'title': f'Strengthen {domain} AI Skills',
-                'description': f'Focus on {domain.lower()} aspects of AI to improve your overall literacy.',
-                'priority': 'high',
-                'action': f'Take {domain.lower()}-focused training modules'
+                'domain': domain,
+                'title': f'Deepen {domain} skills',
+                'description': domain_actions.get(domain, ''),
+                'priority': 'medium',
+                'action': 'Focus your next learning sprint on this competency area.'
             })
-    
+
     return recommendations
 
 @assessment_bp.route('/history', methods=['GET'])
@@ -245,22 +404,46 @@ def get_assessment_history():
         
         history = []
         for result in results:
+            strategic_score = None
+            recommendation_payload = []
+            if result.recommendations:
+                try:
+                    parsed = json.loads(result.recommendations)
+                    if isinstance(parsed, dict):
+                        recommendation_payload = parsed.get('insights', [])
+                        strategic_score = parsed.get('strategic_score')
+                    else:
+                        recommendation_payload = parsed
+                except Exception:
+                    recommendation_payload = []
+
+            score_lookup = {
+                'AI Fundamentals': result.functional_score or 0,
+                'Practical Usage': result.ethical_score or 0,
+                'Ethics & Critical Thinking': result.rhetorical_score or 0,
+                'AI Impact & Applications': result.pedagogical_score or 0,
+                'Strategic Understanding': strategic_score or 0
+            }
+
+            domain_scores_payload = {}
+            for domain in DOMAINS:
+                domain_scores_payload[domain] = {
+                    'score': score_lookup.get(domain, 0),
+                    'total': DOMAIN_TOTALS.get(domain, 0)
+                }
+
             history.append({
                 'id': result.id,
                 'total_score': result.total_score,
                 'max_score': result.max_score,
                 'percentage': result.percentage,
-                'domain_scores': {
-                    'functional': result.functional_score,
-                    'ethical': result.ethical_score,
-                    'rhetorical': result.rhetorical_score,
-                    'pedagogical': result.pedagogical_score
-                },
+                'score_band': classify_score(result.total_score),
+                'domain_scores': domain_scores_payload,
                 'time_taken_minutes': result.time_taken_minutes,
                 'completed_at': result.completed_at.isoformat(),
-                'recommendations': json.loads(result.recommendations) if result.recommendations else []
+                'recommendations': recommendation_payload
             })
-        
+
         return jsonify({'history': history}), 200
         
     except Exception as e:

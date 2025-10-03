@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
 from models import db, User
 import bcrypt
 import re
@@ -198,3 +198,70 @@ def update_profile():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to update profile', 'details': str(e)}), 500
+
+
+@auth_bp.route('/sync', methods=['POST'])
+@jwt_required()
+def sync_user():
+    """Ensure a corresponding user record exists in the local database for Supabase-authenticated users."""
+    try:
+        supabase_user_id = get_jwt_identity()
+        claims = get_jwt()
+        payload = request.get_json() or {}
+
+        email = (payload.get('email') or claims.get('email') or '').strip().lower()
+        first_name = (payload.get('first_name')
+                      or claims.get('user_metadata', {}).get('first_name')
+                      or '').strip()
+        last_name = (payload.get('last_name')
+                     or claims.get('user_metadata', {}).get('last_name')
+                     or '').strip()
+        role = payload.get('role') or claims.get('user_metadata', {}).get('role')
+        organization = payload.get('organization') or claims.get('user_metadata', {}).get('organization')
+
+        if not email:
+            return jsonify({'error': 'Email is required to sync user'}), 400
+
+        if not first_name:
+            first_name = 'AI'
+        if not last_name:
+            last_name = 'Learner'
+
+        user = User.query.get(supabase_user_id)
+
+        if not user:
+            user = User(
+                id=supabase_user_id,
+                email=email,
+                password_hash='supabase_managed',
+                first_name=first_name,
+                last_name=last_name,
+                role=role or None,
+                organization=organization or None
+            )
+            db.session.add(user)
+        else:
+            user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.role = role or None
+            user.organization = organization or None
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'User synchronized successfully',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'organization': user.organization,
+                'subscription_tier': user.subscription_tier
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to sync user', 'details': str(e)}), 500

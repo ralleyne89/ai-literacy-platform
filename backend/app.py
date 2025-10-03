@@ -16,7 +16,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///ai_literacy.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
+supabase_jwt_secret = os.getenv('SUPABASE_JWT_SECRET')
+app.config['JWT_SECRET_KEY'] = supabase_jwt_secret or os.getenv('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Initialize extensions
@@ -70,4 +71,7 @@ def platform_stats():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, port=5001)
+    port = int(os.getenv('PORT', 5001))
+    debug_mode = os.getenv('FLASK_DEBUG', 'True').lower() in ('1', 'true', 'yes')
+    host = os.getenv('HOST', '0.0.0.0')
+    app.run(debug=debug_mode, port=port, host=host)

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle, AlertCircle, Brain, ArrowRight, ArrowLeft, User } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { CheckCircle, AlertCircle, Brain, ArrowRight, User } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+
+const STORAGE_KEY = 'assessmentProgress_v2'
+const ASSESSMENT_VERSION = '2024-05-15'
 
 const AssessmentPage = () => {
   const [questions, setQuestions] = useState([])
@@ -11,54 +14,156 @@ const AssessmentPage = () => {
   const [timeStarted, setTimeStarted] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [results, setResults] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [showIntroModal, setShowIntroModal] = useState(true)
+  const [resumeDetected, setResumeDetected] = useState(false)
 
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+
+  const clearProgress = () => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem('assessmentProgress')
+    } catch (err) {
+      console.warn('Unable to clear assessment progress from storage:', err)
+    }
+  }
+
+  const persistProgress = ({
+    questions: persistedQuestions = questions,
+    answers: persistedAnswers = answers,
+    currentIndex = currentQuestion,
+    startedAt = timeStarted
+  }) => {
+    const payload = {
+      questions: persistedQuestions,
+      answers: persistedAnswers,
+      currentQuestion: currentIndex,
+      timeStarted: startedAt ? new Date(startedAt).toISOString() : null,
+      version: ASSESSMENT_VERSION
+    }
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    } catch (err) {
+      console.warn('Unable to persist assessment progress:', err)
+    }
+  }
 
   useEffect(() => {
-    fetchQuestions()
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (!saved) {
+        return
+      }
+      const parsed = JSON.parse(saved)
+      const isValidVersion = parsed?.version === ASSESSMENT_VERSION
+      const hasQuestions = Array.isArray(parsed?.questions) && parsed.questions.length === 15
+
+      if (isValidVersion && hasQuestions) {
+        setQuestions(parsed.questions)
+        setAnswers(parsed.answers || {})
+        setCurrentQuestion(parsed.currentQuestion || 0)
+        setTimeStarted(parsed.timeStarted ? new Date(parsed.timeStarted) : new Date())
+        setHasStarted(true)
+        setShowIntroModal(false)
+        setResumeDetected(true)
+      } else {
+        clearProgress()
+      }
+    } catch (err) {
+      console.warn('Failed to restore assessment progress:', err)
+      clearProgress()
+    }
   }, [])
 
-  const fetchQuestions = async () => {
+  const startAssessment = async () => {
+    clearProgress()
+    setLoading(true)
+    setResults(null)
+    setAnswers({})
+    setCurrentQuestion(0)
+    const assessmentStart = new Date()
     try {
       const response = await axios.get('/api/assessment/questions')
-      setQuestions(response.data.questions)
-      setTimeStarted(new Date())
-      setLoading(false)
+      const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
+      if (loadedQuestions.length !== 15) {
+        console.warn('Expected 15 assessment questions, received', loadedQuestions.length)
+        alert('We’re updating the assessment. Please refresh in a moment to access the full 15-question experience.')
+        return
+      }
+      setQuestions(loadedQuestions)
+      setTimeStarted(assessmentStart)
+      setHasStarted(true)
+      setShowIntroModal(false)
+      setResumeDetected(false)
+
+      persistProgress({
+        questions: loadedQuestions,
+        answers: {},
+        currentIndex: 0,
+        startedAt: assessmentStart
+      })
     } catch (error) {
       console.error('Failed to fetch questions:', error)
+      alert('Failed to load assessment questions. Please try again later.')
+    } finally {
       setLoading(false)
     }
   }
 
+  const handleNotNow = () => {
+    setShowIntroModal(false)
+    navigate('/')
+  }
+
+
+
   const handleAnswerSelect = (questionId, answer) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
-    }))
+    setAnswers(prev => {
+      const updated = {
+        ...prev,
+        [questionId]: answer
+      }
+      persistProgress({ answers: updated })
+      return updated
+    })
   }
 
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1)
+      setCurrentQuestion(prev => {
+        const nextIndex = prev + 1
+        persistProgress({ currentIndex: nextIndex })
+        return nextIndex
+      })
     }
   }
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
-      const timeElapsed = Math.round((new Date() - timeStarted) / 60000) // minutes
+      const timeElapsed = timeStarted
+        ? Math.round((new Date() - timeStarted) / 60000)
+        : 0
       const response = await axios.post('/api/assessment/submit', {
         answers,
         time_taken_minutes: timeElapsed
       })
       setResults(response.data)
+      clearProgress()
     } catch (error) {
       console.error('Failed to submit assessment:', error)
       alert('Failed to submit assessment. Please try again.')
@@ -66,26 +171,61 @@ const AssessmentPage = () => {
     setIsSubmitting(false)
   }
 
+
+
   const getProgressPercentage = () => {
+    if (!questions.length) {
+      return 0
+    }
     return ((currentQuestion + 1) / questions.length) * 100
   }
 
+  const getEstimatedMinutesRemaining = () => {
+    if (!questions.length) {
+      return 0
+    }
+    const estimatedTotalMinutes = 5
+    const perQuestion = estimatedTotalMinutes / questions.length
+    const remainingQuestions = questions.length - (currentQuestion + 1)
+    return Math.max(0, remainingQuestions * perQuestion)
+  }
+
+  const getTimeEstimateLabel = () => {
+    if (!hasStarted) {
+      return ''
+    }
+    const remaining = getEstimatedMinutesRemaining()
+    if (remaining <= 0.75) {
+      return 'Less than 1 minute remaining'
+    }
+    const rounded = Math.round(remaining)
+    return `About ${rounded} minute${rounded === 1 ? '' : 's'} remaining`
+  }
+
+  const progressValue = getProgressPercentage()
+  const progressDisplay = Math.round(progressValue)
+  const timeEstimateLabel = getTimeEstimateLabel()
+
   const getDomainColor = (domain) => {
     const colors = {
-      'Functional': 'text-primary-600',
-      'Ethical': 'text-secondary-600',
-      'Rhetorical': 'text-accent-orange',
-      'Pedagogical': 'text-green-600'
+      'AI Fundamentals': 'text-primary-600',
+      'Practical Usage': 'text-secondary-600',
+      'Ethics & Critical Thinking': 'text-accent-orange',
+      'AI Impact & Applications': 'text-green-600',
+      'Strategic Understanding': 'text-purple-600'
     }
     return colors[domain] || 'text-gray-600'
   }
 
-  if (loading) {
+  if (loading && hasStarted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Brain className="w-12 h-12 text-primary-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-gray-600">Loading assessment...</p>
+          <p className="text-gray-600 mb-2">Loading assessment...</p>
+          <div className="w-64 bg-gray-200 rounded-full h-2 mx-auto">
+            <div className="bg-primary-600 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+          </div>
         </div>
       </div>
     )
@@ -100,6 +240,11 @@ const AssessmentPage = () => {
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Assessment Complete!</h1>
               <p className="text-gray-600">Here are your AI literacy results</p>
+              {results.saved && (
+                <p className="mt-2 text-sm text-primary-600 font-medium">
+                  Results saved to your dashboard. Review them anytime.
+                </p>
+              )}
             </div>
 
             {/* Overall Score */}
@@ -107,29 +252,38 @@ const AssessmentPage = () => {
               <h2 className="text-2xl font-bold mb-2">Overall Score</h2>
               <div className="text-4xl font-bold mb-2">{results.percentage}%</div>
               <p className="opacity-90">{results.total_score} out of {results.max_score} questions correct</p>
+              {results.score_band && (
+                <p className="mt-2 text-sm uppercase tracking-wide text-white/80">
+                  AI Literacy Level: {results.score_band}
+                </p>
+              )}
             </div>
 
             {/* Domain Breakdown */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              {Object.entries(results.domain_scores).map(([domain, scores]) => (
+              {Object.entries(results.domain_scores).map(([domain, scores]) => {
+                const domainPercentage = scores.total ? Math.round((scores.score / scores.total) * 100) : 0
+                const widthValue = scores.total ? (scores.score / scores.total) * 100 : 0
+                return (
                 <div key={domain} className="card">
-                  <h3 className={`font-semibold mb-2 capitalize ${getDomainColor(domain)}`}>
-                    {domain} AI Literacy
+                  <h3 className={`font-semibold mb-2 ${getDomainColor(domain)}`}>
+                    {domain}
                   </h3>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">{scores.score} / {scores.total}</span>
                     <span className="font-semibold">
-                      {Math.round((scores.score / scores.total) * 100)}%
+                      {domainPercentage}%
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                     <div 
                       className="bg-primary-600 h-2 rounded-full"
-                      style={{ width: `${(scores.score / scores.total) * 100}%` }}
+                      style={{ width: `${widthValue}%` }}
                     ></div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Recommendations */}
@@ -187,11 +341,99 @@ const AssessmentPage = () => {
     )
   }
 
-  const question = questions[currentQuestion]
+  if (hasStarted && !loading && !questions.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-8 text-center space-y-3">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+          <h2 className="text-xl font-semibold text-gray-900">Assessment Unavailable</h2>
+          <p className="text-gray-600">
+            We could not load any assessment questions right now. Please try again later.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const question = hasStarted ? questions[currentQuestion] : null
+
+  if (!hasStarted && !results) {
+    return (
+      <div className="relative min-h-screen bg-gray-50 py-12 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto text-center px-4">
+          <Brain className="w-16 h-16 text-primary-600 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Literacy Assessment</h1>
+          <p className="text-gray-600">
+            When you’re ready, start the assessment to discover your AI proficiency across critical dimensions.
+            {resumeDetected && ' We saved your progress from a previous session—pick up where you left off.'}
+          </p>
+        </div>
+
+        {showIntroModal && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-gray-900/60 px-4">
+            <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
+                  <Brain className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Before You Begin</h2>
+                  <p className="text-sm text-gray-600">Understand what this assessment measures.</p>
+                </div>
+              </div>
+
+              <p className="text-gray-700 mb-6">
+                This 15-question assessment evaluates your current AI proficiency across three key dimensions:
+              </p>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">AI Thinking &amp; Cognitive Aptitude</h3>
+                  <p className="text-sm text-gray-600">Your ability to think logically and approach systems in a way that will help you be successful with AI.</p>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">AI Knowledge &amp; Understanding</h3>
+                  <p className="text-sm text-gray-600">Your grasp of key AI concepts, terminology, capabilities, and limitations.</p>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Prompt Engineering &amp; Communication</h3>
+                  <p className="text-sm text-gray-600">Your ability to effectively communicate with AI systems through prompts.</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">
+                The test takes approximately 3-5 minutes to complete. Your results will provide a personalized AI proficiency score and tailored recommendations.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleNotNow}
+                  className="btn-outline"
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  onClick={startAssessment}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
+                >
+                  Start the test
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Literacy Assessment</h1>
@@ -200,18 +442,23 @@ const AssessmentPage = () => {
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
             <span className="text-sm text-gray-600">
               Question {currentQuestion + 1} of {questions.length}
             </span>
-            <span className="text-sm text-gray-600">
-              {Math.round(getProgressPercentage())}% Complete
+            {timeEstimateLabel && (
+              <span className="text-sm text-gray-600 sm:text-center">
+                {timeEstimateLabel}
+              </span>
+            )}
+            <span className="text-sm text-gray-600 sm:text-right">
+              {progressDisplay}% Complete
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
-              style={{ width: `${getProgressPercentage()}%` }}
+              style={{ width: `${progressValue}%` }}
             ></div>
           </div>
         </div>
@@ -266,20 +513,7 @@ const AssessmentPage = () => {
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between items-center">
-          <button
-            onClick={handlePrevious}
-            disabled={currentQuestion === 0}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-              currentQuestion === 0
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-700 hover:text-primary-600'
-            }`}
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Previous</span>
-          </button>
-
+        <div className="flex justify-end items-center">
           {currentQuestion === questions.length - 1 ? (
             <button
               onClick={handleSubmit}

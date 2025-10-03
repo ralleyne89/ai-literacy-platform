@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { User, Save, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -22,6 +22,17 @@ const ProfilePage = () => {
     { value: 'Operations', label: 'Operations' },
     { value: 'Other', label: 'Other' }
   ]
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        role: user.role || '',
+        organization: user.organization || ''
+      })
+    }
+  }, [user])
 
   const handleChange = (e) => {
     setFormData(prev => ({

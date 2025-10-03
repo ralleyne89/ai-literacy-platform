@@ -1,50 +1,49 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
         primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
+          50: "#F4F2FF",
+          100: "#EAE6FF",
+          200: "#D6D0FF",
+          300: "#B9B0FF",
+          400: "#9C8FFF",
+          500: "#6B4EFF",
+          600: "#5A3CE6",
+          700: "#4A2ECC",
+          800: "#3B25A3",
+          900: "#2C1B7A",
         },
         secondary: {
-          50: '#faf5ff',
-          100: '#f3e8ff',
-          200: '#e9d5ff',
-          300: '#d8b4fe',
-          400: '#c084fc',
-          500: '#a855f7',
-          600: '#9333ea',
-          700: '#7c3aed',
-          800: '#6b21a8',
-          900: '#581c87',
+          50: "#E6FBFF",
+          100: "#C8F7FF",
+          200: "#9FEFFF",
+          300: "#70E3FF",
+          400: "#3BD5FF",
+          500: "#00D2FF",
+          600: "#00B4E6",
+          700: "#0096CC",
+          800: "#0078B3",
+          900: "#005C99",
         },
         accent: {
-          orange: '#f97316',
-          green: '#10b981',
-        }
+          orange: "#f97316",
+          green: "#10b981",
+        },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ["Roboto", "system-ui", "sans-serif"],
+        heading: ["Poppins", "system-ui", "sans-serif"],
       },
       backgroundImage: {
-        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-        'gradient-secondary': 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-        'gradient-hero': 'linear-gradient(135deg, #14b8a6 0%, #a855f7 100%)',
-      }
+        "gradient-primary": "linear-gradient(135deg, #6B4EFF 0%, #00D2FF 100%)",
+        "gradient-secondary":
+          "linear-gradient(135deg, #5A3CE6 0%, #4A2ECC 100%)",
+        "gradient-hero": "linear-gradient(135deg, #6B4EFF 0%, #00D2FF 100%)",
+      },
     },
   },
   plugins: [],
-}
+};

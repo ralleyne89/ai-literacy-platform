@@ -6,7 +6,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 
 ### Core Functionality
 
-- **AI Readiness Assessment**: 15-question assessment across Functional, Ethical, Rhetorical, and Pedagogical AI literacy domains
+- **AI Readiness Assessment**: 15-question assessment across AI Fundamentals, Practical Usage, Ethics & Critical Thinking, AI Impact & Applications, and Strategic Understanding
 - **Role-Specific Training**: Customized modules for Sales, HR, Marketing, and Operations teams
 - **Industry Certifications**: Verifiable credentials that validate practical AI skills
 - **Progress Tracking**: Comprehensive dashboard with learning analytics
@@ -47,11 +47,17 @@ cd ai-literacy-platform
 # Install frontend dependencies
 npm install
 
-# Start the development server
+# Start the frontend dev server
 npm run dev
+
+# In a separate terminal, start the backend (uses the virtualenv at `backend/venv` by default)
+# By default this runs on port 5001; override with `PORT=... npm run backend` if needed.
+npm run backend
 ```
 
 The frontend will be available at `http://localhost:5173`
+
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` (or your deployed API URL) so the frontend can reach the backend when built outside of Vite's dev server.
 
 ### 3. Backend Setup
 
@@ -187,7 +193,13 @@ JWT_SECRET_KEY=your-jwt-secret-key-here
 DATABASE_URL=sqlite:///ai_literacy.db
 FLASK_ENV=development
 FLASK_DEBUG=True
+VITE_API_URL=http://localhost:5001
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
 ```
+
+Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
 
 ### Database Setup
 

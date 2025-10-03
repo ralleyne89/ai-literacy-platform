@@ -1,29 +1,62 @@
 import React, { useState, useEffect } from 'react'
-import { Play, Clock, Star, Users, CheckCircle, Lock } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
 
 const TrainingPage = () => {
   const [modules, setModules] = useState([])
   const [selectedRole, setSelectedRole] = useState('All')
   const [loading, setLoading] = useState(true)
+  const [progressMap, setProgressMap] = useState({})
+  const [error, setError] = useState('')
+
+  const { isAuthenticated } = useAuth()
 
   const roles = ['All', 'Sales', 'HR', 'Marketing', 'Operations', 'General']
 
   useEffect(() => {
     fetchModules()
-  }, [selectedRole])
+  }, [selectedRole, isAuthenticated])
 
   const fetchModules = async () => {
+    setLoading(true)
+    setError('')
+
     try {
       const params = selectedRole !== 'All' ? { role: selectedRole } : {}
-      const response = await axios.get('/api/training/modules', { params })
-      setModules(response.data.modules)
-      setLoading(false)
-    } catch (error) {
-      console.error('Failed to fetch modules:', error)
+      const modulesRequest = axios.get('/api/training/modules', { params })
+
+      let progressRequest = null
+      if (isAuthenticated) {
+        progressRequest = axios.get('/api/training/progress')
+      }
+
+      const [modulesResponse, progressResponse] = await Promise.all([
+        modulesRequest,
+        progressRequest?.catch(() => null)
+      ])
+
+      setModules(modulesResponse.data.modules || [])
+
+      if (progressResponse?.data?.progress) {
+        const nextProgressMap = {}
+        progressResponse.data.progress.forEach(record => {
+          nextProgressMap[record.module_id] = record
+        })
+        setProgressMap(nextProgressMap)
+      } else {
+        setProgressMap({})
+      }
+    } catch (fetchError) {
+      console.error('Failed to fetch modules:', fetchError)
+      setError('Failed to load training modules. Please try again later.')
+    } finally {
       setLoading(false)
     }
   }
+
+
 
   const getDifficultyColor = (level) => {
     const colors = {
@@ -34,6 +67,29 @@ const TrainingPage = () => {
       5: 'text-purple-600 bg-purple-100'
     }
     return colors[level] || 'text-gray-600 bg-gray-100'
+  }
+
+  const getProgressBadge = (moduleId) => {
+    const progress = progressMap[moduleId]
+    if (!progress) {
+      return null
+    }
+
+    if (progress.status === 'completed') {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+          <CheckCircle className="h-3.5 w-3.5" />
+          Completed
+        </span>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700">
+        <Activity className="h-3.5 w-3.5" />
+        {progress.progress_percentage || 0}% complete
+      </span>
+    )
   }
 
   const getDifficultyText = (level) => {
@@ -64,11 +120,23 @@ const TrainingPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
+          <div className="text-center mb-12">
             <div className="animate-pulse">
               <div className="h-8 bg-gray-300 rounded w-1/3 mx-auto mb-4"></div>
-              <div className="h-4 bg-gray-300 rounded w-1/2 mx-auto"></div>
+              <div className="h-4 bg-gray-300 rounded w-1/2 mx-auto mb-8"></div>
             </div>
+          </div>
+
+          {/* Loading skeleton for modules */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="card animate-pulse">
+                <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
+                <div className="h-3 bg-gray-300 rounded w-full mb-2"></div>
+                <div className="h-3 bg-gray-300 rounded w-2/3 mb-4"></div>
+                <div className="h-8 bg-gray-300 rounded w-full"></div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -78,14 +146,25 @@ const TrainingPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">AI Training Hub</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Hands-on training modules designed for your role. Build practical AI skills 
+            Hands-on training modules designed for your role. Build practical AI skills
             through interactive exercises and real-world applications.
           </p>
         </div>
+
+        {error && (
+          <div className="max-w-3xl mx-auto mb-8">
+            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
 
         {/* Role Filter */}
         <div className="mb-8">
@@ -109,7 +188,7 @@ const TrainingPage = () => {
         {/* Training Modules Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {modules.map(module => (
-            <div key={module.id} className="card hover:shadow-lg transition-shadow duration-200">
+            <div key={module.id} className="card hover:shadow-lg transition-shadow duration-200 flex flex-col">
               {/* Module Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-2">
@@ -125,6 +204,12 @@ const TrainingPage = () => {
                   </div>
                 )}
               </div>
+
+              {getProgressBadge(module.id) && (
+                <div className="mb-3">
+                  {getProgressBadge(module.id)}
+                </div>
+              )}
 
               {/* Module Title and Description */}
               <h3 className="text-xl font-semibold text-gray-900 mb-2">{module.title}</h3>
@@ -156,7 +241,7 @@ const TrainingPage = () => {
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">You'll Learn:</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  {module.learning_objectives.slice(0, 3).map((objective, index) => (
+                  {(Array.isArray(module.learning_objectives) ? module.learning_objectives : []).slice(0, 3).map((objective, index) => (
                     <li key={index} className="flex items-start space-x-2">
                       <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                       <span>{objective}</span>
@@ -166,15 +251,16 @@ const TrainingPage = () => {
               </div>
 
               {/* Action Button */}
-              <button 
-                className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
-                  module.is_premium 
+              <Link
+                to={`/training/modules/${module.id}`}
+                className={`mt-auto w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-all duration-200 ${
+                  module.is_premium
                     ? 'bg-gradient-secondary text-white hover:shadow-lg transform hover:-translate-y-0.5'
                     : 'btn-primary'
                 }`}
               >
-                {module.is_premium ? 'Upgrade to Access' : 'Start Module'}
-              </button>
+                {module.is_premium ? 'Preview Module' : progressMap[module.id]?.status === 'completed' ? 'Review Module' : progressMap[module.id] ? 'Continue Learning' : 'Start Module'}
+              </Link>
             </div>
           ))}
         </div>

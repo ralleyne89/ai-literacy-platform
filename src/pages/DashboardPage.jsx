@@ -31,6 +31,12 @@ const DashboardPage = () => {
   }, [])
 
   const latestAssessment = assessmentHistory[0]
+  const domainBreakdown = latestAssessment
+    ? Object.entries(latestAssessment.domain_scores || {}).filter(([, data]) => data && typeof data.score !== 'undefined')
+    : []
+  const recommendations = Array.isArray(latestAssessment?.recommendations)
+    ? latestAssessment.recommendations
+    : []
   const completedModules = trainingProgress.filter(p => p.status === 'completed').length
   const totalLearningTime = trainingProgress.reduce((total, p) => total + (p.time_spent_minutes || 0), 0)
 
@@ -105,14 +111,51 @@ const DashboardPage = () => {
                   <span className="text-2xl font-bold text-primary-600">{latestAssessment.percentage}%</span>
                 </div>
 
-                <div className="space-y-2 mb-4">
-                  {Object.entries(latestAssessment.domain_scores).map(([domain, score]) => (
-                    <div key={domain} className="flex items-center justify-between text-sm">
-                      <span className="capitalize text-gray-600">{domain}</span>
-                      <span className="font-medium">{score}/1</span>
+                {latestAssessment.score_band && (
+                  <div className="mb-4 rounded-lg bg-primary-50 border border-primary-100 px-4 py-3">
+                    <span className="text-sm font-semibold text-primary-700">AI Literacy Level:</span>
+                    <span className="ml-2 text-sm text-primary-700 uppercase tracking-wide">{latestAssessment.score_band}</span>
+                  </div>
+                )}
+
+                {domainBreakdown.length > 0 && (
+                  <div className="space-y-3 mb-6">
+                    {domainBreakdown.map(([domain, info]) => {
+                      const percent = info.total ? Math.round((info.score / info.total) * 100) : 0
+                      const width = info.total ? (info.score / info.total) * 100 : 0
+                      return (
+                        <div key={domain}>
+                          <div className="flex items-center justify-between text-sm text-gray-700">
+                            <span>{domain}</span>
+                            <span className="font-semibold">{info.score}/{info.total} ({percent}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                            <div className="bg-primary-600 h-2 rounded-full" style={{ width: `${width}%` }}></div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {recommendations.length > 0 && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Recommended next steps</h3>
+                    <div className="space-y-3">
+                      {recommendations.slice(0, 3).map((rec, index) => (
+                        <div key={index} className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3">
+                          <div className="text-sm font-semibold text-primary-700">{rec.title}</div>
+                          {rec.description && (
+                            <p className="text-sm text-primary-700/80 mt-1">{rec.description}</p>
+                          )}
+                          {rec.action && (
+                            <p className="text-xs text-primary-600 font-medium mt-2">{rec.action}</p>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
 
                 <div className="text-xs text-gray-500">
                   Completed {new Date(latestAssessment.completed_at).toLocaleDateString()}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Brain, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Brain, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const RegisterPage = () => {
@@ -17,6 +17,7 @@ const RegisterPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   const { register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -47,6 +48,7 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setMessage('')
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
@@ -67,7 +69,11 @@ const RegisterPage = () => {
     const result = await register(registrationData)
 
     if (result.success) {
-      navigate('/dashboard', { replace: true })
+      if (result.requiresEmailConfirmation) {
+        setMessage('Check your email to confirm your account. You can sign in once verification is complete.')
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     } else {
       setError(result.error)
     }
@@ -96,6 +102,13 @@ const RegisterPage = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
               <span className="text-red-700">{error}</span>
+            </div>
+          )}
+
+          {message && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <span className="text-green-700">{message}</span>
             </div>
           )}
 
