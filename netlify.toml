@@ -15,6 +15,21 @@
   to = "/.netlify/functions/checkout-session"
   status = 200
 
+[[redirects]]
+  from = "/api/billing/customer-portal"
+  to = "/.netlify/functions/customer-portal"
+  status = 200
+
+[[redirects]]
+  from = "/api/billing/subscription-status"
+  to = "/.netlify/functions/subscription-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/webhooks/stripe"
+  to = "/.netlify/functions/stripe-webhook"
+  status = 200
+
 # SPA fallback - must be last
 [[redirects]]
   from = "/*"

@@ -18,6 +18,20 @@ import {
 } from 'lucide-react'
 import { HeroGeometric } from '@/components/ui/shape-landing-hero'
 import ClientFeedback from '@/components/ui/testimonial'
+import { motion } from 'framer-motion'
+
+const AnimatedSection = ({ children, className = '', delay = 0, ...props }) => (
+  <motion.section
+    className={className}
+    initial={{ opacity: 0, y: 48 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.2 }}
+    transition={{ duration: 0.6, ease: 'easeOut', delay }}
+    {...props}
+  >
+    {children}
+  </motion.section>
+)
 
 const HomePage = () => {
   const features = [
@@ -65,7 +79,7 @@ const HomePage = () => {
         />
       </section>
 
-      <section className="py-14 bg-white">
+      <AnimatedSection className="py-14 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600">
             <span className="inline-block h-2 w-2 rounded-full bg-primary-500"></span>
@@ -79,10 +93,10 @@ const HomePage = () => {
             Pair the hero experience above with the rest of our Assess → Activate → Certify journey to benchmark skills, deploy live training, and verify outcomes with trusted credentials.
           </p>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Steps band */}
-      <section className="bg-gray-900 py-14 text-white">
+      <AnimatedSection className="bg-gray-900 py-14 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <h2 className="text-2xl md:text-3xl font-bold text-white">Start with assessment, activate with training, certify proficiency</h2>
@@ -121,10 +135,10 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <AnimatedSection className="py-20 bg-white" delay={0.05}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -148,10 +162,10 @@ const HomePage = () => {
             ))}
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Assessment split section */}
-      <section className="py-20 bg-gray-50">
+      <AnimatedSection className="py-20 bg-gray-50" delay={0.1}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-10 items-start">
             {/* Left copy */}
@@ -246,10 +260,10 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* What sets us apart (dark) */}
-      <section className="py-20 bg-gray-900 text-white">
+      <AnimatedSection className="py-20 bg-gray-900 text-white" delay={0.1}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-10 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-white">What sets us apart</h2>
@@ -282,14 +296,14 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
 
 
 
 
       {/* What you get section */}
-      <section className="py-20 bg-white">
+      <AnimatedSection className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Assessment */}
@@ -350,10 +364,10 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Certification Dimensions */}
-      <section className="py-20 bg-gray-50">
+      <AnimatedSection className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-start">
             <div>
@@ -405,10 +419,10 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* FAQs Preview */}
-      <section className="py-20 bg-white">
+      <AnimatedSection className="py-20 bg-white" delay={0.1}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently asked questions</h2>
@@ -453,7 +467,7 @@ const HomePage = () => {
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Testimonials Section */}
       <section className="bg-white">

@@ -30,58 +30,6 @@ const EnterprisePage = () => {
     }
   ]
 
-  const plans = [
-    {
-      name: 'Professional',
-      price: '$49',
-      period: 'per user/month',
-      description: 'Perfect for growing teams ready to implement AI across departments',
-      features: [
-        'All training modules and certifications',
-        'Department-specific content',
-        'Progress tracking and analytics',
-        'Email support',
-        'Basic integrations'
-      ],
-      cta: 'Start Free Trial',
-      popular: false
-    },
-    {
-      name: 'Enterprise',
-      price: '$99',
-      period: 'per user/month',
-      description: 'Comprehensive AI transformation for large organizations',
-      features: [
-        'Everything in Professional',
-        'Embedded AI leadership (fCAIO)',
-        'Custom content development',
-        'Live training sessions',
-        'Dedicated success manager',
-        'Advanced analytics & reporting',
-        'SSO and enterprise integrations',
-        'Priority support'
-      ],
-      cta: 'Contact Sales',
-      popular: true
-    },
-    {
-      name: 'Custom',
-      price: 'Contact us',
-      period: 'for pricing',
-      description: 'Tailored solutions for unique organizational needs',
-      features: [
-        'Everything in Enterprise',
-        'Custom platform development',
-        'White-label options',
-        'On-premise deployment',
-        'Custom compliance requirements',
-        'Dedicated infrastructure'
-      ],
-      cta: 'Contact Sales',
-      popular: false
-    }
-  ]
-
   const testimonials = [
     {
       quote: "LitmusAI transformed our organization in just 6 weeks. Our teams are now confidently using AI tools, and we've seen a 40% increase in productivity.",
@@ -153,60 +101,6 @@ const EnterprisePage = () => {
                     ))}
                   </ul>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Enterprise Pricing
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Flexible plans designed to scale with your organization's AI transformation journey.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map((plan, index) => (
-              <div key={index} className={`card relative ${plan.popular ? 'border-2 border-primary-600' : ''}`}>
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-primary-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <div className="mb-2">
-                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                    <span className="text-gray-600 ml-1">{plan.period}</span>
-                  </div>
-                  <p className="text-gray-600">{plan.description}</p>
-                </div>
-
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start space-x-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
-                  plan.popular 
-                    ? 'btn-primary' 
-                    : 'btn-outline'
-                }`}>
-                  {plan.cta}
-                </button>
               </div>
             ))}
           </div>

@@ -4,6 +4,10 @@ from datetime import datetime
 import json
 import random
 from routes import get_supabase_identity, supabase_jwt_required
+from logging_config import get_logger
+
+
+logger = get_logger(__name__)
 
 assessment_bp = Blueprint('assessment', __name__)
 
@@ -238,13 +242,15 @@ def get_assessment_questions():
 @supabase_jwt_required(optional=True)
 def submit_assessment():
     """Submit assessment answers and get results"""
+    user_id = None
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
         if not data.get('answers'):
             return jsonify({'error': 'Answers are required'}), 400
-        
+
         answers = data['answers']  # Expected format: {'1': 'A', '2': 'B', ...}
+        option_map_payload = data.get('option_map', {})
         time_taken = data.get('time_taken_minutes', 0)
         
         # Calculate scores
@@ -260,10 +266,16 @@ def submit_assessment():
             domain = question['domain']
             correct = question['correct_answer']
             user_answer = answers.get(q_id, '')
-            
+            answer_options = option_map_payload.get(q_id, {})
+            user_answer_text = answer_options.get(user_answer.upper(), '')
+            correct_answer_text = question[f"option_{correct.lower()}"]
+
             domain_totals[domain] += 1
             
-            is_correct = user_answer.upper() == correct.upper()
+            if user_answer_text:
+                is_correct = user_answer_text.strip().lower() == correct_answer_text.strip().lower()
+            else:
+                is_correct = user_answer.upper() == correct.upper()
             if is_correct:
                 total_score += 1
                 domain_scores[domain] += 1
@@ -272,7 +284,9 @@ def submit_assessment():
                 'question_id': q_id,
                 'domain': domain,
                 'user_answer': user_answer,
+                'user_answer_text': user_answer_text,
                 'correct_answer': correct,
+                'correct_answer_text': correct_answer_text,
                 'is_correct': is_correct,
                 'explanation': question['explanation']
             })
@@ -282,6 +296,14 @@ def submit_assessment():
         # Generate recommendations based on performance
         score_band = classify_score(total_score)
         recommendations = generate_recommendations(domain_scores, domain_totals, total_score, score_band)
+
+        domain_scores_payload = {
+            domain: {
+                'score': domain_scores.get(domain, 0),
+                'total': domain_totals.get(domain, 0)
+            }
+            for domain in DOMAINS
+        }
         
         # Save results if user is authenticated
         user_id = g.get('current_user_id')
@@ -289,50 +311,64 @@ def submit_assessment():
             user_id = get_supabase_identity(optional=True)
         
         if user_id:
-            # Persisting the first four domain scores to fit the current schema
-            domain_values = [domain_scores.get(domain, 0) for domain in DOMAINS]
-            padded_values = domain_values + [0] * (4 - len(domain_values))
+            legacy_field_map = [
+                ('functional_score', 'AI Fundamentals'),
+                ('ethical_score', 'Practical Usage'),
+                ('rhetorical_score', 'Ethics & Critical Thinking'),
+                ('pedagogical_score', 'AI Impact & Applications')
+            ]
 
             result = AssessmentResult(
                 user_id=user_id,
                 total_score=total_score,
                 max_score=max_score,
                 percentage=percentage,
-                functional_score=padded_values[0],
-                ethical_score=padded_values[1],
-                rhetorical_score=padded_values[2],
-                pedagogical_score=padded_values[3],
+                domain_scores=domain_scores_payload,
                 time_taken_minutes=time_taken,
                 recommendations=json.dumps({
                     'insights': recommendations,
                     'strategic_score': domain_scores.get('Strategic Understanding', 0)
                 })
             )
+
+            for attr, domain in legacy_field_map:
+                setattr(result, attr, domain_scores_payload.get(domain, {}).get('score', 0))
+
             db.session.add(result)
             db.session.commit()
 
-        domain_scores_response = {}
-        for domain in DOMAINS:
-            domain_scores_response[domain] = {
-                'score': domain_scores[domain],
-                'total': domain_totals[domain]
-            }
+            logger.info(
+                'assessment_submitted',
+                user_id=user_id,
+                total_score=total_score,
+                percentage=round(percentage, 1),
+                score_band=score_band,
+            )
+        else:
+            logger.info(
+                'assessment_completed_anonymously',
+                total_score=total_score,
+                percentage=round(percentage, 1),
+                score_band=score_band,
+            )
 
-        return jsonify({
+        response_payload = {
             'total_score': total_score,
             'max_score': max_score,
             'percentage': round(percentage, 1),
-            'domain_scores': domain_scores_response,
+            'domain_scores': domain_scores_payload,
             'recommendations': recommendations,
             'detailed_results': detailed_results,
             'time_taken_minutes': time_taken,
             'score_band': score_band,
             'saved': user_id is not None
-        }), 200
+        }
+
+        return jsonify(response_payload), 200
         
     except Exception as e:
-        if user_id:
-            db.session.rollback()
+        db.session.rollback()
+        logger.exception('assessment_submit_failed', error=str(e))
         return jsonify({'error': 'Failed to submit assessment', 'details': str(e)}), 500
 
 def classify_score(total_correct):
@@ -420,32 +456,47 @@ def get_assessment_history():
         
         history = []
         for result in results:
-            strategic_score = None
             recommendation_payload = []
-            if result.recommendations:
+            legacy_strategic_score = 0
+            stored_recommendations = result.recommendations
+            if stored_recommendations:
                 try:
-                    parsed = json.loads(result.recommendations)
+                    parsed = json.loads(stored_recommendations)
                     if isinstance(parsed, dict):
                         recommendation_payload = parsed.get('insights', [])
-                        strategic_score = parsed.get('strategic_score')
-                    else:
+                        legacy_strategic_score = parsed.get('strategic_score', 0) or 0
+                    elif isinstance(parsed, list):
                         recommendation_payload = parsed
                 except Exception:
                     recommendation_payload = []
 
-            score_lookup = {
+            domain_scores_payload = {}
+            stored_domain_scores = result.domain_scores
+            if isinstance(stored_domain_scores, str):
+                try:
+                    stored_domain_scores = json.loads(stored_domain_scores)
+                except ValueError:
+                    stored_domain_scores = {}
+
+            if not isinstance(stored_domain_scores, dict):
+                stored_domain_scores = {}
+
+            legacy_fallback = {
                 'AI Fundamentals': result.functional_score or 0,
                 'Practical Usage': result.ethical_score or 0,
                 'Ethics & Critical Thinking': result.rhetorical_score or 0,
                 'AI Impact & Applications': result.pedagogical_score or 0,
-                'Strategic Understanding': strategic_score or 0
+                'Strategic Understanding': legacy_strategic_score
             }
 
-            domain_scores_payload = {}
             for domain in DOMAINS:
+                stored_entry = stored_domain_scores.get(domain, {}) if stored_domain_scores else {}
+                score_value = stored_entry.get('score') if isinstance(stored_entry, dict) else None
+                total_value = stored_entry.get('total') if isinstance(stored_entry, dict) else None
+
                 domain_scores_payload[domain] = {
-                    'score': score_lookup.get(domain, 0),
-                    'total': DOMAIN_TOTALS.get(domain, 0)
+                    'score': score_value if score_value is not None else legacy_fallback.get(domain, 0),
+                    'total': total_value if total_value else DOMAIN_TOTALS.get(domain, 0)
                 }
 
             history.append({
@@ -460,7 +511,9 @@ def get_assessment_history():
                 'recommendations': recommendation_payload
             })
 
+        logger.info('assessment_history_requested', user_id=user_id, results=len(history))
         return jsonify({'history': history}), 200
         
     except Exception as e:
+        logger.exception('assessment_history_failed', error=str(e))
         return jsonify({'error': 'Failed to get assessment history', 'details': str(e)}), 500

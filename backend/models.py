@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from datetime import datetime
 import uuid
 
@@ -48,6 +49,7 @@ class AssessmentResult(db.Model):
     ethical_score = db.Column(db.Integer, default=0)
     rhetorical_score = db.Column(db.Integer, default=0)
     pedagogical_score = db.Column(db.Integer, default=0)
+    domain_scores = db.Column(MutableDict.as_mutable(db.JSON), nullable=True)
     time_taken_minutes = db.Column(db.Integer, nullable=True)
     recommendations = db.Column(db.Text, nullable=True)
     completed_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -85,9 +87,25 @@ class Certification(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
     certification_type = db.Column(db.String(100), nullable=False)  # LitmusAI Professional, etc.
+    catalog_id = db.Column(db.String(64), db.ForeignKey('certification_type.id'), nullable=True)
     verification_code = db.Column(db.String(50), unique=True, nullable=False)
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=True)
     is_valid = db.Column(db.Boolean, default=True)
     badge_url = db.Column(db.String(500), nullable=True)
     skills_validated = db.Column(db.Text, nullable=True)  # JSON array of skills
+
+
+class CertificationType(db.Model):
+    id = db.Column(db.String(64), primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    requirements = db.Column(MutableList.as_mutable(db.JSON), default=list)
+    estimated_time = db.Column(db.String(50), nullable=True)
+    skills_validated = db.Column(MutableList.as_mutable(db.JSON), default=list)
+    access_tier = db.Column(db.String(20), default='free')
+    is_premium = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    certifications = db.relationship('Certification', backref='certification_type_entry', lazy=True)

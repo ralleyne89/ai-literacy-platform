@@ -26,9 +26,10 @@ function ClientFeedback() {
         <article className="mx-auto max-w-screen-md space-y-2 text-center">
           <TimelineContent
             as="h1"
-            className="text-3xl font-medium xl:text-4xl"
+            className="text-3xl xl:text-4xl"
             animationNum={0}
             customVariants={revealVariants}
+            style={{fontWeight: 700}}
           >
             What our customers think of the LitmusAI experience
           </TimelineContent>

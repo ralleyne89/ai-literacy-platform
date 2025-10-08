@@ -1,0 +1,3 @@
+Migration scripts for the LitmusAI backend.
+
+Use `flask db migrate` to generate new revisions and `flask db upgrade` to apply them.

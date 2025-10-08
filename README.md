@@ -87,6 +87,22 @@ python app.py
 
 The backend API will be available at `http://localhost:5000`
 
+### 4. Database Migrations & Seeds
+
+Application data such as training modules and certification catalogs now live in the database. After configuring your environment:
+
+```bash
+# Run database migrations
+cd backend
+FLASK_APP=app.py flask db upgrade
+
+# Seed default training modules and certifications
+FLASK_APP=app.py flask seed-training-modules
+FLASK_APP=app.py flask seed-certifications
+```
+
+> The seed commands are idempotent. Re-run them with `--force` to refresh fixture content after editing the seed definitions.
+
 ## 🏗️ Project Structure
 
 ```
@@ -188,6 +204,10 @@ python app.py
 # Test API endpoints
 curl http://localhost:5000/api/health
 curl http://localhost:5000/api/assessment/questions
+
+# Run backend unit tests
+pip install -r ../requirements-dev.txt
+pytest
 ```
 
 ## 🔧 Configuration
@@ -206,10 +226,13 @@ VITE_API_URL=http://localhost:5001
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+LOG_LEVEL=INFO
 # Optional: Stripe (populate once your Stripe account is ready)
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
 STRIPE_SECRET_KEY=sk_live_or_test_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+STRIPE_PRICE_PREMIUM=price_live_or_test_premium
+STRIPE_PRICE_ENTERPRISE=price_live_or_test_enterprise
 FRONTEND_URL=https://your-netlify-site.netlify.app
 ```
 

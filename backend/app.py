@@ -7,8 +7,12 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 import bcrypt
+import click
+from flask.cli import with_appcontext
+from logging_config import configure_logging
 
 load_dotenv()
+configure_logging()
 
 app = Flask(__name__)
 
@@ -35,11 +39,33 @@ from routes.auth import auth_bp
 from routes.assessment import assessment_bp
 from routes.training import training_bp
 from routes.certification import certification_bp
+from routes.billing import billing_bp
+from seeders.training import seed_training_modules as seed_training_modules_fixture
+from seeders.certifications import seed_certification_types as seed_certification_types_fixture
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(assessment_bp, url_prefix='/api/assessment')
 app.register_blueprint(training_bp, url_prefix='/api/training')
 app.register_blueprint(certification_bp, url_prefix='/api/certification')
+app.register_blueprint(billing_bp, url_prefix='/api/billing')
+
+
+@app.cli.command('seed-training-modules')
+@click.option('--force', is_flag=True, help='Update existing modules with fixture data')
+@click.option('--silent', is_flag=True, help='Suppress console output')
+@with_appcontext
+def seed_training_modules_command(force: bool, silent: bool):
+    """Seed the training module catalog with curated defaults."""
+    seed_training_modules_fixture(force=force, silent=silent)
+
+
+@app.cli.command('seed-certifications')
+@click.option('--force', is_flag=True, help='Update existing certification entries with fixture data')
+@click.option('--silent', is_flag=True, help='Suppress console output')
+@with_appcontext
+def seed_certifications_command(force: bool, silent: bool):
+    """Seed the certification catalog with curated defaults."""
+    seed_certification_types_fixture(force=force, silent=silent)
 
 @app.route('/api/health')
 def health_check():

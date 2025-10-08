@@ -11,7 +11,6 @@ const AssessmentPage = () => {
   const [questions, setQuestions] = useState([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState({})
-  const [timeStarted, setTimeStarted] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -37,14 +36,12 @@ const AssessmentPage = () => {
   const persistProgress = ({
     questions: persistedQuestions = questions,
     answers: persistedAnswers = answers,
-    currentIndex = currentQuestion,
-    startedAt = timeStarted
+    currentIndex = currentQuestion
   }) => {
     const payload = {
       questions: persistedQuestions,
       answers: persistedAnswers,
       currentQuestion: currentIndex,
-      timeStarted: startedAt ? new Date(startedAt).toISOString() : null,
       version: ASSESSMENT_VERSION
     }
 
@@ -76,7 +73,6 @@ const AssessmentPage = () => {
         setQuestions(parsed.questions)
         setAnswers(parsed.answers || {})
         setCurrentQuestion(parsed.currentQuestion || 0)
-        setTimeStarted(parsed.timeStarted ? new Date(parsed.timeStarted) : new Date())
         setHasStarted(true)
         setShowIntroModal(false)
         setResumeDetected(true)
@@ -95,7 +91,6 @@ const AssessmentPage = () => {
     setResults(null)
     setAnswers({})
     setCurrentQuestion(0)
-    const assessmentStart = new Date()
     try {
       const response = await axios.get('/api/assessment/questions')
       const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
@@ -105,7 +100,6 @@ const AssessmentPage = () => {
         return
       }
       setQuestions(loadedQuestions)
-      setTimeStarted(assessmentStart)
       setHasStarted(true)
       setShowIntroModal(false)
       setResumeDetected(false)
@@ -113,8 +107,7 @@ const AssessmentPage = () => {
       persistProgress({
         questions: loadedQuestions,
         answers: {},
-        currentIndex: 0,
-        startedAt: assessmentStart
+        currentIndex: 0
       })
     } catch (error) {
       console.error('Failed to fetch questions:', error)
@@ -155,12 +148,19 @@ const AssessmentPage = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true)
     try {
-      const timeElapsed = timeStarted
-        ? Math.round((new Date() - timeStarted) / 60000)
-        : 0
+      const optionMap = questions.reduce((acc, question) => {
+        acc[question.id] = {
+          A: question.option_a,
+          B: question.option_b,
+          C: question.option_c,
+          D: question.option_d
+        }
+        return acc
+      }, {})
+
       const response = await axios.post('/api/assessment/submit', {
         answers,
-        time_taken_minutes: timeElapsed
+        option_map: optionMap
       })
       setResults(response.data)
       clearProgress()
@@ -180,31 +180,8 @@ const AssessmentPage = () => {
     return ((currentQuestion + 1) / questions.length) * 100
   }
 
-  const getEstimatedMinutesRemaining = () => {
-    if (!questions.length) {
-      return 0
-    }
-    const estimatedTotalMinutes = 5
-    const perQuestion = estimatedTotalMinutes / questions.length
-    const remainingQuestions = questions.length - (currentQuestion + 1)
-    return Math.max(0, remainingQuestions * perQuestion)
-  }
-
-  const getTimeEstimateLabel = () => {
-    if (!hasStarted) {
-      return ''
-    }
-    const remaining = getEstimatedMinutesRemaining()
-    if (remaining <= 0.75) {
-      return 'Less than 1 minute remaining'
-    }
-    const rounded = Math.round(remaining)
-    return `About ${rounded} minute${rounded === 1 ? '' : 's'} remaining`
-  }
-
   const progressValue = getProgressPercentage()
   const progressDisplay = Math.round(progressValue)
-  const timeEstimateLabel = getTimeEstimateLabel()
 
   const getDomainColor = (domain) => {
     const colors = {
@@ -446,11 +423,6 @@ const AssessmentPage = () => {
             <span className="text-sm text-gray-600">
               Question {currentQuestion + 1} of {questions.length}
             </span>
-            {timeEstimateLabel && (
-              <span className="text-sm text-gray-600 sm:text-center">
-                {timeEstimateLabel}
-              </span>
-            )}
             <span className="text-sm text-gray-600 sm:text-right">
               {progressDisplay}% Complete
             </span>
