@@ -1,62 +1,62 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const PLAN_DEFINITIONS = {
   free: {
-    name: 'Free',
+    name: "Free",
     amount_cents: 0,
     is_free: true,
   },
   premium: {
-    name: 'Premium',
+    name: "Premium",
     amount_cents: 4900,
-    currency: 'usd',
-    description: 'Unlock premium training, certifications, and analytics.',
-    billing_interval: 'month',
+    currency: "usd",
+    description: "Unlock premium training, certifications, and analytics.",
+    billing_interval: "month",
   },
   enterprise: {
-    name: 'Enterprise',
+    name: "Enterprise",
     amount_cents: 9900,
-    currency: 'usd',
-    description: 'Tailored enablement for teams and departments.',
-    billing_interval: 'month',
+    currency: "usd",
+    description: "Tailored enablement for teams and departments.",
+    billing_interval: "month",
   },
 };
 
 exports.handler = async (event, context) => {
   // Enable CORS
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 
   // Handle preflight requests
-  if (event.httpMethod === 'OPTIONS') {
+  if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
       headers,
-      body: '',
+      body: "",
     };
   }
 
   // Only allow POST
-  if (event.httpMethod !== 'POST') {
+  if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: "Method not allowed" }),
     };
   }
 
   try {
-    const { plan, email } = JSON.parse(event.body || '{}');
+    const { plan, email } = JSON.parse(event.body || "{}");
 
     // Validate plan
     if (!plan) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Plan is required' }),
+        body: JSON.stringify({ error: "Plan is required" }),
       };
     }
 
@@ -65,7 +65,7 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Unknown plan selected' }),
+        body: JSON.stringify({ error: "Unknown plan selected" }),
       };
     }
 
@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Free plan does not require checkout' }),
+        body: JSON.stringify({ error: "Free plan does not require checkout" }),
       };
     }
 
@@ -82,19 +82,19 @@ exports.handler = async (event, context) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Email is required to start checkout' }),
+        body: JSON.stringify({ error: "Email is required to start checkout" }),
       };
     }
 
     // Get frontend URL
-    const frontendUrl = process.env.URL || 'https://litmusai.netlify.app';
+    const frontendUrl = process.env.URL || "https://litmusai.netlify.app";
     const successUrl = `${frontendUrl}/billing?success=true`;
     const cancelUrl = `${frontendUrl}/billing?canceled=true`;
 
     // Check for mock mode
-    const mockMode = process.env.STRIPE_MOCK_MODE === 'true';
+    const mockMode = process.env.STRIPE_MOCK_MODE === "true";
     if (mockMode) {
-      console.log('Stripe checkout mock mode', { plan, email });
+      console.log("Stripe checkout mock mode", { plan, email });
       return {
         statusCode: 200,
         headers,
@@ -104,18 +104,19 @@ exports.handler = async (event, context) => {
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+      mode: "subscription",
+      payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: planDefinition.currency || 'usd',
+            currency: planDefinition.currency || "usd",
             product_data: {
               name: planDefinition.name,
-              description: planDefinition.description || '',
+              description: planDefinition.description || "",
             },
             unit_amount: planDefinition.amount_cents,
             recurring: {
-              interval: planDefinition.billing_interval || 'month',
+              interval: planDefinition.billing_interval || "month",
             },
           },
           quantity: 1,
@@ -136,17 +137,16 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ url: session.url }),
     };
   } catch (error) {
-    console.error('Stripe checkout error:', error);
-    
+    console.error("Stripe checkout error:", error);
+
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        error: 'Unable to start checkout with Stripe',
+        error: "Unable to start checkout with Stripe",
         details: error.message,
-        hint: 'Verify STRIPE_SECRET_KEY is set correctly in Netlify environment variables.',
+        hint: "Verify STRIPE_SECRET_KEY is set correctly in Netlify environment variables.",
       }),
     };
   }
 };
-
