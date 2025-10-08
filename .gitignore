@@ -57,3 +57,7 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+
+# Deployment helper files with secrets (keep local only)
+render_env_vars.txt
+RENDER_DEPLOYMENT_CHECKLIST.md
