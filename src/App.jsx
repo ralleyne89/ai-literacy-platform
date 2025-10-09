@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import AssessmentPage from './pages/AssessmentPage'
 import TrainingPage from './pages/TrainingPage'
 import TrainingModulePage from './pages/TrainingModulePage'
+import CourseViewerPage from './pages/CourseViewerPage'
 import CertificationPage from './pages/CertificationPage'
 import EnterprisePage from './pages/EnterprisePage'
 import DashboardPage from './pages/DashboardPage'
@@ -27,6 +28,11 @@ function App() {
             <Route path="/assessment" element={<AssessmentPage />} />
             <Route path="/training" element={<TrainingPage />} />
             <Route path="/training/modules/:moduleId" element={<TrainingModulePage />} />
+            <Route path="/training/modules/:moduleId/learn" element={
+              <ProtectedRoute>
+                <CourseViewerPage />
+              </ProtectedRoute>
+            } />
             <Route path="/certification" element={<CertificationPage />} />
             <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
