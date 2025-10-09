@@ -1,0 +1,37 @@
+# Netlify configuration for LitmusAI
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+  publish = "dist"
+
+# Redirect API calls to Netlify Functions
+[[redirects]]
+  from = "/api/billing/config"
+  to = "/.netlify/functions/billing-config"
+  status = 200
+
+[[redirects]]
+  from = "/api/billing/checkout-session"
+  to = "/.netlify/functions/checkout-session"
+  status = 200
+
+[[redirects]]
+  from = "/api/billing/customer-portal"
+  to = "/.netlify/functions/customer-portal"
+  status = 200
+
+[[redirects]]
+  from = "/api/billing/subscription-status"
+  to = "/.netlify/functions/subscription-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/webhooks/stripe"
+  to = "/.netlify/functions/stripe-webhook"
+  status = 200
+
+# SPA fallback - must be last
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
