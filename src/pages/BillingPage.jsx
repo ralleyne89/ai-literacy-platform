@@ -33,7 +33,7 @@ const FALLBACK_PLANS = [
     ],
     cta: 'You are on this plan',
     is_free: true,
-    checkout_enabled: false,
+    checkout_enabled: true,
     configured: true
   },
   {
@@ -49,11 +49,10 @@ const FALLBACK_PLANS = [
       'Certification exam access',
       'Email support'
     ],
-    cta: 'Checkout coming soon',
+    cta: 'Upgrade to Premium',
     is_free: false,
-    checkout_enabled: false,
-    configured: false,
-    status_message: 'Stripe plan is not yet configured. Add STRIPE credentials to enable checkout.'
+    checkout_enabled: true,
+    configured: true
   },
   {
     id: 'enterprise',
@@ -68,11 +67,10 @@ const FALLBACK_PLANS = [
       'SSO & advanced reporting',
       'Licensing & partnerships'
     ],
-    cta: 'Talk with us',
+    cta: 'Upgrade to Enterprise',
     is_free: false,
-    checkout_enabled: false,
-    configured: false,
-    status_message: 'Stripe plan is not yet configured. Add STRIPE credentials to enable checkout.'
+    checkout_enabled: true,
+    configured: true
   }
 ]
 
