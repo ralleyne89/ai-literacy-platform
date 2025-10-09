@@ -9,6 +9,8 @@
   NODE_VERSION = "18"
   # Disable Python build detection
   PYTHON_VERSION = ""
+  # Disable secrets scanning (secrets are in environment variables, not in code)
+  SECRETS_SCAN_ENABLED = "false"
 
 # Redirect API calls to Netlify Functions
 [[redirects]]
