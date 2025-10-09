@@ -1,0 +1,52 @@
+# Environment files with secrets
+.env
+.env.local
+.env.production
+backend/.env
+render_env_vars.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Netlify
+.netlify/
+
