@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { BarChart3, Clock, Award, TrendingUp, User, BookOpen, Target, Calendar, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import axios from 'axios'
+import supabase from '../services/supabaseClient'
 
 const DashboardPage = () => {
   const { user } = useAuth()
@@ -13,16 +13,46 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      try {
-        const [assessmentRes, trainingRes, recommendationsRes] = await Promise.all([
-          axios.get('/api/assessment/history').catch(() => ({ data: { history: [] } })),
-          axios.get('/api/training/progress').catch(() => ({ data: { progress: [] } })),
-          axios.get('/api/assessment/recommendations').catch(() => ({ data: { recommendations: [] } }))
-        ])
+      if (!user?.id || !supabase) {
+        setLoading(false)
+        return
+      }
 
-        setAssessmentHistory(assessmentRes.data.history)
-        setTrainingProgress(trainingRes.data.progress)
-        setCourseRecommendations(recommendationsRes.data.recommendations || [])
+      try {
+        // Fetch assessment history directly from Supabase
+        const { data: assessments, error: assessmentError } = await supabase
+          .from('assessment_results')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (assessmentError) {
+          console.error('Failed to fetch assessments:', assessmentError)
+        } else {
+          setAssessmentHistory(assessments || [])
+        }
+
+        // Fetch training progress directly from Supabase
+        const { data: progress, error: progressError } = await supabase
+          .from('user_progress')
+          .select(`
+            *,
+            training_module:training_modules(id, title, description, difficulty_level)
+          `)
+          .eq('user_id', user.id)
+
+        if (progressError) {
+          console.error('Failed to fetch training progress:', progressError)
+        } else {
+          setTrainingProgress(progress || [])
+        }
+
+        // Generate recommendations from latest assessment
+        if (assessments && assessments.length > 0) {
+          const latest = assessments[0]
+          const recommendations = generateRecommendations(latest)
+          setCourseRecommendations(recommendations)
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
       } finally {
@@ -31,15 +61,44 @@ const DashboardPage = () => {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [user?.id])
+
+  const generateRecommendations = (assessment) => {
+    if (!assessment || !assessment.domain_scores) {
+      return []
+    }
+
+    const recommendations = []
+    const domainScores = typeof assessment.domain_scores === 'string'
+      ? JSON.parse(assessment.domain_scores)
+      : assessment.domain_scores
+
+    // Find domains with scores below 70%
+    Object.entries(domainScores).forEach(([domain, data]) => {
+      if (data && data.score < 70) {
+        recommendations.push({
+          domain,
+          score: data.score,
+          priority: data.score < 50 ? 'high' : 'medium'
+        })
+      }
+    })
+
+    return recommendations.sort((a, b) => a.score - b.score).slice(0, 3)
+  }
 
   const latestAssessment = assessmentHistory[0]
-  const domainBreakdown = latestAssessment
-    ? Object.entries(latestAssessment.domain_scores || {}).filter(([, data]) => data && typeof data.score !== 'undefined')
-    : []
-  const recommendations = Array.isArray(latestAssessment?.recommendations)
-    ? latestAssessment.recommendations
-    : []
+
+  // Parse domain_scores if it's a string
+  const parsedDomainScores = latestAssessment?.domain_scores
+    ? (typeof latestAssessment.domain_scores === 'string'
+        ? JSON.parse(latestAssessment.domain_scores)
+        : latestAssessment.domain_scores)
+    : {}
+
+  const domainBreakdown = Object.entries(parsedDomainScores)
+    .filter(([, data]) => data && typeof data.score !== 'undefined')
+
   const completedModules = trainingProgress.filter(p => p.status === 'completed').length
   const totalLearningTime = trainingProgress.reduce((total, p) => total + (p.time_spent_minutes || 0), 0)
 
