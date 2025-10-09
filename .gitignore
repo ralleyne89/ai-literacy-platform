@@ -3,6 +3,14 @@
 .env.local
 .env.production
 backend/.env
+backend/.env.local
+backend/.env.production
+
+# Documentation files that may contain secrets
+STRIPE_PAYMENT_FIX_SUMMARY.md
+docs/deployment/STRIPE_QUICK_REFERENCE.md
+docs/deployment/RENDER_DEPLOYMENT_CHECKLIST.md
+docs/fixes/STRIPE_PAYMENT_FIXES.md
 
 # Node
 node_modules/
