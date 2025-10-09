@@ -210,13 +210,12 @@ const TrainingModulePage = () => {
               </div>
               <div className="flex flex-col items-stretch gap-3 min-w-[200px]">
                 {isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
-                  <button
-                    onClick={handleEnroll}
-                    disabled={enrolling}
-                    className="btn-primary disabled:opacity-60"
+                  <Link
+                    to={`/training/modules/${moduleId}/learn`}
+                    className="btn-primary text-center"
                   >
-                    {progress ? 'Resume Module' : enrolling ? 'Enrolling...' : 'Enroll & Start'}
-                  </button>
+                    {progress && progress.progress_percentage > 0 ? 'Continue Learning' : 'Start Learning'}
+                  </Link>
                 ) : !isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
                   <button
                     onClick={() => navigate('/login', { state: { from: `/training/modules/${moduleId}` } })}

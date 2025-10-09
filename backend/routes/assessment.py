@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g
-from models import db, Assessment, AssessmentResult, User
+from models import db, Assessment, AssessmentResult, User, TrainingModule
 from datetime import datetime
 import json
 import random
@@ -513,7 +513,165 @@ def get_assessment_history():
 
         logger.info('assessment_history_requested', user_id=user_id, results=len(history))
         return jsonify({'history': history}), 200
-        
+
     except Exception as e:
         logger.exception('assessment_history_failed', error=str(e))
         return jsonify({'error': 'Failed to get assessment history', 'details': str(e)}), 500
+
+
+@assessment_bp.route('/recommendations', methods=['GET'])
+@supabase_jwt_required()
+def get_course_recommendations():
+    """Get personalized course recommendations based on latest assessment results"""
+    try:
+        user_id = g.get('current_user_id') or get_supabase_identity()
+
+        # Get the latest assessment result
+        latest_result = AssessmentResult.query.filter_by(user_id=user_id)\
+                                             .order_by(AssessmentResult.completed_at.desc())\
+                                             .first()
+
+        if not latest_result:
+            # No assessment taken yet - return beginner-friendly modules
+            modules = TrainingModule.query.filter_by(
+                is_active=True,
+                difficulty_level=1
+            ).limit(6).all()
+
+            recommendations = []
+            for module in modules:
+                recommendations.append({
+                    'id': module.id,
+                    'title': module.title,
+                    'description': module.description,
+                    'difficulty_level': module.difficulty_level,
+                    'estimated_duration_minutes': module.estimated_duration_minutes,
+                    'content_type': module.content_type,
+                    'is_premium': module.is_premium,
+                    'reason': 'Great starting point for AI literacy',
+                    'priority': 'low',
+                    'target_domains': []
+                })
+
+            return jsonify({
+                'recommendations': recommendations,
+                'message': 'Take an assessment to get personalized recommendations'
+            }), 200
+
+        # Parse domain scores
+        domain_scores_data = latest_result.domain_scores or {}
+
+        # Identify weak domains (score <= 50% of total questions in that domain)
+        weak_domains = []
+        for domain, data in domain_scores_data.items():
+            if isinstance(data, dict):
+                score = data.get('score', 0)
+                total = data.get('total', 1)
+                percentage = (score / total * 100) if total > 0 else 0
+
+                if percentage < 50:  # Less than 50% correct
+                    weak_domains.append({
+                        'domain': domain,
+                        'score': score,
+                        'total': total,
+                        'percentage': percentage
+                    })
+
+        # Sort by percentage (weakest first)
+        weak_domains.sort(key=lambda x: x['percentage'])
+
+        # Get training modules that target weak domains
+        recommendations = []
+        seen_module_ids = set()
+
+        # First, get modules that specifically target weak domains
+        for weak_domain_info in weak_domains[:3]:  # Focus on top 3 weakest domains
+            weak_domain = weak_domain_info['domain']
+
+            # Query modules that target this domain
+            modules = TrainingModule.query.filter_by(is_active=True).all()
+
+            for module in modules:
+                if module.id in seen_module_ids:
+                    continue
+
+                # Check if module targets this domain
+                target_domains = []
+                if module.target_domains:
+                    try:
+                        target_domains = json.loads(module.target_domains) if isinstance(module.target_domains, str) else module.target_domains
+                    except:
+                        target_domains = []
+
+                if weak_domain in target_domains or not target_domains:
+                    # Module targets this weak domain or is general
+                    priority = 'high' if weak_domain_info['percentage'] < 33 else 'medium'
+
+                    recommendations.append({
+                        'id': module.id,
+                        'title': module.title,
+                        'description': module.description,
+                        'difficulty_level': module.difficulty_level,
+                        'estimated_duration_minutes': module.estimated_duration_minutes,
+                        'content_type': module.content_type,
+                        'is_premium': module.is_premium,
+                        'role_specific': module.role_specific,
+                        'reason': f'Strengthen your {weak_domain} skills (scored {weak_domain_info["score"]}/{weak_domain_info["total"]})',
+                        'priority': priority,
+                        'target_domains': target_domains,
+                        'skill_gap_percentage': round(100 - weak_domain_info['percentage'], 1)
+                    })
+
+                    seen_module_ids.add(module.id)
+
+                    if len(recommendations) >= 6:
+                        break
+
+            if len(recommendations) >= 6:
+                break
+
+        # If we don't have enough recommendations, add some general modules
+        if len(recommendations) < 3:
+            general_modules = TrainingModule.query.filter_by(
+                is_active=True,
+                role_specific='General'
+            ).limit(6 - len(recommendations)).all()
+
+            for module in general_modules:
+                if module.id not in seen_module_ids:
+                    recommendations.append({
+                        'id': module.id,
+                        'title': module.title,
+                        'description': module.description,
+                        'difficulty_level': module.difficulty_level,
+                        'estimated_duration_minutes': module.estimated_duration_minutes,
+                        'content_type': module.content_type,
+                        'is_premium': module.is_premium,
+                        'role_specific': module.role_specific,
+                        'reason': 'Recommended for continued learning',
+                        'priority': 'low',
+                        'target_domains': [],
+                        'skill_gap_percentage': 0
+                    })
+                    seen_module_ids.add(module.id)
+
+        # Sort by priority and skill gap
+        priority_order = {'high': 0, 'medium': 1, 'low': 2}
+        recommendations.sort(key=lambda x: (priority_order.get(x['priority'], 3), -x.get('skill_gap_percentage', 0)))
+
+        logger.info(
+            'course_recommendations_generated',
+            user_id=user_id,
+            weak_domains=len(weak_domains),
+            recommendations=len(recommendations)
+        )
+
+        return jsonify({
+            'recommendations': recommendations[:6],  # Return top 6
+            'assessment_score': latest_result.percentage,
+            'weak_domains': [d['domain'] for d in weak_domains[:3]]
+        }), 200
+
+    except Exception as e:
+        logger.exception('course_recommendations_failed', error=str(e))
+        return jsonify({'error': 'Failed to get recommendations', 'details': str(e)}), 500

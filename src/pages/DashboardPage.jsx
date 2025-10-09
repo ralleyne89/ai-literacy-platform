@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { BarChart3, Clock, Award, TrendingUp, User, BookOpen, Target, Calendar } from 'lucide-react'
+import { BarChart3, Clock, Award, TrendingUp, User, BookOpen, Target, Calendar, Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import axios from 'axios'
@@ -8,18 +8,21 @@ const DashboardPage = () => {
   const { user } = useAuth()
   const [assessmentHistory, setAssessmentHistory] = useState([])
   const [trainingProgress, setTrainingProgress] = useState([])
+  const [courseRecommendations, setCourseRecommendations] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [assessmentRes, trainingRes] = await Promise.all([
+        const [assessmentRes, trainingRes, recommendationsRes] = await Promise.all([
           axios.get('/api/assessment/history').catch(() => ({ data: { history: [] } })),
-          axios.get('/api/training/progress').catch(() => ({ data: { progress: [] } }))
+          axios.get('/api/training/progress').catch(() => ({ data: { progress: [] } })),
+          axios.get('/api/assessment/recommendations').catch(() => ({ data: { recommendations: [] } }))
         ])
 
         setAssessmentHistory(assessmentRes.data.history)
         setTrainingProgress(trainingRes.data.progress)
+        setCourseRecommendations(recommendationsRes.data.recommendations || [])
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
       } finally {
@@ -210,6 +213,74 @@ const DashboardPage = () => {
             )}
           </div>
         </div>
+
+        {/* Course Recommendations */}
+        {courseRecommendations.length > 0 && (
+          <div className="mt-8 card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Recommended for You</h2>
+              <Link to="/training" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                View All Courses
+              </Link>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Based on your assessment results, these courses will help strengthen your skills
+            </p>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courseRecommendations.slice(0, 6).map((course) => (
+                <div key={course.id} className="border border-gray-200 rounded-lg p-5 hover:border-primary-300 hover:shadow-md transition-all duration-200">
+                  {/* Priority Badge */}
+                  {course.priority === 'high' && (
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 mb-3">
+                      High Priority
+                    </div>
+                  )}
+                  {course.priority === 'medium' && (
+                    <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 mb-3">
+                      Recommended
+                    </div>
+                  )}
+
+                  {/* Course Title */}
+                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
+
+                  {/* Reason */}
+                  <p className="text-sm text-primary-600 mb-3 font-medium">{course.reason}</p>
+
+                  {/* Description */}
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{course.description}</p>
+
+                  {/* Meta Info */}
+                  <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{course.estimated_duration_minutes} min</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <BarChart3 className="w-3 h-3" />
+                      <span>Level {course.difficulty_level}</span>
+                    </div>
+                    {course.is_premium && (
+                      <div className="flex items-center gap-1 text-accent-orange">
+                        <Lock className="w-3 h-3" />
+                        <span>Premium</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Button */}
+                  <Link
+                    to={`/training/modules/${course.id}/learn`}
+                    className="block w-full text-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium"
+                  >
+                    Start Learning
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="mt-8 card">
