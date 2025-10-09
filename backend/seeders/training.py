@@ -36,7 +36,8 @@ DEFAULT_MODULES = [
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        }
+        },
+        'target_domains': ['Practical Usage', 'AI Impact & Applications']
     },
     {
         'id': 'module-ethical-hr',
@@ -71,7 +72,8 @@ DEFAULT_MODULES = [
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        }
+        },
+        'target_domains': ['Ethics & Critical Thinking', 'AI Impact & Applications']
     },
     {
         'id': 'module-marketing-ai',
@@ -105,7 +107,8 @@ DEFAULT_MODULES = [
             'access_tier': 'enterprise',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        }
+        },
+        'target_domains': ['Practical Usage', 'Strategic Understanding']
     },
     {
         'id': 'module-ops-ai',
@@ -139,7 +142,8 @@ DEFAULT_MODULES = [
             'access_tier': 'enterprise',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'
-        }
+        },
+        'target_domains': ['Strategic Understanding', 'AI Impact & Applications']
     },
     {
         'id': 'module-prompt-master',
@@ -173,7 +177,8 @@ DEFAULT_MODULES = [
             'access_tier': 'professional',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'
-        }
+        },
+        'target_domains': ['Practical Usage', 'AI Fundamentals']
     },
     {
         'id': 'module-google-ai-essentials',
@@ -200,7 +205,8 @@ DEFAULT_MODULES = [
             'accreditation': 'Google AI Essentials Certificate',
             'external_url': 'https://grow.google/certificates/ai-essentials/',
             'attribution': '© Google LLC. Content linked under free access terms.'
-        }
+        },
+        'target_domains': ['AI Fundamentals', 'Practical Usage']
     },
     {
         'id': 'module-elements-of-ai',
@@ -227,7 +233,8 @@ DEFAULT_MODULES = [
             'accreditation': 'Free certificate upon completion',
             'external_url': 'https://www.elementsofai.com/',
             'attribution': 'Elements of AI content © University of Helsinki & MinnaLearn. Offered under specified terms.'
-        }
+        },
+        'target_domains': ['AI Fundamentals', 'Ethics & Critical Thinking']
     },
     {
         'id': 'module-ibm-skillsbuild',
@@ -254,7 +261,8 @@ DEFAULT_MODULES = [
             'accreditation': 'IBM digital credential',
             'external_url': 'https://skillsbuild.org/',
             'attribution': 'IBM SkillsBuild is a trademark of IBM and used with attribution.'
-        }
+        },
+        'target_domains': ['AI Fundamentals', 'Practical Usage', 'Ethics & Critical Thinking']
     },
     {
         'id': 'module-freecodecamp-ai',
@@ -550,6 +558,7 @@ def seed_training_modules(force: bool = False, silent: bool = False):
             existing.prerequisites = json.dumps(payload)
             existing.is_premium = module_data.get('is_premium', False)
             existing.is_active = True
+            existing.target_domains = json.dumps(module_data.get('target_domains', []))
             updated += 1
         else:
             module = TrainingModule(
@@ -564,7 +573,8 @@ def seed_training_modules(force: bool = False, silent: bool = False):
                 learning_objectives=json.dumps(module_data.get('learning_objectives', [])),
                 prerequisites=json.dumps(payload),
                 is_premium=module_data.get('is_premium', False),
-                is_active=True
+                is_active=True,
+                target_domains=json.dumps(module_data.get('target_domains', []))
             )
             db.session.add(module)
             inserted += 1
