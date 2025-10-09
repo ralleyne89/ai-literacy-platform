@@ -4,6 +4,12 @@
   functions = "netlify/functions"
   publish = "dist"
 
+# Build environment
+[build.environment]
+  NODE_VERSION = "18"
+  # Disable Python build detection
+  PYTHON_VERSION = ""
+
 # Redirect API calls to Netlify Functions
 [[redirects]]
   from = "/api/billing/config"

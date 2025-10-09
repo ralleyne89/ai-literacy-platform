@@ -1,0 +1,30 @@
+# Ignore Python backend files (not needed for Netlify deployment)
+backend/
+requirements.txt
+runtime.txt
+Pipfile
+Pipfile.lock
+*.py
+
+# Ignore documentation and development files
+docs/
+*.md
+!README.md
+
+# Ignore test files
+tests/
+**/*.test.js
+**/*.spec.js
+
+# Ignore local development files
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env.local
+.env.development
+
+# Ignore git files
+.git/
+.gitignore
+
