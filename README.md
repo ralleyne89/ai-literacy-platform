@@ -109,11 +109,18 @@ FLASK_APP=app.py flask seed-certifications
 ai-literacy-platform/
 ├── src/                          # React frontend
 │   ├── components/               # Reusable UI components
+│   │   ├── course/              # Course viewer components
+│   │   │   ├── TextLesson.jsx
+│   │   │   ├── VideoLesson.jsx
+│   │   │   ├── QuizLesson.jsx
+│   │   │   └── InteractiveLesson.jsx
 │   │   └── Navbar.jsx
 │   ├── pages/                    # Page components
 │   │   ├── HomePage.jsx
 │   │   ├── AssessmentPage.jsx
 │   │   ├── TrainingPage.jsx
+│   │   ├── TrainingModulePage.jsx
+│   │   ├── CourseViewerPage.jsx
 │   │   ├── CertificationPage.jsx
 │   │   ├── DashboardPage.jsx
 │   │   ├── LoginPage.jsx
@@ -126,9 +133,20 @@ ai-literacy-platform/
 │   │   ├── auth.py              # Authentication routes
 │   │   ├── assessment.py        # Assessment routes
 │   │   ├── training.py          # Training routes
+│   │   ├── course_content.py    # Course content routes
 │   │   └── certification.py     # Certification routes
+│   ├── migrations/              # Database migrations
+│   ├── seeders/                 # Data seeders
+│   │   ├── course_content.py   # Course content seeder
+│   │   └── training.py          # Training modules seeder
 │   ├── models.py                # Database models
 │   └── app.py                   # Flask application
+├── docs/                        # Documentation
+│   ├── deployment/              # Deployment guides
+│   ├── course-content/          # Course content docs
+│   ├── testing/                 # Testing guides
+│   ├── implementation/          # Implementation details
+│   └── archive/                 # Historical docs
 ├── package.json                 # Frontend dependencies
 ├── requirements.txt             # Backend dependencies
 ├── vite.config.js              # Vite configuration
@@ -138,37 +156,46 @@ ai-literacy-platform/
 
 ## 🎯 Current Implementation Status
 
-### ✅ Completed (Phase 1)
+### ✅ Completed (Phase 1 & 2)
 
 - [x] Project setup and configuration
 - [x] Modern React frontend with Tailwind CSS
 - [x] Flask backend with SQLAlchemy
 - [x] Database models and schema
-- [x] Assessment engine with sample questions
-- [x] User authentication system
+- [x] Assessment engine with 15 questions across 5 domains
+- [x] User authentication system (Supabase)
 - [x] Responsive UI components
 - [x] Homepage with hero section and features
 - [x] Assessment page with interactive quiz
 - [x] Training modules overview
-- [x] Certification system framework
+- [x] **Course content management system**
+- [x] **Course viewer with 4 lesson types (text, video, quiz, interactive)**
+- [x] **3 complete courses with 18 lessons (~5.5 hours content)**
+- [x] **Personalized course recommendations based on assessment**
+- [x] **Video integration with 2 videos + 10 curated**
+- [x] **Enhanced quizzes (8 questions, 80% passing score)**
+- [x] **Progress tracking for lessons and courses**
+- [x] **Certification framework defined**
+- [x] Payment integration (Stripe)
+- [x] Dashboard with analytics and recommendations
 
-### 🚧 In Progress (Phase 2)
+### 🚧 In Progress (Phase 3)
 
-- [ ] Complete user authentication integration
-- [ ] Database initialization and migrations
-- [ ] Assessment results persistence
-- [ ] Training module content delivery
-- [ ] User progress tracking
-- [ ] Dashboard analytics
+- [x] Course content enhancement (30% complete)
+- [ ] Complete Prompt Engineering Mastery (5 more lessons)
+- [ ] Enhance AI Fundamentals with videos
+- [ ] Enhance Elements of AI with videos
+- [ ] Certificate generation system
+- [ ] Final exams for all courses
 
-### 📅 Planned (Phase 3)
+### 📅 Planned (Phase 4)
 
-- [ ] Payment integration (Stripe)
 - [ ] Email notifications
 - [ ] Advanced reporting
 - [ ] Enterprise features
 - [ ] Mobile app
 - [ ] API documentation
+- [ ] More courses and content
 
 ## 🔐 Social Sign-In Setup
 
@@ -242,13 +269,42 @@ Create a Supabase project (or use an existing one) and copy the Project URL and 
 
 The application uses SQLite for development. The database will be automatically created when you first run the Flask application.
 
+## 📚 Documentation
+
+Comprehensive documentation is available in the `/docs` directory:
+
+### Quick Links
+
+- **[Deployment Guide](docs/deployment/DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
+- **[Push & Deploy Guide](docs/deployment/PUSH_AND_DEPLOY_GUIDE.md)** - Quick start for deployment
+- **[Course Catalog](docs/course-content/COURSE_CATALOG.md)** - Available courses and content
+- **[Course Enhancement Strategy](docs/course-content/COURSE_ENHANCEMENT_STRATEGY.md)** - Content roadmap
+- **[Testing Guide](docs/testing/TESTING_GUIDE.md)** - Testing procedures
+- **[Work Completed Summary](docs/implementation/WORK_COMPLETED_SUMMARY.md)** - Recent updates
+
+### Documentation Structure
+
+```
+docs/
+├── deployment/          # Deployment and setup guides
+├── course-content/      # Course documentation and strategies
+├── testing/            # Testing guides and checklists
+├── implementation/     # Implementation summaries
+└── archive/           # Historical documentation
+```
+
+See [docs/README.md](docs/README.md) for the complete documentation index.
+
 ## 📱 Usage
 
 1. **Start Assessment**: Visit the homepage and click "Start Free Assessment"
 2. **Complete Quiz**: Answer 15 questions across AI literacy domains
 3. **View Results**: Get personalized recommendations based on performance
 4. **Explore Training**: Browse role-specific training modules
-5. **Earn Certifications**: Complete requirements to earn industry credentials
+5. **Start Learning**: Click "Start Learning" on recommended courses
+6. **Complete Lessons**: Work through text, video, quiz, and interactive lessons
+7. **Track Progress**: Monitor your progress on the dashboard
+8. **Earn Certifications**: Complete requirements to earn industry credentials
 
 ## 🤝 Contributing
 
