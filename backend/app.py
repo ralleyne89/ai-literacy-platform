@@ -40,6 +40,7 @@ from routes.assessment import assessment_bp
 from routes.training import training_bp
 from routes.certification import certification_bp
 from routes.billing import billing_bp
+from routes.course_content import course_content_bp
 from seeders.training import seed_training_modules as seed_training_modules_fixture
 from seeders.certifications import seed_certification_types as seed_certification_types_fixture
 
@@ -48,6 +49,7 @@ app.register_blueprint(assessment_bp, url_prefix='/api/assessment')
 app.register_blueprint(training_bp, url_prefix='/api/training')
 app.register_blueprint(certification_bp, url_prefix='/api/certification')
 app.register_blueprint(billing_bp, url_prefix='/api/billing')
+app.register_blueprint(course_content_bp, url_prefix='/api/course')
 
 
 @app.cli.command('seed-training-modules')
@@ -66,6 +68,35 @@ def seed_training_modules_command(force: bool, silent: bool):
 def seed_certifications_command(force: bool, silent: bool):
     """Seed the certification catalog with curated defaults."""
     seed_certification_types_fixture(force=force, silent=silent)
+
+
+@app.cli.command('migrate-add-target-domains')
+@with_appcontext
+def migrate_add_target_domains():
+    """Add target_domains column to training_module table"""
+    from sqlalchemy import text
+    try:
+        # Check if column already exists
+        inspector = db.inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('training_module')]
+
+        if 'target_domains' in columns:
+            print("✅ Column 'target_domains' already exists in training_module table")
+            return
+
+        # Add the column
+        with db.engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE training_module ADD COLUMN target_domains TEXT"
+            ))
+            conn.commit()
+
+        print("✅ Successfully added 'target_domains' column to training_module table")
+
+    except Exception as e:
+        print(f"❌ Migration failed: {e}")
+        raise
+
 
 @app.route('/api/health')
 def health_check():

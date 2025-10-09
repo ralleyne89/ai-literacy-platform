@@ -68,9 +68,44 @@ class TrainingModule(db.Model):
     is_premium = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    target_domains = db.Column(db.Text, nullable=True)  # JSON array of assessment domains this module addresses
+
     # Relationships
     progress = db.relationship('UserProgress', backref='module', lazy=True)
+    lessons = db.relationship('Lesson', backref='module', lazy=True, cascade='all, delete-orphan', order_by='Lesson.order_index')
+
+class Lesson(db.Model):
+    """Individual lessons within a training module"""
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    module_id = db.Column(db.String(36), db.ForeignKey('training_module.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    order_index = db.Column(db.Integer, nullable=False)  # Order within the module
+    content_type = db.Column(db.String(50), nullable=False)  # video, text, quiz, interactive
+    content = db.Column(db.Text, nullable=True)  # JSON content based on type
+    estimated_duration_minutes = db.Column(db.Integer, default=10)
+    is_required = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    progress = db.relationship('LessonProgress', backref='lesson', lazy=True, cascade='all, delete-orphan')
+
+class LessonProgress(db.Model):
+    """Track user progress through individual lessons"""
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    lesson_id = db.Column(db.String(36), db.ForeignKey('lesson.id'), nullable=False)
+    module_id = db.Column(db.String(36), db.ForeignKey('training_module.id'), nullable=False)
+    status = db.Column(db.String(20), default='not_started')  # not_started, in_progress, completed
+    time_spent_minutes = db.Column(db.Integer, default=0)
+    quiz_score = db.Column(db.Integer, nullable=True)  # For quiz lessons
+    quiz_attempts = db.Column(db.Integer, default=0)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Unique constraint: one progress record per user per lesson
+    __table_args__ = (db.UniqueConstraint('user_id', 'lesson_id', name='unique_user_lesson'),)
 
 class UserProgress(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -79,6 +114,7 @@ class UserProgress(db.Model):
     status = db.Column(db.String(20), default='not_started')  # not_started, in_progress, completed
     progress_percentage = db.Column(db.Integer, default=0)
     time_spent_minutes = db.Column(db.Integer, default=0)
+    current_lesson_id = db.Column(db.String(36), nullable=True)  # Track current lesson
     started_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     last_accessed = db.Column(db.DateTime, default=datetime.utcnow)
