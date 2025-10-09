@@ -147,7 +147,7 @@ async function handleCheckoutSessionCompleted(session) {
         const { error: updateError } = await supabase
           .from("users")
           .update({
-            subscription_plan: planId || "premium",
+            subscription_tier: planId || "premium",
             stripe_customer_id: session.customer,
             stripe_subscription_id: subscriptionId,
             subscription_status: "active",
@@ -158,7 +158,9 @@ async function handleCheckoutSessionCompleted(session) {
         if (updateError) {
           console.error("Error updating user subscription:", updateError);
         } else {
-          console.log(`Updated subscription for user ${user.id}`);
+          console.log(
+            `Updated subscription for user ${user.id} to ${planId || "premium"}`
+          );
         }
       } else {
         console.log(`No user found with email: ${customerEmail}`);
@@ -224,7 +226,7 @@ async function handleSubscriptionDeleted(subscription) {
       const { error } = await supabase
         .from("users")
         .update({
-          subscription_plan: "free",
+          subscription_tier: "free",
           subscription_status: "cancelled",
           stripe_subscription_id: null,
           updated_at: new Date().toISOString(),
@@ -267,4 +269,3 @@ async function handleInvoicePaymentFailed(invoice) {
 
   // You can send email notifications here to alert the customer
 }
-

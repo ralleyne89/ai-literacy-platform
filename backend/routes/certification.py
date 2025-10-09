@@ -21,7 +21,8 @@ logger = get_logger(__name__)
 
 TIER_RANK = {
     'free': 0,
-    'professional': 1,
+    'premium': 1,        # Stripe payment tier
+    'professional': 1,   # Legacy/alias for premium
     'enterprise': 2,
     'affiliate': 1,
 }

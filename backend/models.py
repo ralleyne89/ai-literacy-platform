@@ -14,10 +14,16 @@ class User(db.Model):
     last_name = db.Column(db.String(50), nullable=False)
     role = db.Column(db.String(50), nullable=True)  # Sales, HR, Marketing, Operations
     organization = db.Column(db.String(100), nullable=True)
-    subscription_tier = db.Column(db.String(20), default='free')  # free, professional, enterprise
+    subscription_tier = db.Column(db.String(20), default='free')  # free, premium, enterprise
+
+    # Stripe subscription fields
+    stripe_customer_id = db.Column(db.String(100), nullable=True)
+    stripe_subscription_id = db.Column(db.String(100), nullable=True)
+    subscription_status = db.Column(db.String(20), nullable=True)  # active, canceled, past_due, etc.
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     assessment_results = db.relationship('AssessmentResult', backref='user', lazy=True)
     progress = db.relationship('UserProgress', backref='user', lazy=True)
