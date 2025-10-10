@@ -2,9 +2,9 @@
 -- This migration creates all required tables for the application
 
 -- Create users table (extends Supabase auth.users)
--- Note: auth.users.id is TEXT (UUID format), not UUID type
+-- Note: auth.users.id is UUID type in Supabase
 CREATE TABLE IF NOT EXISTS public.users (
-  id TEXT PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   first_name TEXT,
   last_name TEXT,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Create assessment_results table
 CREATE TABLE IF NOT EXISTS public.assessment_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   score INTEGER NOT NULL,
   total_questions INTEGER NOT NULL,
   domain_scores JSONB,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.training_modules (
 -- Create user_progress table
 CREATE TABLE IF NOT EXISTS public.user_progress (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   module_id UUID NOT NULL REFERENCES public.training_modules(id) ON DELETE CASCADE,
   progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
   status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed')),
@@ -75,24 +75,24 @@ ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for users table
 CREATE POLICY "Users can view their own data"
   ON public.users FOR SELECT
-  USING (auth.uid()::text = id);
+  USING (auth.uid() = id);
 
 CREATE POLICY "Users can update their own data"
   ON public.users FOR UPDATE
-  USING (auth.uid()::text = id);
+  USING (auth.uid() = id);
 
 -- RLS Policies for assessment_results table
 CREATE POLICY "Users can view their own assessment results"
   ON public.assessment_results FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own assessment results"
   ON public.assessment_results FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own assessment results"
   ON public.assessment_results FOR UPDATE
-  USING (auth.uid()::text = user_id);
+  USING (auth.uid() = user_id);
 
 -- RLS Policies for training_modules table (public read access)
 CREATE POLICY "Anyone can view training modules"
@@ -103,15 +103,15 @@ CREATE POLICY "Anyone can view training modules"
 -- RLS Policies for user_progress table
 CREATE POLICY "Users can view their own progress"
   ON public.user_progress FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own progress"
   ON public.user_progress FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own progress"
   ON public.user_progress FOR UPDATE
-  USING (auth.uid()::text = user_id);
+  USING (auth.uid() = user_id);
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
