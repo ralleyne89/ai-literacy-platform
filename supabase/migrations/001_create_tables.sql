@@ -113,6 +113,65 @@ CREATE POLICY "Users can update their own progress"
   ON public.user_progress FOR UPDATE
   USING (auth.uid() = user_id);
 
+-- Admin RLS Policies
+-- Admins have elevated permissions across all tables
+
+-- Admin policies for users table
+CREATE POLICY "Admins can view all users"
+  ON public.users FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can update all users"
+  ON public.users FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can insert users"
+  ON public.users FOR INSERT
+  WITH CHECK (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can delete users"
+  ON public.users FOR DELETE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+-- Admin policies for assessment_results table
+CREATE POLICY "Admins can view all assessment results"
+  ON public.assessment_results FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can update all assessment results"
+  ON public.assessment_results FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can delete assessment results"
+  ON public.assessment_results FOR DELETE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+-- Admin policies for training_modules table
+CREATE POLICY "Admins can insert training modules"
+  ON public.training_modules FOR INSERT
+  WITH CHECK (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can update training modules"
+  ON public.training_modules FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can delete training modules"
+  ON public.training_modules FOR DELETE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+-- Admin policies for user_progress table
+CREATE POLICY "Admins can view all user progress"
+  ON public.user_progress FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can update all user progress"
+  ON public.user_progress FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
+CREATE POLICY "Admins can delete user progress"
+  ON public.user_progress FOR DELETE
+  USING (auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin'));
+
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
