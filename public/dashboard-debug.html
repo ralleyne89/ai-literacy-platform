@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Data Diagnostic</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; margin-bottom: 10px; }
+    h2 { color: #555; margin-top: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.ok { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .status.warning { background: #fff3cd; color: #856404; }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .test-item {
+      margin: 15px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+    button {
+      background: #5469d4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #4053b8; }
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .warning-box {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .error-box {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      padding: 15px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Dashboard Data Diagnostic Tool</h1>
+    <p>This tool checks Supabase connection, authentication, and data availability.</p>
+    
+    <div class="info-box">
+      <strong>Instructions:</strong>
+      <ol>
+        <li>Make sure you're logged in to the main app first</li>
+        <li>Click "Run All Tests" below</li>
+        <li>Copy all results and share with support</li>
+      </ol>
+    </div>
+
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="location.reload()">Refresh Page</button>
+    
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    const resultsDiv = document.getElementById('results');
+
+    function addResult(title, status, details, isHtml = false) {
+      const statusClass = status === 'OK' ? 'ok' : status === 'ERROR' ? 'error' : 'warning';
+      const content = isHtml ? details : `<pre>${details}</pre>`;
+      const html = `
+        <div class="test-item">
+          <strong>${title}</strong>
+          <span class="status ${statusClass}">${status}</span>
+          ${content}
+        </div>
+      `;
+      resultsDiv.innerHTML += html;
+    }
+
+    async function checkEnvironmentVariables() {
+      const viteSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const viteSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const details = {
+        'VITE_SUPABASE_URL': viteSupabaseUrl || 'NOT SET ❌',
+        'VITE_SUPABASE_ANON_KEY': viteSupabaseAnonKey ? `SET ✅ (length: ${viteSupabaseAnonKey.length})` : 'NOT SET ❌',
+      };
+
+      const allSet = viteSupabaseUrl && viteSupabaseAnonKey;
+      const status = allSet ? 'OK' : 'ERROR';
+
+      addResult('Environment Variables Check', status, JSON.stringify(details, null, 2));
+      
+      return { viteSupabaseUrl, viteSupabaseAnonKey, allSet };
+    }
+
+    async function checkSupabaseConnection(supabaseUrl, supabaseAnonKey) {
+      if (!supabaseUrl || !supabaseAnonKey) {
+        addResult('Supabase Connection', 'ERROR', 'Cannot test - environment variables not set');
+        return null;
+      }
+
+      try {
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+        // Test connection by getting session
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          addResult('Supabase Connection', 'ERROR', `Connection failed: ${error.message}`);
+          return null;
+        }
+
+        const details = {
+          'Connection': 'SUCCESS ✅',
+          'Session': session ? 'Active ✅' : 'No active session ⚠️',
+          'User Email': session?.user?.email || 'Not logged in',
+          'User ID': session?.user?.id || 'N/A',
+        };
+
+        const status = session ? 'OK' : 'WARNING';
+        addResult('Supabase Connection & Authentication', status, JSON.stringify(details, null, 2));
+
+        return { supabase, session };
+      } catch (error) {
+        addResult('Supabase Connection', 'ERROR', `Failed to initialize: ${error.message}`);
+        return null;
+      }
+    }
+
+    async function checkAssessmentData(supabase, userId) {
+      if (!supabase || !userId) {
+        addResult('Assessment Data Check', 'ERROR', 'Cannot check - not authenticated');
+        return;
+      }
+
+      try {
+        console.log('[Dashboard Debug] Querying assessment_results for user:', userId);
+        
+        const { data: assessments, error } = await supabase
+          .from('assessment_results')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        console.log('[Dashboard Debug] Assessment query result:', { assessments, error });
+
+        if (error) {
+          addResult('Assessment Data Check', 'ERROR', 
+            `Query failed:\n${JSON.stringify(error, null, 2)}`);
+          return;
+        }
+
+        const count = assessments?.length || 0;
+        const status = count > 0 ? 'OK' : 'WARNING';
+
+        const details = {
+          'Records Found': count,
+          'User ID Queried': userId,
+          'Data': count > 0 ? assessments.map(a => ({
+            id: a.id,
+            score: a.score,
+            created_at: a.created_at,
+            domain_scores: typeof a.domain_scores === 'string' ? 'JSON string' : 'Object'
+          })) : 'No assessment data found for this user'
+        };
+
+        addResult('Assessment Results Data', status, JSON.stringify(details, null, 2));
+
+        if (count === 0) {
+          const warningHtml = `
+            <div class="warning-box">
+              <strong>⚠️ No Assessment Data Found</strong>
+              <p>Possible reasons:</p>
+              <ul>
+                <li>You haven't completed any assessments yet</li>
+                <li>You're logged in as a different user than when you took assessments</li>
+                <li>Data was deleted or lost during migration</li>
+              </ul>
+            </div>
+          `;
+          addResult('Assessment Data Analysis', 'WARNING', warningHtml, true);
+        }
+      } catch (error) {
+        addResult('Assessment Data Check', 'ERROR', `Exception: ${error.message}\n${error.stack}`);
+      }
+    }
+
+    async function checkTrainingProgressData(supabase, userId) {
+      if (!supabase || !userId) {
+        addResult('Training Progress Check', 'ERROR', 'Cannot check - not authenticated');
+        return;
+      }
+
+      try {
+        console.log('[Dashboard Debug] Querying user_progress for user:', userId);
+        
+        const { data: progress, error } = await supabase
+          .from('user_progress')
+          .select(`
+            *,
+            training_module:training_modules(id, title, description, difficulty_level)
+          `)
+          .eq('user_id', userId);
+
+        console.log('[Dashboard Debug] Training progress query result:', { progress, error });
+
+        if (error) {
+          addResult('Training Progress Check', 'ERROR', 
+            `Query failed:\n${JSON.stringify(error, null, 2)}`);
+          return;
+        }
+
+        const count = progress?.length || 0;
+        const status = count > 0 ? 'OK' : 'WARNING';
+
+        const details = {
+          'Records Found': count,
+          'User ID Queried': userId,
+          'Data': count > 0 ? progress.map(p => ({
+            module_id: p.module_id,
+            progress_percentage: p.progress_percentage,
+            status: p.status,
+            last_accessed: p.last_accessed,
+            module_title: p.training_module?.title || 'N/A'
+          })) : 'No training progress found for this user'
+        };
+
+        addResult('Training Progress Data', status, JSON.stringify(details, null, 2));
+
+        if (count === 0) {
+          const warningHtml = `
+            <div class="warning-box">
+              <strong>⚠️ No Training Progress Found</strong>
+              <p>Possible reasons:</p>
+              <ul>
+                <li>You haven't started any training modules yet</li>
+                <li>You're logged in as a different user than when you started training</li>
+                <li>Data was deleted or lost during migration</li>
+              </ul>
+            </div>
+          `;
+          addResult('Training Progress Analysis', 'WARNING', warningHtml, true);
+        }
+      } catch (error) {
+        addResult('Training Progress Check', 'ERROR', `Exception: ${error.message}\n${error.stack}`);
+      }
+    }
+
+    async function checkAllUsersData(supabase) {
+      if (!supabase) {
+        return;
+      }
+
+      try {
+        // Check total assessment records (without user filter)
+        const { data: allAssessments, error: assessError } = await supabase
+          .from('assessment_results')
+          .select('user_id, created_at', { count: 'exact' })
+          .limit(100);
+
+        const { data: allProgress, error: progressError } = await supabase
+          .from('user_progress')
+          .select('user_id', { count: 'exact' })
+          .limit(100);
+
+        const details = {
+          'Total Assessment Records': allAssessments?.length || 0,
+          'Total Progress Records': allProgress?.length || 0,
+          'Unique Users (Assessments)': allAssessments ? [...new Set(allAssessments.map(a => a.user_id))].length : 0,
+          'Unique Users (Progress)': allProgress ? [...new Set(allProgress.map(p => p.user_id))].length : 0,
+          'Note': 'This shows if ANY data exists in the database'
+        };
+
+        const status = (allAssessments?.length > 0 || allProgress?.length > 0) ? 'OK' : 'WARNING';
+        addResult('Database-Wide Data Check', status, JSON.stringify(details, null, 2));
+
+        if (allAssessments?.length === 0 && allProgress?.length === 0) {
+          const warningHtml = `
+            <div class="error-box">
+              <strong>🚨 No Data in Database</strong>
+              <p>The database tables are empty. This means:</p>
+              <ul>
+                <li>No users have completed assessments</li>
+                <li>No users have training progress</li>
+                <li>Data may have been lost or never created</li>
+              </ul>
+            </div>
+          `;
+          addResult('Database Status', 'ERROR', warningHtml, true);
+        }
+      } catch (error) {
+        console.error('Error checking database-wide data:', error);
+      }
+    }
+
+    window.runAllTests = async function() {
+      resultsDiv.innerHTML = '<h2>Running Tests...</h2>';
+      
+      // Step 1: Check environment variables
+      const { viteSupabaseUrl, viteSupabaseAnonKey, allSet } = await checkEnvironmentVariables();
+      
+      if (!allSet) {
+        const errorHtml = `
+          <div class="error-box">
+            <strong>🚨 Critical Error: Environment Variables Not Set</strong>
+            <p>The following environment variables are missing in Netlify:</p>
+            <ul>
+              <li><code>VITE_SUPABASE_URL</code></li>
+              <li><code>VITE_SUPABASE_ANON_KEY</code></li>
+            </ul>
+            <p><strong>Action Required:</strong> Add these to Netlify environment variables and redeploy.</p>
+          </div>
+        `;
+        addResult('Critical Error', 'ERROR', errorHtml, true);
+        return;
+      }
+
+      // Step 2: Check Supabase connection and auth
+      const result = await checkSupabaseConnection(viteSupabaseUrl, viteSupabaseAnonKey);
+      
+      if (!result) {
+        return;
+      }
+
+      const { supabase, session } = result;
+
+      if (!session) {
+        const warningHtml = `
+          <div class="warning-box">
+            <strong>⚠️ Not Logged In</strong>
+            <p>You need to log in to check your personal data.</p>
+            <p><strong>Action:</strong> Go to <a href="/login">Login Page</a>, log in, then return here.</p>
+          </div>
+        `;
+        addResult('Authentication Required', 'WARNING', warningHtml, true);
+        
+        // Still check database-wide data
+        await checkAllUsersData(supabase);
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // Step 3: Check assessment data
+      await checkAssessmentData(supabase, userId);
+
+      // Step 4: Check training progress data
+      await checkTrainingProgressData(supabase, userId);
+
+      // Step 5: Check database-wide data
+      await checkAllUsersData(supabase);
+
+      resultsDiv.innerHTML += '<h2 style="color: green;">✅ All Tests Complete</h2>';
+    };
+
+    // Auto-run on page load
+    window.addEventListener('load', runAllTests);
+  </script>
+</body>
+</html>
+
