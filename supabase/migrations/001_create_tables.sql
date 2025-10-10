@@ -1,6 +1,10 @@
+-- AI Literacy Platform Database Schema
+-- This migration creates all required tables for the application
+
 -- Create users table (extends Supabase auth.users)
+-- Note: auth.users.id is TEXT (UUID format), not UUID type
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   first_name TEXT,
   last_name TEXT,
@@ -17,11 +21,11 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Create assessment_results table
 CREATE TABLE IF NOT EXISTS public.assessment_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   score INTEGER NOT NULL,
   total_questions INTEGER NOT NULL,
   domain_scores JSONB,
-  time_taken INTEGER, -- in seconds
+  time_taken INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -32,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.training_modules (
   title TEXT NOT NULL,
   description TEXT,
   difficulty_level TEXT CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced')),
-  estimated_duration INTEGER, -- in minutes
+  estimated_duration INTEGER,
   content JSONB,
   prerequisites TEXT[],
   learning_objectives TEXT[],
@@ -43,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.training_modules (
 -- Create user_progress table
 CREATE TABLE IF NOT EXISTS public.user_progress (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   module_id UUID NOT NULL REFERENCES public.training_modules(id) ON DELETE CASCADE,
   progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
   status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed')),
@@ -71,24 +75,24 @@ ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for users table
 CREATE POLICY "Users can view their own data"
   ON public.users FOR SELECT
-  USING (auth.uid() = id);
+  USING (auth.uid()::text = id);
 
 CREATE POLICY "Users can update their own data"
   ON public.users FOR UPDATE
-  USING (auth.uid() = id);
+  USING (auth.uid()::text = id);
 
 -- RLS Policies for assessment_results table
 CREATE POLICY "Users can view their own assessment results"
   ON public.assessment_results FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can insert their own assessment results"
   ON public.assessment_results FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can update their own assessment results"
   ON public.assessment_results FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::text = user_id);
 
 -- RLS Policies for training_modules table (public read access)
 CREATE POLICY "Anyone can view training modules"
@@ -99,24 +103,24 @@ CREATE POLICY "Anyone can view training modules"
 -- RLS Policies for user_progress table
 CREATE POLICY "Users can view their own progress"
   ON public.user_progress FOR SELECT
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can insert their own progress"
   ON public.user_progress FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can update their own progress"
   ON public.user_progress FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid()::text = user_id);
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS \$\$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+\$\$ LANGUAGE plpgsql;
 
 -- Create triggers for updated_at
 CREATE TRIGGER update_users_updated_at
@@ -171,4 +175,3 @@ VALUES
     ARRAY['Integrate AI APIs', 'Build AI workflows', 'Measure AI ROI']
   )
 ON CONFLICT DO NOTHING;
-
