@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Checkout Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; }
+    button {
+      background: #5469d4;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    button:hover { background: #4053b8; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    .info { background: #d1ecf1; color: #0c5460; }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Stripe Checkout Diagnostic Test</h1>
+    <p>This page tests the Stripe checkout flow directly without the React app.</p>
+    
+    <div>
+      <label for="email">Email:</label>
+      <input type="email" id="email" placeholder="your-email@example.com" value="test@example.com">
+    </div>
+
+    <div>
+      <label for="plan">Plan:</label>
+      <select id="plan" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+        <option value="premium">Premium ($49/month)</option>
+        <option value="enterprise">Enterprise ($99/month)</option>
+      </select>
+    </div>
+
+    <div>
+      <button onclick="testBillingConfig()">1. Test Billing Config API</button>
+      <button onclick="testCheckoutSession()">2. Test Checkout Session</button>
+      <button onclick="testFullFlow()">3. Test Full Flow</button>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function showResult(message, type = 'info') {
+      const resultDiv = document.getElementById('result');
+      resultDiv.className = `result ${type}`;
+      resultDiv.textContent = message;
+    }
+
+    async function testBillingConfig() {
+      showResult('Testing billing config API...', 'info');
+      try {
+        const response = await fetch('/api/billing/config');
+        const data = await response.json();
+        
+        if (response.ok) {
+          showResult(
+            `✅ SUCCESS!\n\n` +
+            `Status: ${response.status}\n` +
+            `Publishable Key: ${data.publishable_key ? 'SET' : 'MISSING'}\n` +
+            `Plans: ${data.plans?.length || 0}\n\n` +
+            `Full Response:\n${JSON.stringify(data, null, 2)}`,
+            'success'
+          );
+        } else {
+          showResult(
+            `❌ FAILED!\n\n` +
+            `Status: ${response.status}\n` +
+            `Error: ${JSON.stringify(data, null, 2)}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        showResult(
+          `❌ NETWORK ERROR!\n\n` +
+          `Error: ${error.message}\n` +
+          `This usually means:\n` +
+          `- CORS issue\n` +
+          `- Network connectivity problem\n` +
+          `- API endpoint not found`,
+          'error'
+        );
+      }
+    }
+
+    async function testCheckoutSession() {
+      const email = document.getElementById('email').value;
+      const plan = document.getElementById('plan').value;
+
+      if (!email) {
+        showResult('❌ Please enter an email address', 'error');
+        return;
+      }
+
+      showResult(`Testing checkout session for ${plan}...`, 'info');
+      
+      try {
+        const response = await fetch('/api/billing/checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ plan, email }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.url) {
+          showResult(
+            `✅ SUCCESS!\n\n` +
+            `Status: ${response.status}\n` +
+            `Checkout URL: ${data.url}\n\n` +
+            `The checkout session was created successfully!\n` +
+            `Click "Test Full Flow" to be redirected to Stripe.`,
+            'success'
+          );
+        } else {
+          showResult(
+            `❌ FAILED!\n\n` +
+            `Status: ${response.status}\n` +
+            `Error: ${data.error || 'Unknown error'}\n` +
+            `Details: ${data.details || 'None'}\n` +
+            `Hint: ${data.hint || 'None'}\n\n` +
+            `Full Response:\n${JSON.stringify(data, null, 2)}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        showResult(
+          `❌ NETWORK ERROR!\n\n` +
+          `Error: ${error.message}\n` +
+          `Stack: ${error.stack}`,
+          'error'
+        );
+      }
+    }
+
+    async function testFullFlow() {
+      const email = document.getElementById('email').value;
+      const plan = document.getElementById('plan').value;
+
+      if (!email) {
+        showResult('❌ Please enter an email address', 'error');
+        return;
+      }
+
+      showResult(`Starting full checkout flow for ${plan}...`, 'info');
+
+      try {
+        const response = await fetch('/api/billing/checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ plan, email }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.url) {
+          showResult(
+            `✅ Redirecting to Stripe Checkout...\n\n` +
+            `URL: ${data.url}`,
+            'success'
+          );
+          
+          // Redirect after 2 seconds
+          setTimeout(() => {
+            window.location.href = data.url;
+          }, 2000);
+        } else {
+          showResult(
+            `❌ FAILED!\n\n` +
+            `Status: ${response.status}\n` +
+            `Error: ${data.error || 'Unknown error'}\n` +
+            `Details: ${data.details || 'None'}\n` +
+            `Hint: ${data.hint || 'None'}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        showResult(
+          `❌ NETWORK ERROR!\n\n` +
+          `Error: ${error.message}`,
+          'error'
+        );
+      }
+    }
+
+    // Auto-run billing config test on page load
+    window.addEventListener('load', () => {
+      testBillingConfig();
+    });
+  </script>
+</body>
+</html>
+
