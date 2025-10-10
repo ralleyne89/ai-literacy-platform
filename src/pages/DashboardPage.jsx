@@ -13,12 +13,27 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!user?.id || !supabase) {
+      console.log('[Dashboard] Starting data fetch')
+      console.log('[Dashboard] User:', user)
+      console.log('[Dashboard] User ID:', user?.id)
+      console.log('[Dashboard] Supabase client:', supabase ? 'initialized' : 'NOT initialized')
+
+      if (!user?.id) {
+        console.warn('[Dashboard] No user ID, skipping data fetch')
+        setLoading(false)
+        return
+      }
+
+      if (!supabase) {
+        console.error('[Dashboard] Supabase client not initialized!')
+        console.error('[Dashboard] Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables')
         setLoading(false)
         return
       }
 
       try {
+        console.log('[Dashboard] Fetching assessment history for user:', user.id)
+
         // Fetch assessment history directly from Supabase
         const { data: assessments, error: assessmentError } = await supabase
           .from('assessment_results')
@@ -26,11 +41,17 @@ const DashboardPage = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
 
+        console.log('[Dashboard] Assessment query result:', { assessments, assessmentError })
+
         if (assessmentError) {
-          console.error('Failed to fetch assessments:', assessmentError)
+          console.error('[Dashboard] Failed to fetch assessments:', assessmentError)
+          console.error('[Dashboard] Error details:', JSON.stringify(assessmentError, null, 2))
         } else {
+          console.log('[Dashboard] Assessments fetched:', assessments?.length || 0, 'records')
           setAssessmentHistory(assessments || [])
         }
+
+        console.log('[Dashboard] Fetching training progress for user:', user.id)
 
         // Fetch training progress directly from Supabase
         const { data: progress, error: progressError } = await supabase
@@ -41,21 +62,31 @@ const DashboardPage = () => {
           `)
           .eq('user_id', user.id)
 
+        console.log('[Dashboard] Training progress query result:', { progress, progressError })
+
         if (progressError) {
-          console.error('Failed to fetch training progress:', progressError)
+          console.error('[Dashboard] Failed to fetch training progress:', progressError)
+          console.error('[Dashboard] Error details:', JSON.stringify(progressError, null, 2))
         } else {
+          console.log('[Dashboard] Training progress fetched:', progress?.length || 0, 'records')
           setTrainingProgress(progress || [])
         }
 
         // Generate recommendations from latest assessment
         if (assessments && assessments.length > 0) {
+          console.log('[Dashboard] Generating recommendations from latest assessment')
           const latest = assessments[0]
           const recommendations = generateRecommendations(latest)
+          console.log('[Dashboard] Recommendations generated:', recommendations.length)
           setCourseRecommendations(recommendations)
+        } else {
+          console.log('[Dashboard] No assessments found, skipping recommendations')
         }
       } catch (error) {
-        console.error('Failed to fetch dashboard data:', error)
+        console.error('[Dashboard] Failed to fetch dashboard data:', error)
+        console.error('[Dashboard] Error stack:', error.stack)
       } finally {
+        console.log('[Dashboard] Data fetch complete')
         setLoading(false)
       }
     }

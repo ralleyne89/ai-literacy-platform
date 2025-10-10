@@ -150,19 +150,48 @@ const BillingPage = () => {
 
     setCheckoutPlan(planId)
     setError('')
+
+    console.log('[Checkout] Starting checkout for plan:', planId, 'email:', emailToUse)
+    console.log('[Checkout] Axios baseURL:', axios.defaults.baseURL)
+    console.log('[Checkout] Current origin:', window.location.origin)
+
     try {
-      const { data } = await axios.post('/api/billing/checkout-session', { plan: planId, email: emailToUse })
+      const requestUrl = '/api/billing/checkout-session'
+      const requestData = { plan: planId, email: emailToUse }
+
+      console.log('[Checkout] Making POST request to:', requestUrl)
+      console.log('[Checkout] Request data:', requestData)
+
+      const response = await axios.post(requestUrl, requestData)
+
+      console.log('[Checkout] Response status:', response.status)
+      console.log('[Checkout] Response data:', response.data)
+
+      const { data } = response
+
       if (data?.url) {
+        console.log('[Checkout] Redirecting to:', data.url)
         window.location.href = data.url
       } else {
+        console.error('[Checkout] No URL in response:', data)
         throw new Error('Missing checkout URL from server')
       }
     } catch (err) {
-      console.error('Checkout failed:', err)
+      console.error('[Checkout] Error caught:', err)
+      console.error('[Checkout] Error type:', err.constructor.name)
+      console.error('[Checkout] Error message:', err.message)
+      console.error('[Checkout] Error response:', err?.response)
+      console.error('[Checkout] Error response data:', err?.response?.data)
+      console.error('[Checkout] Error response status:', err?.response?.status)
+
       const responseData = err?.response?.data
       const message = responseData?.error || 'We could not start the checkout session.'
       const details = responseData?.details || responseData?.hint
-      setError(details ? `${message} (${details})` : message)
+
+      const fullError = details ? `${message} (${details})` : message
+      console.error('[Checkout] Setting error message:', fullError)
+
+      setError(fullError)
       setCheckoutPlan('')
     }
   }

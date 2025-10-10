@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environment Check</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1000px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; margin-bottom: 10px; }
+    h2 { color: #555; margin-top: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.ok { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .status.warning { background: #fff3cd; color: #856404; }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .test-item {
+      margin: 15px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+    button {
+      background: #5469d4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #4053b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Environment & Configuration Check</h1>
+    <p>This page checks all environment variables and API endpoints.</p>
+    
+    <button onclick="runAllTests()">Run All Tests</button>
+    <button onclick="location.reload()">Refresh Page</button>
+    
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    const resultsDiv = document.getElementById('results');
+
+    function addResult(title, status, details) {
+      const statusClass = status === 'OK' ? 'ok' : status === 'ERROR' ? 'error' : 'warning';
+      const html = `
+        <div class="test-item">
+          <strong>${title}</strong>
+          <span class="status ${statusClass}">${status}</span>
+          <pre>${details}</pre>
+        </div>
+      `;
+      resultsDiv.innerHTML += html;
+    }
+
+    async function checkFrontendEnv() {
+      const viteSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const viteSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const viteStripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+      const viteApiUrl = import.meta.env.VITE_API_URL;
+
+      const details = {
+        'VITE_SUPABASE_URL': viteSupabaseUrl || 'NOT SET',
+        'VITE_SUPABASE_ANON_KEY': viteSupabaseAnonKey ? 'SET (length: ' + viteSupabaseAnonKey.length + ')' : 'NOT SET',
+        'VITE_STRIPE_PUBLISHABLE_KEY': viteStripePublishableKey ? 'SET (starts with: ' + viteStripePublishableKey.substring(0, 10) + '...)' : 'NOT SET',
+        'VITE_API_URL': viteApiUrl || 'NOT SET (will use window.location.origin)',
+        'window.location.origin': window.location.origin,
+      };
+
+      const allSet = viteSupabaseUrl && viteSupabaseAnonKey;
+      const status = allSet ? 'OK' : 'ERROR';
+
+      addResult('Frontend Environment Variables', status, JSON.stringify(details, null, 2));
+    }
+
+    async function checkAxiosConfig() {
+      // We need to import axios to check its config
+      // For now, just check what the config should be based on main.jsx logic
+      const origin = window.location.origin;
+      const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+      const expectedBaseURL = isLocal ? origin.replace(/:\d+$/, ':5001') : origin;
+
+      const details = {
+        'Current Origin': origin,
+        'Is Local': isLocal,
+        'Expected Axios baseURL': expectedBaseURL,
+        'Note': 'Axios baseURL is set in main.jsx based on environment'
+      };
+
+      addResult('Axios Configuration', 'OK', JSON.stringify(details, null, 2));
+    }
+
+    async function testBillingConfigAPI() {
+      try {
+        const response = await fetch('/api/billing/config');
+        const data = await response.json();
+
+        if (response.ok) {
+          const details = {
+            'Status': response.status,
+            'Publishable Key': data.publishable_key ? 'SET' : 'MISSING',
+            'Plans Count': data.plans?.length || 0,
+            'Plans': data.plans?.map(p => p.id).join(', ') || 'None'
+          };
+          addResult('Billing Config API', 'OK', JSON.stringify(details, null, 2));
+        } else {
+          addResult('Billing Config API', 'ERROR', JSON.stringify(data, null, 2));
+        }
+      } catch (error) {
+        addResult('Billing Config API', 'ERROR', error.message);
+      }
+    }
+
+    async function testCheckoutSessionAPI() {
+      try {
+        const response = await fetch('/api/billing/checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'premium', email: 'test@example.com' })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.url) {
+          const details = {
+            'Status': response.status,
+            'Checkout URL': data.url.substring(0, 50) + '...',
+            'Result': 'SUCCESS - Checkout session created'
+          };
+          addResult('Checkout Session API', 'OK', JSON.stringify(details, null, 2));
+        } else {
+          const details = {
+            'Status': response.status,
+            'Error': data.error || 'Unknown',
+            'Details': data.details || 'None',
+            'Hint': data.hint || 'None'
+          };
+          addResult('Checkout Session API', 'ERROR', JSON.stringify(details, null, 2));
+        }
+      } catch (error) {
+        addResult('Checkout Session API', 'ERROR', error.message);
+      }
+    }
+
+    async function testStripeConnection() {
+      try {
+        const response = await fetch('/.netlify/functions/test-stripe-connection');
+        const data = await response.json();
+
+        if (response.ok) {
+          const status = data.stripeConnection?.status === 'SUCCESS' ? 'OK' : 'ERROR';
+          addResult('Stripe Connection Test', status, JSON.stringify(data, null, 2));
+        } else {
+          addResult('Stripe Connection Test', 'ERROR', JSON.stringify(data, null, 2));
+        }
+      } catch (error) {
+        addResult('Stripe Connection Test', 'ERROR', error.message);
+      }
+    }
+
+    async function testSupabaseConnection() {
+      const viteSupabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const viteSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!viteSupabaseUrl || !viteSupabaseAnonKey) {
+        addResult('Supabase Connection Test', 'ERROR', 'Environment variables not set');
+        return;
+      }
+
+      try {
+        // Import Supabase dynamically
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+        const supabase = createClient(viteSupabaseUrl, viteSupabaseAnonKey);
+
+        // Try to get session
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          addResult('Supabase Connection Test', 'WARNING', 
+            'Connection works but no active session:\n' + JSON.stringify({ error: error.message }, null, 2));
+        } else {
+          const details = {
+            'Connection': 'SUCCESS',
+            'Session': session ? 'Active' : 'No active session',
+            'User': session?.user?.email || 'Not logged in'
+          };
+          addResult('Supabase Connection Test', 'OK', JSON.stringify(details, null, 2));
+        }
+      } catch (error) {
+        addResult('Supabase Connection Test', 'ERROR', error.message);
+      }
+    }
+
+    async function testNetlifyFunctions() {
+      const functions = [
+        'billing-config',
+        'checkout-session',
+        'stripe-webhook',
+        'subscription-status',
+        'test-stripe-connection',
+        'debug-env'
+      ];
+
+      const results = {};
+
+      for (const func of functions) {
+        try {
+          const response = await fetch(`/.netlify/functions/${func}`, {
+            method: func === 'checkout-session' ? 'POST' : 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            body: func === 'checkout-session' ? JSON.stringify({ plan: 'premium', email: 'test@example.com' }) : undefined
+          });
+
+          results[func] = {
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText
+          };
+        } catch (error) {
+          results[func] = {
+            error: error.message
+          };
+        }
+      }
+
+      addResult('Netlify Functions Check', 'OK', JSON.stringify(results, null, 2));
+    }
+
+    window.runAllTests = async function() {
+      resultsDiv.innerHTML = '<h2>Running Tests...</h2>';
+      
+      await checkFrontendEnv();
+      await checkAxiosConfig();
+      await testBillingConfigAPI();
+      await testCheckoutSessionAPI();
+      await testStripeConnection();
+      await testSupabaseConnection();
+      await testNetlifyFunctions();
+      
+      resultsDiv.innerHTML += '<h2 style="color: green;">✅ All Tests Complete</h2>';
+    };
+
+    // Auto-run on page load
+    window.addEventListener('load', runAllTests);
+  </script>
+</body>
+</html>
+
