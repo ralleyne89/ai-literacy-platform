@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink, Loader2 } from 'lucide-react'
-import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabaseClient'
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -22,27 +22,43 @@ const TrainingModulePage = () => {
         setLoading(true)
         setError('')
 
-        const moduleRequest = axios.get(`/api/training/modules/${moduleId}`)
-        let progressRequest = null
-        if (isAuthenticated) {
-          progressRequest = axios.get('/api/training/progress')
+        console.log('[TrainingModule] Loading module:', moduleId)
+
+        // Fetch module from Supabase
+        const { data: moduleData, error: moduleError } = await supabase
+          .from('training_modules')
+          .select('*')
+          .eq('id', moduleId)
+          .single()
+
+        if (moduleError) {
+          console.error('[TrainingModule] Error fetching module:', moduleError)
+          throw moduleError
         }
 
-        const [moduleResponse, progressResponse] = await Promise.all([
-          moduleRequest,
-          progressRequest?.catch(() => null)
-        ])
+        console.log('[TrainingModule] Module loaded:', moduleData)
+        setModule(moduleData)
 
-        setModule(moduleResponse.data.module)
+        // Fetch user progress if authenticated
+        if (isAuthenticated && user?.id) {
+          console.log('[TrainingModule] Fetching progress for user:', user.id)
 
-        if (progressResponse?.data?.progress) {
-          const record = progressResponse.data.progress.find(item => item.module_id === moduleId)
-          if (record) {
-            setProgress(record)
+          const { data: progressData, error: progressError } = await supabase
+            .from('user_progress')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('module_id', moduleId)
+            .maybeSingle()
+
+          if (progressError) {
+            console.error('[TrainingModule] Error fetching progress:', progressError)
+          } else if (progressData) {
+            console.log('[TrainingModule] Progress loaded:', progressData)
+            setProgress(progressData)
           }
         }
       } catch (err) {
-        console.error('Failed to load module', err)
+        console.error('[TrainingModule] Failed to load module:', err)
         setError('Unable to load this module right now. Please try again later.')
       } finally {
         setLoading(false)
@@ -50,24 +66,42 @@ const TrainingModulePage = () => {
     }
 
     loadModule()
-  }, [moduleId, isAuthenticated])
+  }, [moduleId, isAuthenticated, user?.id])
 
   const handleEnroll = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.id) {
       navigate('/login', { state: { from: `/training/modules/${moduleId}` } })
       return
     }
 
     try {
       setEnrolling(true)
-      const response = await axios.post(`/api/training/enroll/${moduleId}`)
-      setProgress(prev => ({
-        ...(prev || {}),
-        status: response.data.status,
-        progress_percentage: prev?.progress_percentage || 0
-      }))
+      console.log('[TrainingModule] Enrolling user:', user.id, 'in module:', moduleId)
+
+      // Create or update user progress in Supabase
+      const { data, error } = await supabase
+        .from('user_progress')
+        .upsert({
+          user_id: user.id,
+          module_id: moduleId,
+          status: 'in_progress',
+          progress_percentage: 0,
+          last_accessed: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,module_id'
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[TrainingModule] Error enrolling:', error)
+        throw error
+      }
+
+      console.log('[TrainingModule] Enrolled successfully:', data)
+      setProgress(data)
     } catch (err) {
-      console.error('Failed to enroll', err)
+      console.error('[TrainingModule] Failed to enroll:', err)
       setError('We could not enroll you in this module. Please try again.')
     } finally {
       setEnrolling(false)
@@ -75,20 +109,38 @@ const TrainingModulePage = () => {
   }
 
   const handleMarkComplete = async () => {
+    if (!isAuthenticated || !user?.id) {
+      return
+    }
+
     try {
       setProgressUpdating(true)
-      const response = await axios.put(`/api/training/progress/${moduleId}`, {
-        progress_percentage: 100,
-        status: 'completed'
-      })
-      setProgress(prev => ({
-        ...(prev || {}),
-        status: response.data.status,
-        progress_percentage: response.data.progress_percentage,
-        completed_at: response.data.completed_at
-      }))
+      console.log('[TrainingModule] Marking module complete:', moduleId)
+
+      const { data, error } = await supabase
+        .from('user_progress')
+        .upsert({
+          user_id: user.id,
+          module_id: moduleId,
+          status: 'completed',
+          progress_percentage: 100,
+          completed_at: new Date().toISOString(),
+          last_accessed: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,module_id'
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[TrainingModule] Error marking complete:', error)
+        throw error
+      }
+
+      console.log('[TrainingModule] Marked complete successfully:', data)
+      setProgress(data)
     } catch (err) {
-      console.error('Failed to update progress', err)
+      console.error('[TrainingModule] Failed to update progress:', err)
       setError('We could not update your progress. Please try again.')
     } finally {
       setProgressUpdating(false)

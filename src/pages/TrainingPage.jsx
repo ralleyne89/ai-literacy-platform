@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp } from 'lucide-react'
-import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabaseClient'
 
 const TrainingPage = () => {
   const [modules, setModules] = useState([])
@@ -11,7 +11,7 @@ const TrainingPage = () => {
   const [progressMap, setProgressMap] = useState({})
   const [error, setError] = useState('')
 
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const roles = ['All', 'Sales', 'HR', 'Marketing', 'Operations', 'General']
 
@@ -24,32 +24,48 @@ const TrainingPage = () => {
     setError('')
 
     try {
-      const params = selectedRole !== 'All' ? { role: selectedRole } : {}
-      const modulesRequest = axios.get('/api/training/modules', { params })
+      console.log('[Training] Fetching training modules from Supabase')
 
-      let progressRequest = null
-      if (isAuthenticated) {
-        progressRequest = axios.get('/api/training/progress')
+      // Fetch training modules from Supabase
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('training_modules')
+        .select('*')
+        .order('difficulty_level', { ascending: true })
+        .order('title', { ascending: true })
+
+      if (modulesError) {
+        console.error('[Training] Error fetching modules:', modulesError)
+        throw modulesError
       }
 
-      const [modulesResponse, progressResponse] = await Promise.all([
-        modulesRequest,
-        progressRequest?.catch(() => null)
-      ])
+      console.log('[Training] Modules fetched:', modulesData?.length || 0, 'modules')
+      setModules(modulesData || [])
 
-      setModules(modulesResponse.data.modules || [])
+      // Fetch user progress if authenticated
+      if (isAuthenticated && user?.id) {
+        console.log('[Training] Fetching user progress for user:', user.id)
 
-      if (progressResponse?.data?.progress) {
-        const nextProgressMap = {}
-        progressResponse.data.progress.forEach(record => {
-          nextProgressMap[record.module_id] = record
-        })
-        setProgressMap(nextProgressMap)
+        const { data: progressData, error: progressError } = await supabase
+          .from('user_progress')
+          .select('*')
+          .eq('user_id', user.id)
+
+        if (progressError) {
+          console.error('[Training] Error fetching progress:', progressError)
+        } else {
+          console.log('[Training] Progress fetched:', progressData?.length || 0, 'records')
+
+          const nextProgressMap = {}
+          progressData?.forEach(record => {
+            nextProgressMap[record.module_id] = record
+          })
+          setProgressMap(nextProgressMap)
+        }
       } else {
         setProgressMap({})
       }
     } catch (fetchError) {
-      console.error('Failed to fetch modules:', fetchError)
+      console.error('[Training] Failed to fetch modules:', fetchError)
       setError('Failed to load training modules. Please try again later.')
     } finally {
       setLoading(false)
