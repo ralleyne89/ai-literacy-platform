@@ -49,7 +49,26 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    // Check if Stripe secret key is set
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("STRIPE_SECRET_KEY is not set in environment variables");
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: "Stripe is not configured",
+          details: "STRIPE_SECRET_KEY environment variable is missing",
+          hint: "Add STRIPE_SECRET_KEY to Netlify environment variables",
+        }),
+      };
+    }
+
     const { plan, email } = JSON.parse(event.body || "{}");
+
+    console.log("Checkout request:", {
+      plan,
+      email: email ? "provided" : "missing",
+    });
 
     // Validate plan
     if (!plan) {
@@ -137,15 +156,41 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ url: session.url }),
     };
   } catch (error) {
-    console.error("Stripe checkout error:", error);
+    console.error("Stripe checkout error:", {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      statusCode: error.statusCode,
+      stack: error.stack,
+    });
+
+    // Provide more specific error messages
+    let errorMessage = "Unable to start checkout with Stripe";
+    let errorDetails = error.message;
+    let errorHint = "Check Netlify function logs for details.";
+
+    if (error.type === "StripeAuthenticationError") {
+      errorMessage = "Stripe authentication failed";
+      errorDetails = "Invalid API key";
+      errorHint =
+        "Verify STRIPE_SECRET_KEY is correct and not expired. You may need to rotate your key.";
+    } else if (error.type === "StripeInvalidRequestError") {
+      errorMessage = "Invalid Stripe request";
+      errorDetails = error.message;
+      errorHint = "Check the request parameters.";
+    } else if (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED") {
+      errorMessage = "Cannot connect to Stripe";
+      errorDetails = "Network error";
+      errorHint = "Check your internet connection or Stripe service status.";
+    }
 
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        error: "Unable to start checkout with Stripe",
-        details: error.message,
-        hint: "Verify STRIPE_SECRET_KEY is set correctly in Netlify environment variables.",
+        error: errorMessage,
+        details: errorDetails,
+        hint: errorHint,
       }),
     };
   }
