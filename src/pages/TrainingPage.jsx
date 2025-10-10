@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../services/supabaseClient'
+import supabase from '../services/supabaseClient'
 
 const TrainingPage = () => {
   const [modules, setModules] = useState([])

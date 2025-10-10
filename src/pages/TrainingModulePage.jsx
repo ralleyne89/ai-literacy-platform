@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink, Loader2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../services/supabaseClient'
+import supabase from '../services/supabaseClient'
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
