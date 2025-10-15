@@ -40,7 +40,7 @@ const FALLBACK_PLANS = [
     id: 'premium',
     name: 'Premium',
     description: 'Unlock premium training, certifications, and analytics.',
-    amount: 49,
+    amount: 15,
     currency: 'usd',
     billing_interval: 'month',
     features: [
@@ -69,8 +69,8 @@ const FALLBACK_PLANS = [
     ],
     cta: 'Upgrade to Enterprise',
     is_free: false,
-    checkout_enabled: true,
-    configured: true
+    checkout_enabled: false,
+    configured: false // Temporarily hidden
   }
 ]
 
@@ -108,13 +108,17 @@ const BillingPage = () => {
       try {
         const { data } = await axios.get('/api/billing/config')
         const remotePlans = Array.isArray(data?.plans) && data.plans.length > 0 ? data.plans : null
-        setPlans(remotePlans || FALLBACK_PLANS)
+        // Filter to only show configured plans
+        const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
+        setPlans(filteredPlans)
         if (!remotePlans) {
           setNotice('Using standard plan information. Connect the backend billing service to enable live checkout.')
         }
       } catch (err) {
         console.error('Failed to load billing config:', err)
-        setPlans(FALLBACK_PLANS)
+        // Filter fallback plans too
+        const filteredFallback = FALLBACK_PLANS.filter(plan => plan.configured !== false)
+        setPlans(filteredFallback)
         setNotice('Unable to reach billing API. Displaying standard plan information instead.')
       } finally {
         setLoading(false)
@@ -322,8 +326,8 @@ const BillingPage = () => {
         )}
 
         {loading ? (
-          <div className="grid gap-8 md:grid-cols-3">
-            {[0, 1, 2].map((i) => (
+          <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
+            {[0, 1].map((i) => (
               <div key={i} className="card animate-pulse">
                 <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
                 <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
@@ -338,7 +342,7 @@ const BillingPage = () => {
             ))}
           </div>
         ) : (
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
             {plans.map((plan) => (
               <div key={plan.id} className="card flex flex-col">
                 <div className="mb-6">
