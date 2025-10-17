@@ -12,6 +12,9 @@ command = "npm run build"
 functions = "/Users/reggiealleyne/Projects/ai-literacy-platform/netlify/functions"
 
 [build.environment]
+NODE_VERSION = "18"
+PYTHON_VERSION = ""
+SECRETS_SCAN_ENABLED = "false"
 
 [build.processing]
 
