@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, Brain, User, LogOut, Settings } from 'lucide-react'
+import { Menu, X, Brain, User, LogOut } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const Navbar = () => {
@@ -144,20 +144,57 @@ const Navbar = () => {
               </Link>
             ))}
             <div className="border-t border-gray-200 pt-4 pb-3">
-              <Link
-                to="/login"
-                className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
-                onClick={() => setIsOpen(false)}
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/assessment"
-                className="block mx-3 mt-2 btn-primary text-center text-sm"
-                onClick={() => setIsOpen(false)}
-              >
-                Start free assessment
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Profile Settings
+                  </Link>
+                  <Link
+                    to="/billing"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Billing
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleLogout()
+                      setIsOpen(false)
+                    }}
+                    className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-primary-600"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/assessment"
+                    className="block mx-3 mt-2 btn-primary text-center text-sm"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Start free assessment
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -258,6 +258,27 @@ export const AuthProvider = ({ children }) => {
     return { success: true, data }
   }
 
+  const requestPasswordReset = async (email) => {
+    if (!supabase) {
+      return { success: false, error: 'Supabase is not configured' }
+    }
+
+    const normalizedEmail = (email || '').trim()
+    if (!normalizedEmail) {
+      return { success: false, error: 'Email is required' }
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${window.location.origin}/login`
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  }
+
   const syncBackendAfterLogin = async () => {
     if (!supabase) return
     try {
@@ -288,6 +309,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     loginWithProvider,
+    requestPasswordReset,
     syncBackendAfterLogin,
     isAuthenticated: !!user
   }

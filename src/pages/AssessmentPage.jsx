@@ -17,6 +17,7 @@ const AssessmentPage = () => {
   const [hasStarted, setHasStarted] = useState(false)
   const [showIntroModal, setShowIntroModal] = useState(true)
   const [resumeDetected, setResumeDetected] = useState(false)
+  const [error, setError] = useState('')
 
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
@@ -88,6 +89,7 @@ const AssessmentPage = () => {
   const startAssessment = async () => {
     clearProgress()
     setLoading(true)
+    setError('')
     setResults(null)
     setAnswers({})
     setCurrentQuestion(0)
@@ -95,8 +97,9 @@ const AssessmentPage = () => {
       const response = await axios.get('/api/assessment/questions')
       const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
       if (loadedQuestions.length !== 15) {
-        console.warn('Expected 15 assessment questions, received', loadedQuestions.length)
-        alert('We’re updating the assessment. Please refresh in a moment to access the full 15-question experience.')
+        setError('We are updating the assessment. Please refresh in a moment to access the full 15-question experience.')
+        setHasStarted(false)
+        setShowIntroModal(true)
         return
       }
       setQuestions(loadedQuestions)
@@ -110,8 +113,7 @@ const AssessmentPage = () => {
         currentIndex: 0
       })
     } catch (error) {
-      console.error('Failed to fetch questions:', error)
-      alert('Failed to load assessment questions. Please try again later.')
+      setError('Failed to load assessment questions. Please try again later.')
     } finally {
       setLoading(false)
     }
@@ -147,6 +149,7 @@ const AssessmentPage = () => {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
+    setError('')
     try {
       const optionMap = questions.reduce((acc, question) => {
         acc[question.id] = {
@@ -165,8 +168,7 @@ const AssessmentPage = () => {
       setResults(response.data)
       clearProgress()
     } catch (error) {
-      console.error('Failed to submit assessment:', error)
-      alert('Failed to submit assessment. Please try again.')
+      setError('Failed to submit assessment. Please try again.')
     }
     setIsSubmitting(false)
   }
@@ -344,6 +346,11 @@ const AssessmentPage = () => {
             When you’re ready, start the assessment to discover your AI proficiency across critical dimensions.
             {resumeDetected && ' We saved your progress from a previous session—pick up where you left off.'}
           </p>
+          {error && (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
         </div>
 
         {showIntroModal && (
@@ -409,6 +416,11 @@ const AssessmentPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
 
         {/* Header */}

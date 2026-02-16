@@ -11,8 +11,10 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resetNotice, setResetNotice] = useState('')
+  const [showResetForm, setShowResetForm] = useState(false)
 
-  const { login, isAuthenticated, loginWithProvider } = useAuth()
+  const { login, isAuthenticated, loginWithProvider, requestPasswordReset } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -35,6 +37,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setResetNotice('')
     setLoading(true)
 
     const result = await login(formData.email, formData.password)
@@ -50,9 +53,24 @@ const LoginPage = () => {
 
   const handleProviderLogin = async (provider) => {
     setError('')
+    setResetNotice('')
     const result = await loginWithProvider(provider)
     if (!result.success && result.error) {
       setError(result.error)
+    }
+  }
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setResetNotice('')
+
+    const result = await requestPasswordReset(formData.email)
+    if (result.success) {
+      setResetNotice('Password reset email sent. Check your inbox for next steps.')
+      setShowResetForm(false)
+    } else {
+      setError(result.error || 'Unable to send reset email.')
     }
   }
 
@@ -77,6 +95,13 @@ const LoginPage = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
               <span className="text-red-700">{error}</span>
+            </div>
+          )}
+
+          {resetNotice && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <span className="text-green-700">{resetNotice}</span>
             </div>
           )}
 
@@ -137,11 +162,28 @@ const LoginPage = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="text-primary-600 hover:text-primary-500 font-medium">
+              <button
+                type="button"
+                onClick={() => setShowResetForm(prev => !prev)}
+                className="text-primary-600 hover:text-primary-500 font-medium"
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
+
+          {showResetForm && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm text-gray-700 mb-3">Send a password reset link to your email address.</p>
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition-colors"
+              >
+                Send Reset Link
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink, Loader2 } from 'lucide-react'
+import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
-import supabase from '../services/supabaseClient'
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated } = useAuth()
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -16,49 +16,32 @@ const TrainingModulePage = () => {
   const [progressUpdating, setProgressUpdating] = useState(false)
   const [progress, setProgress] = useState(null)
 
+  const fetchProgress = async () => {
+    if (!isAuthenticated) {
+      setProgress(null)
+      return
+    }
+
+    try {
+      const { data } = await axios.get('/api/training/progress')
+      const records = Array.isArray(data?.progress) ? data.progress : []
+      const match = records.find(record => record.module_id === moduleId) || null
+      setProgress(match)
+    } catch {
+      setProgress(null)
+    }
+  }
+
   useEffect(() => {
     const loadModule = async () => {
       try {
         setLoading(true)
         setError('')
 
-        console.log('[TrainingModule] Loading module:', moduleId)
-
-        // Fetch module from Supabase
-        const { data: moduleData, error: moduleError } = await supabase
-          .from('training_modules')
-          .select('*')
-          .eq('id', moduleId)
-          .single()
-
-        if (moduleError) {
-          console.error('[TrainingModule] Error fetching module:', moduleError)
-          throw moduleError
-        }
-
-        console.log('[TrainingModule] Module loaded:', moduleData)
-        setModule(moduleData)
-
-        // Fetch user progress if authenticated
-        if (isAuthenticated && user?.id) {
-          console.log('[TrainingModule] Fetching progress for user:', user.id)
-
-          const { data: progressData, error: progressError } = await supabase
-            .from('user_progress')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('module_id', moduleId)
-            .maybeSingle()
-
-          if (progressError) {
-            console.error('[TrainingModule] Error fetching progress:', progressError)
-          } else if (progressData) {
-            console.log('[TrainingModule] Progress loaded:', progressData)
-            setProgress(progressData)
-          }
-        }
-      } catch (err) {
-        console.error('[TrainingModule] Failed to load module:', err)
+        const { data } = await axios.get(`/api/training/modules/${moduleId}`)
+        setModule(data?.module || null)
+        await fetchProgress()
+      } catch {
         setError('Unable to load this module right now. Please try again later.')
       } finally {
         setLoading(false)
@@ -66,42 +49,19 @@ const TrainingModulePage = () => {
     }
 
     loadModule()
-  }, [moduleId, isAuthenticated, user?.id])
+  }, [moduleId, isAuthenticated])
 
   const handleEnroll = async () => {
-    if (!isAuthenticated || !user?.id) {
+    if (!isAuthenticated) {
       navigate('/login', { state: { from: `/training/modules/${moduleId}` } })
       return
     }
 
     try {
       setEnrolling(true)
-      console.log('[TrainingModule] Enrolling user:', user.id, 'in module:', moduleId)
-
-      // Create or update user progress in Supabase
-      const { data, error } = await supabase
-        .from('user_progress')
-        .upsert({
-          user_id: user.id,
-          module_id: moduleId,
-          status: 'in_progress',
-          progress_percentage: 0,
-          last_accessed: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,module_id'
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('[TrainingModule] Error enrolling:', error)
-        throw error
-      }
-
-      console.log('[TrainingModule] Enrolled successfully:', data)
-      setProgress(data)
-    } catch (err) {
-      console.error('[TrainingModule] Failed to enroll:', err)
+      await axios.post(`/api/training/enroll/${moduleId}`)
+      await fetchProgress()
+    } catch {
       setError('We could not enroll you in this module. Please try again.')
     } finally {
       setEnrolling(false)
@@ -109,38 +69,19 @@ const TrainingModulePage = () => {
   }
 
   const handleMarkComplete = async () => {
-    if (!isAuthenticated || !user?.id) {
+    if (!isAuthenticated) {
       return
     }
 
     try {
       setProgressUpdating(true)
-      console.log('[TrainingModule] Marking module complete:', moduleId)
-
-      const { data, error } = await supabase
-        .from('user_progress')
-        .upsert({
-          user_id: user.id,
-          module_id: moduleId,
-          status: 'completed',
-          progress_percentage: 100,
-          completed_at: new Date().toISOString(),
-          last_accessed: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,module_id'
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('[TrainingModule] Error marking complete:', error)
-        throw error
-      }
-
-      console.log('[TrainingModule] Marked complete successfully:', data)
-      setProgress(data)
-    } catch (err) {
-      console.error('[TrainingModule] Failed to update progress:', err)
+      await axios.put(`/api/training/progress/${moduleId}`, {
+        status: 'completed',
+        progress_percentage: 100,
+        time_spent_minutes: module?.estimated_duration_minutes || 0
+      })
+      await fetchProgress()
+    } catch {
       setError('We could not update your progress. Please try again.')
     } finally {
       setProgressUpdating(false)
@@ -148,7 +89,6 @@ const TrainingModulePage = () => {
   }
 
   const isCompleted = progress?.status === 'completed'
-
   const metadata = module?.metadata || {}
 
   const watchUrl = useMemo(() => {
@@ -286,6 +226,15 @@ const TrainingModulePage = () => {
                     {metadata.cta_text || 'Visit course site'}
                     <ExternalLink className="h-4 w-4" />
                   </a>
+                )}
+                {isAuthenticated && !progress && !['external', 'partner', 'affiliate'].includes(module.content_type) && (
+                  <button
+                    onClick={handleEnroll}
+                    disabled={enrolling}
+                    className="btn-outline disabled:opacity-60"
+                  >
+                    {enrolling ? 'Enrolling...' : 'Enroll in Module'}
+                  </button>
                 )}
                 {isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) && (
                   <button
