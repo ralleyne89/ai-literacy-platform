@@ -12,8 +12,9 @@ if (supabaseUrl && supabaseServiceKey) {
 }
 
 exports.handler = async (event, context) => {
+  const allowedOrigin = process.env.FRONTEND_URL || event.headers.origin || event.headers.Origin || "http://localhost:5173";
   const headers = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, Stripe-Signature",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };

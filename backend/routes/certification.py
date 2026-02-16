@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from flask import Blueprint, request, jsonify, g
-from routes import supabase_jwt_required, get_supabase_identity
+from routes import supabase_jwt_required, get_supabase_identity, get_supabase_claims
 from models import (
     db,
     Certification,
@@ -49,6 +49,21 @@ def _serialize_certification_type(record: CertificationType):
         'access_tier': record.access_tier or 'free',
         'is_premium': record.is_premium,
         'updated_at': record.updated_at.isoformat() if record.updated_at else None,
+    }
+
+
+def _serialize_awarded_certification(certification: Certification, cert_type: Optional[CertificationType] = None):
+    skills = _parse_skill_payload(certification.skills_validated)
+    if not skills and cert_type:
+        skills = cert_type.skills_validated or []
+
+    return {
+        'catalog_id': certification.catalog_id,
+        'certification_type': certification.certification_type,
+        'verification_code': certification.verification_code,
+        'issued_at': certification.issued_at.isoformat() if certification.issued_at else None,
+        'expires_at': certification.expires_at.isoformat() if certification.expires_at else None,
+        'skills_validated': skills
     }
 
 
@@ -128,11 +143,69 @@ def generate_verification_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
 @certification_bp.route('/available', methods=['GET'])
+@supabase_jwt_required(optional=True)
 def get_available_certifications():
     """Get available certification types"""
     try:
+        user_id = g.get('current_user_id') or get_supabase_identity(optional=True)
+        claims = g.get('supabase_claims') or get_supabase_claims(optional=True) or {}
+        user = User.query.get(user_id) if user_id else None
+
+        if user is None and user_id:
+            email = (claims.get('email') or claims.get('user_email') or '').strip().lower()
+            if email:
+                metadata = claims.get('user_metadata') or {}
+                user = User(
+                    id=user_id,
+                    email=email,
+                    password_hash='supabase_managed',
+                    first_name=metadata.get('first_name') or 'AI',
+                    last_name=metadata.get('last_name') or 'Learner',
+                    role=metadata.get('role'),
+                    organization=metadata.get('organization')
+                )
+                db.session.add(user)
+                db.session.commit()
+
+        latest_assessment = None
+        completed_modules = 0
+        current_tier = _normalize_tier(user.subscription_tier) if user else 'free'
+        if user:
+            latest_assessment = (AssessmentResult.query
+                                 .filter_by(user_id=user.id)
+                                 .order_by(AssessmentResult.completed_at.desc())
+                                 .first())
+            completed_modules = (UserProgress.query
+                                 .filter_by(user_id=user.id, status='completed')
+                                 .count())
+
         records = CertificationType.query.order_by(CertificationType.title.asc()).all()
-        payload = [_serialize_certification_type(record) for record in records]
+        payload = []
+        for record in records:
+            serialized = _serialize_certification_type(record)
+            required_tier = record.access_tier or ('professional' if record.is_premium else 'free')
+            upgrade_required = not _has_tier_access(current_tier, required_tier)
+
+            if user:
+                readiness = _evaluate_certification_readiness(record, latest_assessment, completed_modules)
+            else:
+                readiness = {
+                    'eligible': False,
+                    'reasons': ['Sign in to evaluate your certification readiness.']
+                }
+
+            missing_requirements = list(readiness['reasons'])
+            if upgrade_required:
+                missing_requirements.append(f'Upgrade to {required_tier} to unlock this certification.')
+
+            serialized.update({
+                'required_tier': required_tier,
+                'current_tier': current_tier,
+                'upgrade_required': upgrade_required,
+                'eligible': readiness['eligible'] and not upgrade_required,
+                'missing_requirements': missing_requirements
+            })
+            payload.append(serialized)
 
         response = {'certifications': payload}
         if not payload:
@@ -249,13 +322,30 @@ def apply_for_certification(certification_id):
                 'current_tier': user_tier
             }), 403
 
+        existing_certification = (Certification.query
+                                  .filter_by(user_id=user_id, catalog_id=cert_type.id)
+                                  .order_by(Certification.issued_at.desc())
+                                  .first())
+        if existing_certification:
+            logger.info(
+                'certification_already_issued',
+                user_id=user_id,
+                certification_id=certification_id,
+                verification_code=existing_certification.verification_code
+            )
+            return jsonify({
+                'status': 'already_issued',
+                'message': 'Certification already granted for this user.',
+                'certification': _serialize_awarded_certification(existing_certification, cert_type)
+            }), 200
+
         latest_assessment = (AssessmentResult.query
-                              .filter_by(user_id=user_id)
-                              .order_by(AssessmentResult.completed_at.desc())
-                              .first())
+                             .filter_by(user_id=user_id)
+                             .order_by(AssessmentResult.completed_at.desc())
+                             .first())
         completed_modules = (UserProgress.query
-                              .filter_by(user_id=user_id, status='completed')
-                              .count())
+                             .filter_by(user_id=user_id, status='completed')
+                             .count())
 
         readiness = _evaluate_certification_readiness(cert_type, latest_assessment, completed_modules)
         if not readiness['eligible']:
@@ -292,15 +382,9 @@ def apply_for_certification(certification_id):
         logger.info('certification_awarded', user_id=user_id, certification_id=certification_id, verification_code=verification_code)
 
         return jsonify({
+            'status': 'issued',
             'message': 'Certification granted successfully',
-            'certification': {
-                'catalog_id': cert_type.id,
-                'certification_type': certification.certification_type,
-                'verification_code': certification.verification_code,
-                'issued_at': certification.issued_at.isoformat() if certification.issued_at else None,
-                'expires_at': certification.expires_at.isoformat() if certification.expires_at else None,
-                'skills_validated': cert_type.skills_validated or []
-            }
+            'certification': _serialize_awarded_certification(certification, cert_type)
         }), 201
         
     except Exception as e:

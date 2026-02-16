@@ -1,8 +1,9 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 exports.handler = async (event, context) => {
+  const allowedOrigin = process.env.FRONTEND_URL || event.headers.origin || event.headers.Origin || "http://localhost:5173";
   const headers = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   };
@@ -113,4 +114,3 @@ exports.handler = async (event, context) => {
     };
   }
 };
-

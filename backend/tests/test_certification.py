@@ -78,3 +78,33 @@ def test_apply_for_professional_certification_success(client):
         assert record is not None
         assert record.verification_code
         assert record.expires_at is not None
+
+
+def test_apply_for_certification_is_idempotent(client):
+    with app.app_context():
+        user = create_enterprise_user(email='idempotent@example.com')
+        seed_assessment_result(user.id)
+        seed_completed_modules(user.id, count=3)
+        secret = app.config['SUPABASE_JWT_SECRET']
+        token = jwt.encode({'sub': user.id}, secret, algorithm='HS256')
+
+    first_response = client.post(
+        '/api/certification/apply/litmusai-professional',
+        headers={'Authorization': f'Bearer {token}'},
+        json={}
+    )
+    assert first_response.status_code == 201
+    assert first_response.get_json().get('status') == 'issued'
+
+    second_response = client.post(
+        '/api/certification/apply/litmusai-professional',
+        headers={'Authorization': f'Bearer {token}'},
+        json={}
+    )
+    assert second_response.status_code == 200
+    second_payload = second_response.get_json()
+    assert second_payload.get('status') == 'already_issued'
+
+    with app.app_context():
+        records = Certification.query.filter_by(user_id=user.id, catalog_id='litmusai-professional').all()
+        assert len(records) == 1

@@ -29,7 +29,27 @@ from models import db
 db.init_app(app)
 jwt = JWTManager(app)
 migrate = Migrate(app, db)
-CORS(app)
+frontend_url = os.getenv('FRONTEND_URL', '').strip()
+allowed_origins_env = os.getenv('ALLOWED_ORIGINS', '')
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',') if origin.strip()]
+
+if frontend_url and frontend_url not in allowed_origins:
+    allowed_origins.append(frontend_url)
+
+environment = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
+if environment not in ('production', 'prod'):
+    for local_origin in ('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'):
+        if local_origin not in allowed_origins:
+            allowed_origins.append(local_origin)
+
+if allowed_origins:
+    CORS(
+        app,
+        resources={r'/api/*': {'origins': allowed_origins}},
+        supports_credentials=True
+    )
+else:
+    CORS(app)
 
 # Import models and routes after app initialization
 # This will be done after db initialization to avoid circular imports
