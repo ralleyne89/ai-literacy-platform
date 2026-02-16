@@ -224,17 +224,14 @@ npm run preview
 ### Backend Testing
 
 ```bash
-# Start the Flask development server
-cd backend
-python app.py
+# Install backend + test dependencies
+pip install -r requirements-dev.txt
 
-# Test API endpoints
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/assessment/questions
+# Start the Flask development server
+npm run backend
 
 # Run backend unit tests
-pip install -r ../requirements-dev.txt
-pytest
+python -m pytest -q
 ```
 
 ## 🔧 Configuration
