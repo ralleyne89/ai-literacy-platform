@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { AUTH0_CALLBACK_PATH } from './config/authRoutes'
 import Navbar from './components/Navbar'
 import HomePage from './pages/HomePage'
 import AssessmentPage from './pages/AssessmentPage'
@@ -37,7 +38,7 @@ function App() {
             } />
             <Route path="/certification" element={<CertificationPage />} />
             <Route path="/enterprise" element={<EnterprisePage />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path={AUTH0_CALLBACK_PATH} element={<AuthCallback />} />
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />

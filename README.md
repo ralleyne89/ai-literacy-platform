@@ -225,6 +225,17 @@ In **Backend mode**, OAuth is disabled unless you intentionally keep Supabase va
 
 In **Auth0 mode**, configure provider connections in the Auth0 dashboard and enable them in the configured app/client.
 
+For this app, keep the OAuth callback route at `/auth/callback`. The frontend route is implemented in `src/config/authRoutes.js` and enforced by default in `AuthContext`.
+
+Auth0 dashboard checklist:
+
+1. Open **Applications → Applications → [Your App] → Connections** and enable **Google** for that app (`google-oauth2`).
+2. In **Allowed Callback URLs**, add your frontend callback endpoint(s), for example:
+   - `https://litmusai.netlify.app/auth/callback` (production)
+   - `http://localhost:5173/auth/callback` (local)
+3. In **Allowed Logout URLs** and **Allowed Web Origins**, include the matching app origins (`https://litmusai.netlify.app`, `http://localhost:5173`).
+4. Keep `VITE_AUTH0_REDIRECT_URI` aligned to the exact callback route above (or leave unset to use the app default).
+
 ## 🧪 Testing the Application
 
 ### Frontend Testing

@@ -115,12 +115,25 @@ const RegisterPage = () => {
           <div className="w-16 h-16 bg-gradient-primary rounded-xl flex items-center justify-center mx-auto mb-4">
             <Brain className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
+          <h2 className="text-3xl font-bold text-gray-900">
+            {isAuth0Mode ? 'Create your account with Auth0' : 'Create your account'}
+          </h2>
           <p className="mt-2 text-gray-600">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-              Sign in
-            </Link>
+            {isAuth0Mode ? (
+              <>
+                Already have an account?{' '}
+                <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
+                  sign in with Auth0
+                </Link>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
+                  Sign in
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -139,197 +152,250 @@ const RegisterPage = () => {
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                  First name
-                </label>
-                <input
-                  id="firstName"
-                  name="firstName"
-                autoComplete="given-name"
-                  type="text"
-                required={!isAuth0Mode}
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                  placeholder="First name"
-                />
-              </div>
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Last name
-                </label>
-                <input
-                  id="lastName"
-                  name="lastName"
-                autoComplete="family-name"
-                  type="text"
-                required={!isAuth0Mode}
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                  placeholder="Last name"
-                />
-              </div>
-            </div>
+          {isAuth0Mode ? (
+            <>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (optional)
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    autoComplete="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    placeholder="Continue with email or use a social provider"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                autoComplete="email"
-                type="email"
-                required={!isAuth0Mode}
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                placeholder="Enter your email"
-              />
-            </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Redirecting...' : 'Continue with Auth0'}
+                </button>
+              </div>
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                Role (optional)
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              <p className="text-sm text-gray-600 text-center">
+                Prefer a social provider? Continue with Google or Facebook.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('google')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('facebook')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Facebook
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+                      First name
+                    </label>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      autoComplete="given-name"
+                      type="text"
+                      required={!isAuth0Mode}
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                      placeholder="First name"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Last name
+                    </label>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      autoComplete="family-name"
+                      type="text"
+                      required={!isAuth0Mode}
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                      placeholder="Last name"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    autoComplete="email"
+                    type="email"
+                    required={!isAuth0Mode}
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    placeholder="Enter your email"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                    Role (optional)
+                  </label>
+                  <select
+                    id="role"
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  >
+                    {roles.map(role => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
+                    Organization (optional)
+                  </label>
+                  <input
+                    id="organization"
+                    name="organization"
+                    type="text"
+                    value={formData.organization}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    placeholder="Your company or organization"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      required={!isAuth0Mode}
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
+                      placeholder="Create a password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      required={!isAuth0Mode}
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
+                      placeholder="Confirm your password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  id="terms"
+                  name="terms"
+                  type="checkbox"
+                  required={!isAuth0Mode}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
+                  I agree to the{' '}
+                  <Link to="/terms" className="text-primary-600 hover:text-primary-500">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/privacy" className="text-primary-600 hover:text-primary-500">
+                    Privacy Policy
+                  </Link>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {roles.map(role => (
-                  <option key={role.value} value={role.value}>{role.label}</option>
-                ))}
-              </select>
-            </div>
+                {loading ? 'Creating account...' : 'Create account'}
+              </button>
 
-            <div>
-              <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
-                Organization (optional)
-              </label>
-              <input
-                id="organization"
-                name="organization"
-                type="text"
-                value={formData.organization}
-                onChange={handleChange}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                placeholder="Your company or organization"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                required={!isAuth0Mode}
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                  placeholder="Create a password"
-                />
+              <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  onClick={() => handleProviderLogin('google')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  Continue with Google
                 </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm password
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                required={!isAuth0Mode}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                  placeholder="Confirm your password"
-                />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  onClick={() => handleProviderLogin('facebook')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  Continue with Facebook
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="flex items-center">
-            <input
-              id="terms"
-              name="terms"
-              type="checkbox"
-              required={!isAuth0Mode}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-                I agree to the{' '}
-                <Link to="/terms" className="text-primary-600 hover:text-primary-500">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link to="/privacy" className="text-primary-600 hover:text-primary-500">
-                  Privacy Policy
-                </Link>
-              </label>
-            </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('google')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('facebook')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Facebook
-            </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-                Sign in
-              </Link>
-            </p>
-          </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
+                    Sign in
+                  </Link>
+                </p>
+              </div>
+            </>
+          )}
         </form>
       </div>
     </div>

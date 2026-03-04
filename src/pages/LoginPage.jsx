@@ -151,12 +151,25 @@ const LoginPage = () => {
           <div className="w-16 h-16 bg-gradient-primary rounded-xl flex items-center justify-center mx-auto mb-4">
             <Brain className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Sign in to your account</h2>
+          <h2 className="text-3xl font-bold text-gray-900">
+            {isAuth0Mode ? 'Sign in to continue' : 'Sign in to your account'}
+          </h2>
           <p className="mt-2 text-gray-600">
-            Or{' '}
-            <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-              create a new account
-            </Link>
+            {isAuth0Mode ? (
+              <>
+                New here?{' '}
+                <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
+                  create an account with Auth0
+                </Link>
+              </>
+            ) : (
+              <>
+                Or{' '}
+                <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
+                  create a new account
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -189,121 +202,175 @@ const LoginPage = () => {
             </div>
           )}
 
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                autoComplete="email"
-                type="email"
-                required={!isAuth0Mode}
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                placeholder="Enter your email"
-              />
-            </div>
+          {isAuth0Mode ? (
+            <>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email (optional)
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    autoComplete="email"
+                    type="email"
+                    required={false}
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    placeholder="Continue with email or use a social provider"
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                autoComplete={isAuth0Mode ? 'off' : 'current-password'}
-                required={!isAuth0Mode}
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                  placeholder="Enter your password"
-                />
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  type="submit"
+                  disabled={loading}
+                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {loading ? 'Redirecting...' : 'Continue with Auth0'}
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                Remember me
-              </label>
-            </div>
+              <p className="text-sm text-gray-600 text-center">
+                Prefer a social provider? Use one of the options below.
+              </p>
 
-            <div className="text-sm">
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('google')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('facebook')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Facebook
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    autoComplete="email"
+                    type="email"
+                    required={!isAuth0Mode}
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    placeholder="Enter your email"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      required={!isAuth0Mode}
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
+                      placeholder="Enter your password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                    Remember me
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetForm(prev => !prev)}
+                    className="text-primary-600 hover:text-primary-500 font-medium"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              </div>
+
+              {showResetForm && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-sm text-gray-700 mb-3">Send a password reset link to your email address.</p>
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition-colors"
+                  >
+                    Send Reset Link
+                  </button>
+                </div>
+              )}
+
               <button
-                type="button"
-                onClick={() => setShowResetForm(prev => !prev)}
-                className="text-primary-600 hover:text-primary-500 font-medium"
+                type="submit"
+                disabled={loading}
+                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Forgot your password?
+                {loading ? 'Signing in...' : 'Sign in'}
               </button>
-            </div>
-          </div>
 
-          {showResetForm && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm text-gray-700 mb-3">Send a password reset link to your email address.</p>
-              <button
-                type="button"
-                onClick={handlePasswordReset}
-                className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition-colors"
-              >
-                Send Reset Link
-              </button>
-            </div>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('google')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderLogin('facebook')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Continue with Facebook
+                </button>
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
+                    Sign up for free
+                  </Link>
+                </p>
+              </div>
+            </>
           )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('google')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('facebook')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Facebook
-            </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-                Sign up for free
-              </Link>
-            </p>
-          </div>
         </form>
       </div>
     </div>

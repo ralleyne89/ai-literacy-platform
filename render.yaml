@@ -9,6 +9,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
+      - key: AUTH0_DOMAIN
+        value: litmusai.us.auth0.com
+      - key: AUTH0_AUDIENCE
+        value: https://litmusai.us.auth0.com/api/v2/
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY

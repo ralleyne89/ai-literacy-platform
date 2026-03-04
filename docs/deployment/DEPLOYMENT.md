@@ -42,6 +42,8 @@ STRIPE_SECRET_KEY=<copy-from-your-local-backend/.env-file>
 STRIPE_PUBLISHABLE_KEY=<copy-from-your-local-.env-file>
 STRIPE_WEBHOOK_SECRET=<copy-from-your-local-backend/.env-file>
 FRONTEND_URL=https://litmusai.netlify.app
+AUTH0_DOMAIN=<your-auth0-domain>
+AUTH0_AUDIENCE=<your-auth0-audience>
 ```
 
 ### Step 4: Add PostgreSQL Database
@@ -110,6 +112,8 @@ STRIPE_PUBLISHABLE_KEY=<copy-from-your-local-.env-file>
 STRIPE_WEBHOOK_SECRET=<copy-from-your-local-backend/.env-file>
 FRONTEND_URL=https://litmusai.netlify.app
 PORT=8080
+AUTH0_DOMAIN=<your-auth0-domain>
+AUTH0_AUDIENCE=<your-auth0-audience>
 ```
 
 ### Step 5: Deploy

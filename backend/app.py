@@ -25,8 +25,30 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///ai_literacy.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-supabase_jwt_secret = os.getenv('SUPABASE_JWT_SECRET')
-app.config['JWT_SECRET_KEY'] = supabase_jwt_secret or os.getenv('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
+
+
+def _resolve_jwt_secret():
+    supabase_jwt_secret = os.getenv('SUPABASE_JWT_SECRET')
+    jwt_secret = os.getenv('JWT_SECRET_KEY')
+    if supabase_jwt_secret or jwt_secret:
+        return supabase_jwt_secret or jwt_secret
+
+    app_env = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
+    if app_env in ('production', 'prod'):
+        raise RuntimeError('SUPABASE_JWT_SECRET or JWT_SECRET_KEY must be configured in production')
+
+    return 'jwt-secret-change-in-production'
+
+
+def _normalize_setting(value):
+    if value is None:
+        return ''
+    return str(value).strip()
+
+
+app.config['JWT_SECRET_KEY'] = _resolve_jwt_secret()
+app.config['AUTH0_DOMAIN'] = _normalize_setting(os.getenv('AUTH0_DOMAIN'))
+app.config['AUTH0_AUDIENCE'] = _normalize_setting(os.getenv('AUTH0_AUDIENCE'))
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Initialize extensions

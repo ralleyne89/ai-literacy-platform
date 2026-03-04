@@ -14,7 +14,11 @@
 
 [context.production.environment]
   VITE_API_URL = "https://litmusai-backend.onrender.com"
-  VITE_AUTH_MODE = "backend"
+  VITE_AUTH_MODE = "auth0"
+  VITE_AUTH0_DOMAIN = "https://litmusai.us.auth0.com"
+  VITE_AUTH0_CLIENT_ID = "rJVPV5C28rl38LggrVvlKppZ19I8EIlj"
+  VITE_AUTH0_AUDIENCE = "https://litmusai.us.auth0.com/api/v2/"
+  VITE_AUTH0_REDIRECT_URI = "https://litmusai.netlify.app/auth/callback"
 
 # Redirect API calls to Netlify Functions
 [[redirects]]

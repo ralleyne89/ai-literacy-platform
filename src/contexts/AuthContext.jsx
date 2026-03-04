@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 import supabase from '../services/supabaseClient'
+import { AUTH0_CALLBACK_PATH } from '../config/authRoutes'
 
 const AuthContext = createContext()
 const AUTH0_AUTH_MODE = 'auth0'
@@ -102,7 +103,7 @@ const getAuth0RedirectUri = () => {
   if (typeof window === 'undefined') {
     return ''
   }
-  return `${window.location.origin}/auth/callback`
+  return `${window.location.origin}${AUTH0_CALLBACK_PATH}`
 }
 
 const isValidHttpUrl = (value) => {

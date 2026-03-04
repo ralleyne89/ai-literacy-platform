@@ -75,6 +75,9 @@ In Auth0 mode, configure:
 - `VITE_AUTH0_CLIENT_ID`
 - `VITE_AUTH0_AUDIENCE`
 - `VITE_AUTH0_REDIRECT_URI`
+- `AUTH0_DOMAIN`
+- `AUTH0_AUDIENCE`
+- `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`
 
 ## 🌐 Netlify + backend API routing
 
