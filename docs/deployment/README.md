@@ -40,13 +40,25 @@ This directory contains all deployment-related documentation for the LitmusAI pl
 **Already deployed?**
 - Use [PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md) for updates
 
+## 🔁 PR → main → Netlify workflow
+
+Recommended production path:
+
+1. Push a feature branch to GitHub.
+2. Open a pull request that targets `main`.
+3. Merge the PR after review and checks.
+4. Let Netlify auto-deploy from the linked `main` branch.
+
 ## 🔐 Auth and Session Modes
 
-The frontend supports two authentication paths:
+The frontend supports three authentication modes:
 
 - Supabase mode (default): keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
+  - In production, use `VITE_AUTH_MODE=backend` explicitly if you do not provide Supabase credentials.
 - Backend mode: set `VITE_AUTH_MODE=backend` and rely on `/api/auth/register`, `/api/auth/login`, and `/api/auth/profile`.
-  - Keep Supabase vars set to preserve Google/Facebook provider login while backend mode remains active.
+  - Supabase variables can be unset in backend mode unless you still need OAuth/social behavior.
+- Auth0 mode: set `VITE_AUTH_MODE=auth0` and configure `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`.
+  - Auth0 handles email/password and provider sign-in; frontend form routes defer to Auth0 flows.
 
 In backend mode, configure:
 
@@ -54,8 +66,23 @@ In backend mode, configure:
 - `SECRET_KEY`
 - `JWT_SECRET_KEY`
 - `DATABASE_URL`
+- `SUPABASE_JWT_SECRET` (required if your backend validates Supabase-issued tokens)
 
-To enable Supabase OAuth providers, keep Supabase variables configured. Provider login is available when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set, regardless of `VITE_AUTH_MODE`.
+In Auth0 mode, configure:
+
+- `VITE_API_URL`
+- `VITE_AUTH0_DOMAIN`
+- `VITE_AUTH0_CLIENT_ID`
+- `VITE_AUTH0_AUDIENCE`
+- `VITE_AUTH0_REDIRECT_URI`
+
+## 🌐 Netlify + backend API routing
+
+For Netlify-hosted frontend deployments using backend mode, set `VITE_API_URL` to your public backend URL (for example `https://<your-backend-host>/`) so all `/api/*` calls are sent directly to Flask.
+
+- Ensure the backend host permits your Netlify origin in CORS (`ALLOWED_ORIGINS` or `FRONTEND_URL`).
+- Avoid relying on Netlify proxying for backend auth paths unless you explicitly add `/api/*` redirects in `netlify.toml`.
+- Verify `VITE_API_URL` and restart the frontend build whenever the backend URL changes.
 
 ## 🗄️ Database Providers and Migration Notes
 
@@ -80,6 +107,7 @@ A deployment migration checklist:
 - GitHub authentication (Personal Access Token, SSH, Git Credential Manager)
 - Supabase setup
 - Backend auth mode (`VITE_AUTH_MODE=backend`)
+- Auth0 mode (`VITE_AUTH_MODE=auth0`)
 - Environment variables
 
 ### Database

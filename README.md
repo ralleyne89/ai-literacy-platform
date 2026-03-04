@@ -23,7 +23,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: Supabase auth by default, with optional backend JWT auth fallback via `VITE_AUTH_MODE=backend`
+- **Authentication**: Supabase-first, backend, or Auth0 modes (`VITE_AUTH_MODE=auto|backend|supabase|auth0`).
 - **Deployment**: Replit-ready configuration
 
 ## 📋 Prerequisites
@@ -199,29 +199,31 @@ ai-literacy-platform/
 
 ## 🔐 Authentication Modes
 
-The app supports two authentication modes:
+The app supports three modes:
 
-- **Supabase-first mode (default)**: uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for email/password and OAuth providers.
-- **Backend compatibility mode (`VITE_AUTH_MODE=backend`)**: uses `/api/auth/register` and `/api/auth/login`; JWT tokens are stored client-side and sent with API requests.
-  - Keep Supabase vars set to enable Google/Facebook OAuth while backend mode remains active.
+- **Supabase mode (`auto` or `supabase`, default `auto`)**: Supabase login/signup and social OAuth (`Google` / `Facebook`) using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- **Backend mode (`VITE_AUTH_MODE=backend`)**: email/password via `/api/auth/register` and `/api/auth/login`; JWT is stored client-side and attached to API requests.  
+  Keep Supabase vars unset unless you want optional OAuth/social features.
+- **Auth0 mode (`VITE_AUTH_MODE=auth0`)**: form auth is delegated to Auth0 Universal Login (`VITE_AUTH0_*` variables).
 
-Notes:
+Behavior notes:
 
-- Backend mode is useful when you want legacy credential-based auth only or when Supabase credentials are not available.
-- Google/Facebook OAuth is available whenever `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured, even when `VITE_AUTH_MODE=backend` is set.
-- Set `VITE_AUTH_MODE=backend` to use backend-auth for email/password while still allowing OAuth if Supabase variables are present.
+- `auto` will use Supabase if `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are configured; otherwise it falls back to backend mode. For production builds, set `VITE_AUTH_MODE=backend` explicitly if you do not provide Supabase credentials.
+- In backend mode, password reset is unavailable by default and social login is delegated to Supabase only if those vars are present.
+- In Auth0 mode, password reset is handled by Auth0 and social login is managed in Auth0.
 
 ## 🔐 Social Sign-In Setup
 
-In Supabase mode, LitmusAI supports optional Google and Facebook OAuth providers.
+In **Supabase mode**, LitmusAI supports Google and Facebook OAuth through Supabase.
 
 1. In Supabase → Authentication → Providers, enable Google and Facebook.
 2. Supply each provider’s client ID and secret. Add both your local URL (`http://localhost:5173`) and deployed domain (e.g., Netlify) to the authorized redirect list.
-3. Supabase automatically handles the OAuth callback at `/auth/callback`. No additional frontend configuration is needed beyond the environment variables already in place.
-4. After issuing new keys, redeploy so the environment has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+3. Supabase handles the OAuth callback at `/auth/callback`. No additional frontend configuration is needed beyond the environment variables already in place.
+4. After issuing new keys, redeploy so the environment has updated Supabase values.
 
-In legacy-only backend mode (when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are intentionally absent), social login is unavailable and authentication uses backend email/password endpoints only.
-If those vars are set, provider login remains enabled while backend compatibility mode stays active.
+In **Backend mode**, OAuth is disabled unless you intentionally keep Supabase variables configured for hybrid behavior.
+
+In **Auth0 mode**, configure provider connections in the Auth0 dashboard and enable them in the configured app/client.
 
 ## 🧪 Testing the Application
 
@@ -347,6 +349,10 @@ VITE_AUTH_MODE=backend
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+VITE_AUTH0_DOMAIN=https://your-domain.auth0.com
+VITE_AUTH0_CLIENT_ID=your-auth0-client-id
+VITE_AUTH0_AUDIENCE=your-auth0-audience
+VITE_AUTH0_REDIRECT_URI=https://your-site.com/auth/callback
 LOG_LEVEL=INFO
 # Optional: Stripe (populate once your Stripe account is ready)
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
@@ -367,9 +373,34 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 `npm run build` runs `scripts/validate-prod-env.mjs` before Vite build. In production contexts (`NETLIFY=true` + `CONTEXT=production`, `NODE_ENV=production`, or `ENFORCE_PROD_ENV=1`), the build will fail when:
 
 - `VITE_API_URL` is missing, invalid, or points to localhost
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required for Supabase/social flows; they are optional only for intentional legacy-only backend mode.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required when `VITE_AUTH_MODE=auto` or `VITE_AUTH_MODE=supabase`.
+- `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are required when `VITE_AUTH_MODE=auth0`.
+- `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET` is required for backend/Auth0 token flow; `SUPABASE_JWT_SECRET` is additionally required for Supabase-backed token verification.
 
 Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
+
+### Auth mode
+
+Use `VITE_AUTH_MODE` to control login behavior:
+
+`auto` (default): use Supabase auth when configured, otherwise fall back to backend `/api/auth/login` and `/api/auth/register`.
+
+`backend`: always use backend credentials and skip Supabase-first behavior.
+
+`supabase`: force Supabase for login, signup, and social providers (`Google` / `Facebook`).
+
+`auth0`: force Auth0 Universal Login; all email/password and social login flows are handled by Auth0.
+
+In backend mode, social login is typically unavailable unless you keep Supabase settings for hybrid behavior, and password-reset links remain unavailable unless you add custom backend flows. In Auth0 mode, reset is handled in Auth0.
+
+## 🚀 Deployment workflow (PR -> main -> Netlify)
+
+For production releases, use this path:
+
+1. Push your feature branch and open a pull request targeting `main`.
+2. Merge the PR after approval and checks.
+3. Keep Netlify configured to deploy automatically from `main`.
+4. Optionally run a manual deploy from a clean `main` checkout with `netlify deploy --prod`.
 
 ### Database Setup
 
@@ -388,7 +419,7 @@ Migration checklist:
 
 1. Update `DATABASE_URL`
 2. Run `cd backend && FLASK_APP=app.py flask db upgrade`
-3. Re-run seeders where required (`flask seed-training-modules`, `flask seed-certifications`, `flask seed-course-content`)
+3. Re-run seeders where required (`flask seed-training-modules --force`, `flask seed-certifications --force`, `flask seed-course-content --force`)
 
 ## 📚 Documentation
 

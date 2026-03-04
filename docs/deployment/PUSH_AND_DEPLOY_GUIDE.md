@@ -1,8 +1,8 @@
 # Push and Deploy Guide - Quick Start
 
-**Status:** ✅ All commits ready to push  
-**Branch:** feat/phase2-auth-dashboard  
-**Commits:** 7 commits (ready)
+**Status:** ✅ Changes ready for PR + main merge
+**Branch:** <your-feature-branch>  
+**Commits:** branch commits ready
 
 ---
 
@@ -20,7 +20,9 @@ All your work has been committed to git with 7 well-organized commits:
 
 **Now you need to:**
 1. Push to GitHub (requires authentication)
-2. Deploy to Netlify (automatic after push)
+2. Open a PR to `main`
+3. Merge PR into `main`
+4. Deploy to Netlify (automatic after main merge)
 
 ---
 
@@ -41,12 +43,12 @@ You have **3 options** to authenticate:
 **2. Push using the token:**
 ```bash
 # Replace YOUR_TOKEN with the token you just copied
-git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git feat/phase2-auth-dashboard
+git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git <your-feature-branch>
 ```
 
 **Example:**
 ```bash
-git push https://ghp_abc123xyz456@github.com/ralleyne89/ai-literacy-platform.git feat/phase2-auth-dashboard
+git push https://ghp_abc123xyz456@github.com/ralleyne89/ai-literacy-platform.git <your-feature-branch>
 ```
 
 ---
@@ -65,7 +67,7 @@ git config --global credential.helper manager
 
 **3. Push (will prompt for authentication):**
 ```bash
-git push origin feat/phase2-auth-dashboard
+git push origin <your-feature-branch>
 ```
 
 This will open a browser window for GitHub authentication.
@@ -106,12 +108,17 @@ git remote set-url origin git@github.com:ralleyne89/ai-literacy-platform.git
 
 **6. Push:**
 ```bash
-git push origin feat/phase2-auth-dashboard
+git push origin <your-feature-branch>
 ```
 
 ---
 
-## 🚀 Step 2: Verify Push Success
+## 🚀 Step 2: Merge to Main
+
+1. Open and merge a pull request targeting `main`.
+2. Confirm merge status in GitHub.
+
+## 🚀 Step 3: Verify Push/Merge Success
 
 After pushing, verify:
 
@@ -120,12 +127,12 @@ After pushing, verify:
 git status
 
 # View commits on GitHub
-# Go to: https://github.com/ralleyne89/ai-literacy-platform/commits/feat/phase2-auth-dashboard
+# Go to: https://github.com/ralleyne89/ai-literacy-platform/commits/<your-feature-branch>
 ```
 
 ---
 
-## 🌐 Step 3: Deploy to Netlify
+## 🌐 Step 4: Deploy to Netlify
 
 ### Automatic Deployment (If GitHub connected)
 
@@ -370,9 +377,9 @@ python3 seeders/course_content.py --force
 
 ### Push to GitHub
 - [ ] Authenticate with GitHub (choose option A, B, or C)
-- [ ] Push commits: `git push origin feat/phase2-auth-dashboard`
+- [ ] Push commits: `git push origin <your-feature-branch>`
 - [ ] Verify commits on GitHub
-- [ ] (Optional) Create Pull Request
+- [ ] Open a Pull Request to `main`
 
 ### Deploy to Netlify
 - [ ] Verify Netlify build starts
@@ -407,7 +414,7 @@ python3 seeders/course_content.py --force
 
 ```bash
 # Push to GitHub (with token)
-git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git feat/phase2-auth-dashboard
+git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git <your-feature-branch>
 
 # Check deployment status
 netlify status
