@@ -1,28 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Brain, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
+import { Brain, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: '',
-    organization: ''
+    email: ''
   })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
   const { register, isAuthenticated, loginWithProvider } = useAuth()
   const navigate = useNavigate()
-  const authMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
-  const isAuth0Mode = authMode === 'auth0'
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -30,15 +20,6 @@ const RegisterPage = () => {
       navigate('/dashboard', { replace: true })
     }
   }, [isAuthenticated, navigate])
-
-  const roles = [
-    { value: '', label: 'Select your role' },
-    { value: 'Sales', label: 'Sales' },
-    { value: 'HR', label: 'Human Resources' },
-    { value: 'Marketing', label: 'Marketing' },
-    { value: 'Operations', label: 'Operations' },
-    { value: 'Other', label: 'Other' }
-  ]
 
   const handleChange = (e) => {
     setFormData(prev => ({
@@ -52,50 +33,20 @@ const RegisterPage = () => {
     setError('')
     setMessage('')
 
-    if (isAuth0Mode) {
-      setLoading(true)
-      const result = await register({
-        email: formData.email
-      })
+    setLoading(true)
+    const result = await register({
+      email: formData.email
+    })
 
-      if (result.success) {
-        setLoading(false)
-        return
+    if (result.success) {
+      if (result.user) {
+        navigate('/dashboard', { replace: true })
       }
-
-      setError(result.error)
       setLoading(false)
       return
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
-    setLoading(true)
-
-    const registrationData = {
-      email: formData.email,
-      password: formData.password,
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      role: formData.role || null,
-      organization: formData.organization || null
-    }
-
-    const result = await register(registrationData)
-
-    if (result.success) {
-      if (result.requiresEmailConfirmation) {
-        setMessage('Check your email to confirm your account. You can sign in once verification is complete.')
-      } else {
-        navigate('/dashboard', { replace: true })
-      }
-    } else {
-      setError(result.error)
-    }
-
+    setError(result.error)
     setLoading(false)
   }
 
@@ -116,24 +67,13 @@ const RegisterPage = () => {
             <Brain className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
-            {isAuth0Mode ? 'Create your account with Auth0' : 'Create your account'}
+            Create your account with Auth0
           </h2>
           <p className="mt-2 text-gray-600">
-            {isAuth0Mode ? (
-              <>
-                Already have an account?{' '}
-                <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-                  sign in with Auth0
-                </Link>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-                  Sign in
-                </Link>
-              </>
-            )}
+            Already have an account?{' '}
+            <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
+              sign in with Auth0
+            </Link>
           </p>
         </div>
 
@@ -152,250 +92,52 @@ const RegisterPage = () => {
             </div>
           )}
 
-          {isAuth0Mode ? (
-            <>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email (optional)
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    autoComplete="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                    placeholder="Continue with email or use a social provider"
-                  />
-                </div>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email (optional)
+              </label>
+              <input
+                id="email"
+                name="email"
+                autoComplete="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                placeholder="Continue with email or use a social provider"
+              />
+            </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Redirecting...' : 'Continue with Auth0'}
-                </button>
-              </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Redirecting...' : 'Continue with Auth0'}
+            </button>
+          </div>
 
-              <p className="text-sm text-gray-600 text-center">
-                Prefer a social provider? Continue with Google or Facebook.
-              </p>
+          <p className="text-sm text-gray-600 text-center">
+            Prefer a social provider? Continue with Google or Facebook.
+          </p>
 
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('google')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('facebook')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Facebook
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                      First name
-                    </label>
-                    <input
-                      id="firstName"
-                      name="firstName"
-                      autoComplete="given-name"
-                      type="text"
-                      required={!isAuth0Mode}
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                      placeholder="First name"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                      Last name
-                    </label>
-                    <input
-                      id="lastName"
-                      name="lastName"
-                      autoComplete="family-name"
-                      type="text"
-                      required={!isAuth0Mode}
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                      placeholder="Last name"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email address
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    autoComplete="email"
-                    type="email"
-                    required={!isAuth0Mode}
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                    Role (optional)
-                  </label>
-                  <select
-                    id="role"
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                  >
-                    {roles.map(role => (
-                      <option key={role.value} value={role.value}>{role.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
-                    Organization (optional)
-                  </label>
-                  <input
-                    id="organization"
-                    name="organization"
-                    type="text"
-                    value={formData.organization}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                    placeholder="Your company or organization"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      required={!isAuth0Mode}
-                      value={formData.password}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                      placeholder="Create a password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      required={!isAuth0Mode}
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                      placeholder="Confirm your password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    >
-                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  id="terms"
-                  name="terms"
-                  type="checkbox"
-                  required={!isAuth0Mode}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-                  I agree to the{' '}
-                  <Link to="/terms" className="text-primary-600 hover:text-primary-500">
-                    Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link to="/privacy" className="text-primary-600 hover:text-primary-500">
-                    Privacy Policy
-                  </Link>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Creating account...' : 'Create account'}
-              </button>
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('google')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('facebook')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Facebook
-                </button>
-              </div>
-
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  Already have an account?{' '}
-                  <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-                    Sign in
-                  </Link>
-                </p>
-              </div>
-            </>
-          )}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('google')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('facebook')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Facebook
+            </button>
+          </div>
         </form>
       </div>
     </div>

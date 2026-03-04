@@ -78,6 +78,20 @@ In Auth0 mode, configure:
 - `AUTH0_DOMAIN`
 - `AUTH0_AUDIENCE`
 - `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`
+- `FRONTEND_URL`
+- `ALLOWED_ORIGINS`
+
+## Auth0 provider settings for production
+
+- When `VITE_AUTH_MODE=auth0`, confirm your Auth0 application is configured for this frontend domain before redeploying.
+  - Open the Auth0 dashboard and enable **Google** (`google-oauth2`) for the app/client used by this site.
+  - Add callback URL(s):
+    - `https://litmusai.netlify.app/auth/callback` (production)
+    - `http://localhost:5173/auth/callback` (local development)
+  - Add web origins:
+    - `https://litmusai.netlify.app`
+    - `http://localhost:5173`
+  - Verify `VITE_AUTH0_REDIRECT_URI` in Netlify is set to the same production callback URL.
 
 ## 🌐 Netlify + backend API routing
 

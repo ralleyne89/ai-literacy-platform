@@ -15,8 +15,12 @@ functions = "/Users/reggiealleyne/Projects/ai-literacy-platform/netlify/function
 NODE_VERSION = "18"
 PYTHON_VERSION = ""
 SECRETS_SCAN_ENABLED = "false"
-VITE_API_URL = "https://litmusai-backend.onrender.com"
-VITE_AUTH_MODE = "backend"
+VITE_API_URL = "https://ai-literacy-platform.onrender.com"
+VITE_AUTH_MODE = "auth0"
+VITE_AUTH0_DOMAIN = "https://litmusai.us.auth0.com"
+VITE_AUTH0_CLIENT_ID = "rJVPV5C28rl38LggrVvlKppZ19I8EIlj"
+VITE_AUTH0_AUDIENCE = "https://litmusai.us.auth0.com/api/v2/"
+VITE_AUTH0_REDIRECT_URI = "https://litmusai.netlify.app/auth/callback"
 
 [build.processing]
 
@@ -34,67 +38,10 @@ VITE_AUTH_MODE = "backend"
 
 [functions."*"]
 
-[[redirects]]
-from = "/api/billing/config"
-to = "/.netlify/functions/billing-config"
-status = 200.0
-force = false
-
-[redirects.query]
-
-[redirects.conditions]
-
-[redirects.headers]
-
-[[redirects]]
-from = "/api/billing/checkout-session"
-to = "/.netlify/functions/checkout-session"
-status = 200.0
-force = false
-
-[redirects.query]
-
-[redirects.conditions]
-
-[redirects.headers]
-
-[[redirects]]
-from = "/api/billing/customer-portal"
-to = "/.netlify/functions/customer-portal"
-status = 200.0
-force = false
-
-[redirects.query]
-
-[redirects.conditions]
-
-[redirects.headers]
-
-[[redirects]]
-from = "/api/billing/subscription-status"
-to = "/.netlify/functions/subscription-status"
-status = 200.0
-force = false
-
-[redirects.query]
-
-[redirects.conditions]
-
-[redirects.headers]
-
-[[redirects]]
-from = "/api/webhooks/stripe"
-to = "/.netlify/functions/stripe-webhook"
-status = 200.0
-force = false
-
-[redirects.query]
-
-[redirects.conditions]
-
-[redirects.headers]
-
-[[redirects]]
+ # Billing routes and Stripe webhook callbacks are owned by the backend API at `VITE_API_URL`.
+ # Netlify redirects for `/api/billing/*` and `/api/webhooks/stripe` are intentionally absent.
+ # SPA fallback - must be last
+ [[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200.0

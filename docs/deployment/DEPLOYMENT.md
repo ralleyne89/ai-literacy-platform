@@ -24,7 +24,7 @@ For frontend-hosted Netlify releases, use the same pattern:
 - **Branch**: your feature branch (or `main` after merge)
 - **Root Directory**: Leave blank
 - **Environment**: Python 3
-- **Build Command**: `pip install -r requirements.txt && cd backend && flask db upgrade`
+- **Build Command**: `cd backend && pip install -r requirements.txt && flask db upgrade`
 - **Start Command**: `cd backend && gunicorn --bind 0.0.0.0:$PORT app:app`
 - **Plan**: Free
 
@@ -42,6 +42,7 @@ STRIPE_SECRET_KEY=<copy-from-your-local-backend/.env-file>
 STRIPE_PUBLISHABLE_KEY=<copy-from-your-local-.env-file>
 STRIPE_WEBHOOK_SECRET=<copy-from-your-local-backend/.env-file>
 FRONTEND_URL=https://litmusai.netlify.app
+ALLOWED_ORIGINS=https://litmusai.netlify.app
 AUTH0_DOMAIN=<your-auth0-domain>
 AUTH0_AUDIENCE=<your-auth0-audience>
 ```
@@ -131,6 +132,8 @@ AUTH0_AUDIENCE=<your-auth0-audience>
 
 ```bash
 curl https://your-backend-url.onrender.com/api/health
+curl https://your-backend-url.onrender.com/api/auth/login
+curl https://your-backend-url.onrender.com/api/auth/exchange
 curl https://your-backend-url.onrender.com/api/billing/config
 ```
 
@@ -172,6 +175,12 @@ For Railway:
 
 - Verify `FRONTEND_URL` is set to `https://litmusai.netlify.app`
 - Check CORS configuration in `backend/app.py`
+
+### Backend endpoints return 404
+
+- Verify the Render service is pointed at the current repository revision and is running the Flask service defined by `backend/app.py`.
+- Confirm `buildCommand` in Render has succeeded (or `pip install -r backend/requirements.txt` in the same block).
+- Confirm `ALLOWED_ORIGINS`, `FRONTEND_URL`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, and `JWT_SECRET_KEY` are set in the Render Environment Variables.
 
 ### Stripe errors
 

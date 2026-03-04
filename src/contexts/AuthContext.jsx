@@ -1,14 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
-import supabase from '../services/supabaseClient'
 import { AUTH0_CALLBACK_PATH } from '../config/authRoutes'
 
 const AuthContext = createContext()
 const AUTH0_AUTH_MODE = 'auth0'
 const BACKEND_AUTH_MODE = 'backend'
-const SUPABASE_AUTH_MODE = 'supabase'
 const AUTO_AUTH_MODE = 'auto'
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
 const RETRYABLE_AUTH_ERROR_MESSAGE = 'Authentication service unavailable. Please try again shortly.'
 const BACKEND_AUTH_ROUTE_ERROR_CODE = 'backend_auth_route_error'
@@ -18,9 +15,12 @@ const BACKEND_AUTH_ERROR_MESSAGE_MAX_LENGTH = 280
 const AUTH0_AUTH_LOGIN_ERROR_MESSAGE = 'Auth0 is not configured. Set VITE_AUTH0_DOMAIN and VITE_AUTH0_CLIENT_ID.'
 const BACKEND_AUTH_ROUTE_ERROR_MESSAGE =
   'Unable to authenticate: /api/auth returned an HTML page. Verify API routing (for example VITE_API_URL) and ensure /api/auth resolves to your backend endpoint.'
-const AUTH0_RESPONSE_TYPE = 'token'
+const AUTH0_RESPONSE_TYPE = 'code'
 const AUTH0_SCOPE = 'openid profile email'
 const BACKEND_AUTH_SESSION_KEY = 'ailiteracy_backend_auth'
+const AUTH0_CODE_VERIFIER_SESSION_KEY = 'ailiteracy_auth0_code_verifier'
+const AUTH0_STATE_SESSION_KEY = 'ailiteracy_auth0_state'
+const AUTH0_PKCE_VERIFIER_BYTES = 32
 const BACKEND_JWT_SEGMENTS = 3
 const GENERIC_BACKEND_REGISTRATION_ERRORS = new Set([
   'registration failed',
@@ -41,18 +41,12 @@ const getConfiguredAuthMode = () => {
   const configuredMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
   if (
     configuredMode === AUTH0_AUTH_MODE ||
-    configuredMode === BACKEND_AUTH_MODE ||
-    configuredMode === SUPABASE_AUTH_MODE
+    configuredMode === BACKEND_AUTH_MODE
   ) {
     return configuredMode
   }
 
-  if (typeof window === 'undefined') {
-    return AUTO_AUTH_MODE
-  }
-
-  const isLocalHost = LOCAL_HOSTNAMES.has(window.location.hostname.toLowerCase())
-  return isLocalHost ? AUTO_AUTH_MODE : BACKEND_AUTH_MODE
+  return AUTO_AUTH_MODE
 }
 
 const resolveAuthMode = () => {
@@ -60,13 +54,6 @@ const resolveAuthMode = () => {
   if (configuredMode !== AUTO_AUTH_MODE) {
     return configuredMode
   }
-  const isLocalHost =
-    typeof window !== 'undefined' ? LOCAL_HOSTNAMES.has(window.location.hostname.toLowerCase()) : false
-
-  if (isLocalHost) {
-    return supabase ? SUPABASE_AUTH_MODE : BACKEND_AUTH_MODE
-  }
-
   return BACKEND_AUTH_MODE
 }
 
@@ -115,17 +102,105 @@ const isValidHttpUrl = (value) => {
   }
 }
 
-const buildAuth0AuthorizeUrl = ({ provider = '', loginHint = '', screenHint = '' } = {}) => {
+const toBase64Url = (value) => {
+  try {
+    const raw = btoa(String.fromCharCode(...new Uint8Array(value)))
+    return raw.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  } catch {
+    return ''
+  }
+}
+
+const generateAuth0RandomValue = () => {
+  if (
+    typeof window === 'undefined' ||
+    !window.crypto ||
+    typeof window.crypto.getRandomValues !== 'function'
+  ) {
+    return ''
+  }
+
+  try {
+    const randomValues = new Uint8Array(AUTH0_PKCE_VERIFIER_BYTES)
+    window.crypto.getRandomValues(randomValues)
+    return toBase64Url(randomValues)
+  } catch {
+    return ''
+  }
+}
+
+const generateCodeVerifier = () => generateAuth0RandomValue()
+
+const generateState = () => generateAuth0RandomValue()
+
+const generateCodeChallenge = async (codeVerifier) => {
+  if (
+    typeof window === 'undefined' ||
+    !window.crypto ||
+    typeof window.crypto.subtle?.digest !== 'function'
+  ) {
+    return ''
+  }
+
+  try {
+    const encoded = new TextEncoder().encode(String(codeVerifier || ''))
+    const digest = await window.crypto.subtle.digest('SHA-256', encoded)
+    return toBase64Url(digest)
+  } catch {
+    return ''
+  }
+}
+
+const setAuth0PkceSessionData = ({ state = '', codeVerifier = '' } = {}) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return false
+  }
+
+  try {
+    window.sessionStorage.setItem(AUTH0_CODE_VERIFIER_SESSION_KEY, String(codeVerifier || '').trim())
+    window.sessionStorage.setItem(AUTH0_STATE_SESSION_KEY, String(state || '').trim())
+    return true
+  } catch (error) {
+    console.warn('Failed to persist Auth0 PKCE state:', error)
+    return false
+  }
+}
+
+const clearAuth0PkceSessionData = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return false
+  }
+
+  try {
+    window.sessionStorage.removeItem(AUTH0_CODE_VERIFIER_SESSION_KEY)
+    window.sessionStorage.removeItem(AUTH0_STATE_SESSION_KEY)
+    return true
+  } catch (error) {
+    console.warn('Failed to clear Auth0 PKCE state:', error)
+    return false
+  }
+}
+
+const buildAuth0AuthorizeUrl = async ({ provider = '', loginHint = '', screenHint = '' } = {}) => {
   const domain = getAuth0Domain()
   const clientId = getAuth0ClientId()
   const audience = getAuth0Audience()
   const redirectUri = getAuth0RedirectUri()
   const connection = buildAuth0ConnectionName(provider)
+  const codeVerifier = generateCodeVerifier()
+  const state = generateState()
 
   if (!domain || !clientId || !redirectUri) {
     return {
       success: false,
       message: AUTH0_AUTH_LOGIN_ERROR_MESSAGE
+    }
+  }
+
+  if (!codeVerifier || !state) {
+    return {
+      success: false,
+      message: 'Unable to initialize secure Auth0 login.'
     }
   }
 
@@ -138,12 +213,34 @@ const buildAuth0AuthorizeUrl = ({ provider = '', loginHint = '', screenHint = ''
   }
 
   try {
+    const codeChallenge = await generateCodeChallenge(codeVerifier)
+    if (!codeChallenge) {
+      return {
+        success: false,
+        message: 'Unable to prepare secure Auth0 login challenge.'
+      }
+    }
+
+    const stored = setAuth0PkceSessionData({
+      state,
+      codeVerifier
+    })
+    if (!stored) {
+      return {
+        success: false,
+        message: 'Unable to start login flow.'
+      }
+    }
+
     const authorizeUrl = new URL('/authorize', authorizeHost)
     authorizeUrl.searchParams.set('client_id', clientId)
     authorizeUrl.searchParams.set('redirect_uri', redirectUri)
     authorizeUrl.searchParams.set('response_type', AUTH0_RESPONSE_TYPE)
-    authorizeUrl.searchParams.set('response_mode', 'fragment')
+    authorizeUrl.searchParams.set('response_mode', 'query')
     authorizeUrl.searchParams.set('scope', AUTH0_SCOPE)
+    authorizeUrl.searchParams.set('code_challenge', codeChallenge)
+    authorizeUrl.searchParams.set('code_challenge_method', 'S256')
+    authorizeUrl.searchParams.set('state', state)
 
     if (audience) {
       authorizeUrl.searchParams.set('audience', audience)
@@ -173,8 +270,8 @@ const buildAuth0AuthorizeUrl = ({ provider = '', loginHint = '', screenHint = ''
   }
 }
 
-const initiateAuth0Login = (options = {}) => {
-  const result = buildAuth0AuthorizeUrl(options)
+const initiateAuth0Login = async (options = {}) => {
+  const result = await buildAuth0AuthorizeUrl(options)
   if (!result.success) {
     return { success: false, error: result.message }
   }
@@ -191,25 +288,6 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-}
-
-const mapSupabaseUser = (supabaseUser) => {
-  if (!supabaseUser) {
-    return null
-  }
-
-  const metadata = supabaseUser.user_metadata || {}
-
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email,
-    first_name: metadata.first_name || '',
-    last_name: metadata.last_name || '',
-    role: metadata.role || '',
-    organization: metadata.organization || '',
-    subscription_tier: metadata.subscription_tier || 'free',
-    created_at: supabaseUser.created_at
-  }
 }
 
 const mapBackendUser = (backendUser) => {
@@ -622,22 +700,6 @@ export const AuthProvider = ({ children }) => {
   const isAuth0Enabled = authMode === AUTH0_AUTH_MODE
   const isBackendAuthMode = authMode === BACKEND_AUTH_MODE
 
-  const syncBackendProfile = async (profile) => {
-    if (!supabase) {
-      return
-    }
-
-    if (!profile) {
-      return
-    }
-
-    try {
-      await axios.post('/api/auth/sync', profile)
-    } catch (err) {
-      console.warn('Failed to sync profile with backend:', err?.response?.data || err)
-    }
-  }
-
   const clearBackendSession = () => {
     setSession(null)
     setUser(null)
@@ -660,18 +722,23 @@ export const AuthProvider = ({ children }) => {
     clearBackendSessionStorage()
   }
 
-  const exchangeAuth0Token = async ({ accessToken, authCode } = {}) => {
+  const exchangeAuth0Token = async ({ accessToken, authCode, codeVerifier } = {}) => {
     const auth0AccessToken = typeof accessToken === 'string' ? accessToken.trim() : ''
     const auth0Code = typeof authCode === 'string' ? authCode.trim() : ''
+    const auth0CodeVerifier = typeof codeVerifier === 'string' ? codeVerifier.trim() : ''
 
     if (!auth0AccessToken && !auth0Code) {
+      return false
+    }
+    if (auth0Code && !auth0CodeVerifier) {
+      console.warn('Auth0 code exchange missing PKCE verifier.')
       return false
     }
 
     try {
       const response = await axios.post('/api/auth/exchange', {
         ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
-        ...(auth0Code ? { code: auth0Code } : {})
+        ...(auth0Code ? { code: auth0Code, code_verifier: auth0CodeVerifier } : {})
       })
 
       const normalized = normalizeBackendAuthPayload(response, {
@@ -697,131 +764,72 @@ export const AuthProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    if (usesBackendSessionMode) {
-      let isMounted = true
-
-      const initialize = async () => {
-        try {
-      const stored = getStoredBackendSession()
-          if (!stored?.token) {
-            if (isMounted) {
-              clearBackendSession()
-            }
-            return
-          }
-
-          if (isMounted) {
-            setBackendSession(stored.token, stored.user, true)
-          }
-
-          const { data } = await axios.get('/api/auth/profile')
-          const normalizedProfile = normalizeBackendAuthPayload(
-            { data },
-            { fallbackMessage: 'Unable to load backend auth profile.' }
-          )
-          if (!normalizedProfile.success) {
-            if (normalizedProfile.code === BACKEND_AUTH_ROUTE_ERROR_CODE) {
-              console.error('Backend auth profile route is misconfigured:', normalizedProfile.message)
-            }
-            return
-          }
-
-          const mapped = normalizedProfile.user
-
-          if (!mapped?.id || !isMounted) {
-            if (isMounted) {
-              clearBackendSession()
-            }
-            return
-          }
-
-          if (isMounted) {
-            setBackendSession(stored.token, mapped, true)
-          }
-        } catch (error) {
-          const status = error?.response?.status
-          if (!isMounted) {
-            return
-          }
-
-          if (status === 401 || status === 403 || status === 404) {
-            clearBackendSession()
-            return
-          }
-
-          console.warn(
-            'Backend auth session restore failed; keeping local session for retry:',
-            error?.response?.data || error
-          )
-        } finally {
-          if (isMounted) {
-            setLoading(false)
-          }
-        }
-      }
-
-      initialize()
-
-      return () => {
-        isMounted = false
-      }
-    }
-
-    if (!supabase) {
-      console.error('Supabase client is not initialized. Check environment variables.')
-      clearBackendSession()
-      setLoading(false)
-      return
-    }
+    let isMounted = true
 
     const initialize = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession()
-        if (error) {
-          console.error('Failed to retrieve Supabase session:', error)
-        } else {
-          setSession(data.session)
-          const mapped = mapSupabaseUser(data.session?.user)
-          setUser(mapped)
-          if (data.session?.user) {
-            await syncBackendProfile({
-              id: mapped?.id,
-              email: mapped?.email,
-              first_name: mapped?.first_name,
-              last_name: mapped?.last_name,
-              role: mapped?.role,
-              organization: mapped?.organization
-            })
+        const stored = getStoredBackendSession()
+        if (!stored?.token) {
+          if (isMounted) {
+            clearBackendSession()
           }
+          return
         }
-      } catch (err) {
-        console.error('Unexpected Supabase auth error:', err)
+
+        if (isMounted) {
+          setBackendSession(stored.token, stored.user, true)
+        }
+
+        const { data } = await axios.get('/api/auth/profile')
+        const normalizedProfile = normalizeBackendAuthPayload(
+          { data },
+          { fallbackMessage: 'Unable to load backend auth profile.' }
+        )
+        if (!normalizedProfile.success) {
+          if (normalizedProfile.code === BACKEND_AUTH_ROUTE_ERROR_CODE) {
+            console.error('Backend auth profile route is misconfigured:', normalizedProfile.message)
+          }
+          return
+        }
+
+        const mapped = normalizedProfile.user
+
+        if (!mapped?.id || !isMounted) {
+          if (isMounted) {
+            clearBackendSession()
+          }
+          return
+        }
+
+        if (isMounted) {
+          setBackendSession(stored.token, mapped, true)
+        }
+      } catch (error) {
+        const status = error?.response?.status
+        if (!isMounted) {
+          return
+        }
+
+        if (status === 401 || status === 403 || status === 404) {
+          clearBackendSession()
+          return
+        }
+
+        console.warn(
+          'Backend auth session restore failed; keeping local session for retry:',
+          error?.response?.data || error
+        )
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     initialize()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession)
-      const mappedUser = mapSupabaseUser(newSession?.user)
-      setUser(mappedUser)
-
-      if (newSession?.user) {
-        await syncBackendProfile({
-          id: mappedUser?.id,
-          email: mappedUser?.email,
-          first_name: mappedUser?.first_name,
-          last_name: mappedUser?.last_name,
-          role: mappedUser?.role,
-          organization: mappedUser?.organization
-        })
-      }
-    })
-
     return () => {
-      authListener?.subscription.unsubscribe()
+      isMounted = false
     }
   }, [])
 
@@ -835,173 +843,95 @@ export const AuthProvider = ({ children }) => {
   }, [session])
 
   const login = async (email, password) => {
-    if (usesBackendSessionMode) {
-      if (isAuth0Enabled) {
-        return initiateAuth0Login({
-          loginHint: String(email || '').trim().toLowerCase()
-        })
-      }
-
-      try {
-        const response = await axios.post('/api/auth/login', {
-          email: String(email || '').trim().toLowerCase(),
-          password
-        })
-
-        const normalized = normalizeBackendAuthPayload(response, {
-          fallbackMessage: 'Backend authentication response was missing required data.',
-          requiresToken: true
-        })
-        if (!normalized.success) {
-          return {
-            success: false,
-            error: normalized.message,
-            code: normalized.code
-          }
-        }
-
-        setBackendSession(normalized.token, normalized.user, true)
-
-        return { success: true, user: normalized.user }
-      } catch (error) {
-        const normalized = getBackendAuthError(error, 'Unable to sign in right now.')
-        return { success: false, error: normalized.message, code: normalized.code }
-      }
+    if (isAuth0Enabled) {
+      return initiateAuth0Login({
+        loginHint: String(email || '').trim().toLowerCase()
+      })
     }
-
-    if (!supabase) {
-      return { success: false, error: 'Supabase is not configured' }
+    if (!usesBackendSessionMode) {
+      return { success: false, error: 'Authentication mode is not configured.' }
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (error) {
-        const normalized = normalizeAuthError(error, 'Unable to sign in right now.')
-        return { success: false, error: normalized.message, code: normalized.code }
-      }
-
-      setSession(data.session)
-      const mappedUser = mapSupabaseUser(data.user)
-      setUser(mappedUser)
-
-      await syncBackendProfile({
-        id: mappedUser?.id,
-        email: mappedUser?.email,
-        first_name: mappedUser?.first_name,
-        last_name: mappedUser?.last_name,
-        role: mappedUser?.role,
-        organization: mappedUser?.organization
+      const response = await axios.post('/api/auth/login', {
+        email: String(email || '').trim().toLowerCase(),
+        password
       })
 
-      return { success: true, user: mappedUser }
-    } catch (err) {
-      const normalized = normalizeAuthError(err, 'Unable to sign in right now.')
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Backend authentication response was missing required data.',
+        requiresToken: true
+      })
+      if (!normalized.success) {
+        return {
+          success: false,
+          error: normalized.message,
+          code: normalized.code
+        }
+      }
+
+      setBackendSession(normalized.token, normalized.user, true)
+
+      return { success: true, user: normalized.user }
+    } catch (error) {
+      const normalized = getBackendAuthError(error, 'Unable to sign in right now.')
       return { success: false, error: normalized.message, code: normalized.code }
     }
   }
 
   const register = async (userData) => {
-    if (usesBackendSessionMode) {
-      if (isAuth0Enabled) {
-        return initiateAuth0Login({
-          loginHint: String(userData?.email || '').trim().toLowerCase(),
-          screenHint: 'signup'
-        })
-      }
-
-      try {
-        const response = await axios.post('/api/auth/register', {
-          email: String(userData.email || '').trim().toLowerCase(),
-          password: userData.password,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          role: userData.role,
-          organization: userData.organization
-        })
-
-        const normalized = normalizeBackendAuthPayload(response, {
-          fallbackMessage: 'Backend registration response was missing required data.',
-          requiresToken: true
-        })
-        if (!normalized.success) {
-          return {
-            success: false,
-            error: normalized.message,
-            code: normalized.code
-          }
-        }
-
-        setBackendSession(normalized.token, normalized.user, true)
-
-        return {
-          success: true,
-          user: normalized.user,
-          requiresEmailConfirmation: false
-        }
-      } catch (error) {
-        const normalized = getBackendAuthError(
-          error,
-          'Unable to complete registration right now.',
-          { preferRegistrationDetails: true }
-        )
-        return {
-          success: false,
-          error: normalized.message,
-          code: normalized.code,
-          details: normalized.details
-        }
-      }
+    if (isAuth0Enabled) {
+      return initiateAuth0Login({
+        loginHint: String(userData?.email || '').trim().toLowerCase(),
+        screenHint: 'signup'
+      })
     }
 
-    if (!supabase) {
-      return { success: false, error: 'Supabase is not configured' }
+    if (!usesBackendSessionMode) {
+      return { success: false, error: 'Authentication mode is not configured.' }
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
+      const response = await axios.post('/api/auth/register', {
+        email: String(userData.email || '').trim().toLowerCase(),
         password: userData.password,
-        options: {
-          data: {
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            role: userData.role,
-            organization: userData.organization,
-            subscription_tier: 'free'
-          }
-        }
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        role: userData.role,
+        organization: userData.organization
       })
 
-      if (error) {
-        const normalized = normalizeAuthError(error, 'Unable to complete registration right now.')
-        return { success: false, error: normalized.message, code: normalized.code }
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Backend registration response was missing required data.',
+        requiresToken: true
+      })
+      if (!normalized.success) {
+        return {
+          success: false,
+          error: normalized.message,
+          code: normalized.code
+        }
       }
 
-      const mappedUser = mapSupabaseUser(data.user)
-
-      if (data.session) {
-        setSession(data.session)
-        setUser(mappedUser)
-
-        await syncBackendProfile({
-          id: mappedUser?.id,
-          email: mappedUser?.email,
-          first_name: mappedUser?.first_name,
-          last_name: mappedUser?.last_name,
-          role: mappedUser?.role,
-          organization: mappedUser?.organization
-        })
-      }
+      setBackendSession(normalized.token, normalized.user, true)
 
       return {
         success: true,
-        user: mappedUser,
-        requiresEmailConfirmation: !data.session
+        user: normalized.user,
+        requiresEmailConfirmation: false
       }
-    } catch (err) {
-      const normalized = normalizeAuthError(err, 'Unable to complete registration right now.')
-      return { success: false, error: normalized.message, code: normalized.code }
+    } catch (error) {
+      const normalized = getBackendAuthError(
+        error,
+        'Unable to complete registration right now.',
+        { preferRegistrationDetails: true }
+      )
+      return {
+        success: false,
+        error: normalized.message,
+        code: normalized.code,
+        details: normalized.details
+      }
     }
   }
 
@@ -1010,15 +940,7 @@ export const AuthProvider = ({ children }) => {
       clearBackendSession()
       return
     }
-
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('Supabase logout failed:', error)
-      return
-    }
-
-    setSession(null)
-    setUser(null)
+    return { success: false, error: 'Authentication mode is not configured.' }
   }
 
   const updateProfile = async (profileData) => {
@@ -1045,38 +967,10 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: normalized.message, code: normalized.code }
       }
     }
-
-    if (!supabase) {
-      return { success: false, error: 'Supabase is not configured' }
+    return {
+      success: false,
+      error: 'Profile updates are not supported in this authentication mode.'
     }
-
-    const metadata = {
-      first_name: profileData.first_name,
-      last_name: profileData.last_name,
-      role: profileData.role || '',
-      organization: profileData.organization || '',
-      subscription_tier: user?.subscription_tier || 'free'
-    }
-
-    const { data, error } = await supabase.auth.updateUser({ data: metadata })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    const mappedUser = mapSupabaseUser(data.user)
-    setUser(mappedUser)
-
-    await syncBackendProfile({
-      id: mappedUser?.id,
-      email: mappedUser?.email,
-      first_name: mappedUser?.first_name,
-      last_name: mappedUser?.last_name,
-      role: mappedUser?.role,
-      organization: mappedUser?.organization
-    })
-
-    return { success: true, user: mappedUser }
   }
 
   const loginWithProvider = async (provider) => {
@@ -1085,28 +979,9 @@ export const AuthProvider = ({ children }) => {
         provider
       })
     }
-
-    if (!supabase) {
-      return { success: false, error: 'Supabase is not configured' }
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      })
-
-      if (error) {
-        const normalized = normalizeAuthError(error, 'Unable to start social sign-in right now.')
-        return { success: false, error: normalized.message, code: normalized.code }
-      }
-
-      return { success: true, data }
-    } catch (err) {
-      const normalized = normalizeAuthError(err, 'Unable to start social sign-in right now.')
-      return { success: false, error: normalized.message, code: normalized.code }
+    return {
+      success: false,
+      error: 'Social provider login is only supported in Auth0 mode.'
     }
   }
 
@@ -1124,40 +999,28 @@ export const AuthProvider = ({ children }) => {
         error: 'Password reset is not available in backend authentication mode.'
       }
     }
-
-    if (!supabase) {
-      return { success: false, error: 'Supabase is not configured' }
-    }
-
-    const normalizedEmail = (email || '').trim()
-    if (!normalizedEmail) {
-      return { success: false, error: 'Email is required' }
-    }
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: `${window.location.origin}/login`
-      })
-
-      if (error) {
-        const normalized = normalizeAuthError(error, 'Unable to send password reset email right now.')
-        return { success: false, error: normalized.message, code: normalized.code }
-      }
-
-      return { success: true }
-    } catch (err) {
-      const normalized = normalizeAuthError(err, 'Unable to send password reset email right now.')
-      return { success: false, error: normalized.message, code: normalized.code }
+    return {
+      success: false,
+      error: 'Password reset is not available in this authentication mode.'
     }
   }
 
-  const syncBackendAfterLogin = async ({ auth0AccessToken = '', auth0Code = '' } = {}) => {
+  const syncBackendAfterLogin = async ({
+    auth0AccessToken = '',
+    auth0Code = '',
+    auth0CodeVerifier = ''
+  } = {}) => {
     if (usesBackendSessionMode) {
       if (isAuth0Enabled && (auth0AccessToken || auth0Code)) {
-        return await exchangeAuth0Token({
+        const exchanged = await exchangeAuth0Token({
           authCode: auth0Code,
-          accessToken: auth0AccessToken
+          accessToken: auth0AccessToken,
+          codeVerifier: auth0CodeVerifier
         })
+        if (auth0Code || auth0AccessToken) {
+          clearAuth0PkceSessionData()
+        }
+        return exchanged
       }
 
       const stored = getStoredBackendSession()
@@ -1169,9 +1032,12 @@ export const AuthProvider = ({ children }) => {
       setBackendSession(stored.token, stored.user, true)
       try {
         const { data } = await axios.get('/api/auth/profile')
-        const normalizedProfile = normalizeBackendAuthPayload({ data }, {
-          fallbackMessage: 'Unable to load backend auth profile.'
-        })
+        const normalizedProfile = normalizeBackendAuthPayload(
+          { data },
+          {
+            fallbackMessage: 'Unable to load backend auth profile.'
+          }
+        )
 
         if (!normalizedProfile.success || !normalizedProfile.user) {
           clearBackendSession()
@@ -1186,25 +1052,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    try {
-      const { data } = await supabase.auth.getSession()
-      const mapped = mapSupabaseUser(data.session?.user)
-      if (!mapped) return false
-      await syncBackendProfile({
-        id: mapped.id,
-        email: mapped.email,
-        first_name: mapped.first_name,
-        last_name: mapped.last_name,
-        role: mapped.role,
-        organization: mapped.organization
-      })
-      setSession(data.session)
-      setUser(mapped)
-      return true
-    } catch (err) {
-      console.warn('Failed to finalize login sync:', err)
-      return false
-    }
+    return false
   }
 
   const value = {

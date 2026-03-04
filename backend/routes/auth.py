@@ -5,7 +5,11 @@ from logging_config import get_logger
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError, ProgrammingError
 import bcrypt
 import re
+import json
+import os
 from werkzeug.security import check_password_hash as check_legacy_password_hash
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from routes import (
     supabase_jwt_required,
     get_supabase_claims,
@@ -162,6 +166,125 @@ def _normalize_auth0_token(data):
         return token.strip()
 
     return ''
+
+
+def _normalize_auth0_text(value):
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized:
+            return normalized
+
+    return ''
+
+
+def _normalize_frontend_redirect_uri(override_redirect_uri=''):
+    if isinstance(override_redirect_uri, str):
+        override = override_redirect_uri.strip()
+        if override:
+            return override
+
+    configured_redirect_uri = _normalize_auth0_text(os.getenv('AUTH0_REDIRECT_URI'))
+    if configured_redirect_uri:
+        return configured_redirect_uri
+
+    vite_redirect_uri = _normalize_auth0_text(os.getenv('VITE_AUTH0_REDIRECT_URI'))
+    if vite_redirect_uri:
+        return vite_redirect_uri
+
+    frontend_url = _normalize_auth0_text(os.getenv('FRONTEND_URL'))
+    if frontend_url:
+        return f'{frontend_url.rstrip("/")}/auth/callback'
+
+    return ''
+
+
+def _build_auth0_token_url():
+    raw_domain = _normalize_auth0_text(os.getenv('AUTH0_DOMAIN'))
+    if not raw_domain:
+        return ''
+
+    normalized_domain = raw_domain.rstrip('/')
+    if not normalized_domain.startswith(('http://', 'https://')):
+        normalized_domain = f'https://{normalized_domain}'
+
+    return f'{normalized_domain}/oauth/token'
+
+
+def _extract_json_error_message(raw_body):
+    if not isinstance(raw_body, str):
+        return ''
+
+    raw_body = raw_body.strip()
+    if not raw_body:
+        return ''
+
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return raw_body
+
+    if not isinstance(payload, dict):
+        return raw_body
+
+    for key in ('error_description', 'error'):
+        value = payload.get(key)
+        if isinstance(value, str):
+            value = value.strip()
+            if value:
+                return value
+
+    return raw_body
+
+
+def _exchange_authorization_code_for_access_token(auth_code, code_verifier, redirect_uri):
+    token_url = _build_auth0_token_url()
+    if not token_url:
+        return '', 'Auth0 domain is not configured for token exchange.'
+
+    client_id = _normalize_auth0_text(os.getenv('AUTH0_CLIENT_ID'))
+    if not client_id:
+        return '', 'Auth0 client_id is not configured for token exchange.'
+
+    payload = {
+        'grant_type': 'authorization_code',
+        'client_id': client_id,
+        'code': auth_code,
+        'code_verifier': code_verifier,
+        'redirect_uri': redirect_uri,
+    }
+    request_kwargs = {
+        'method': 'POST',
+        'headers': {'Content-Type': 'application/json'},
+        'data': json.dumps(payload).encode('utf-8'),
+    }
+    request = Request(token_url, **request_kwargs)
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            response_body = response.read().decode('utf-8')
+    except HTTPError as error:
+        try:
+            raw_error = error.read().decode('utf-8', errors='replace')
+        except Exception:
+            raw_error = ''
+
+        error_message = _extract_json_error_message(raw_error) or str(error)
+        return '', f'Auth0 token exchange failed: {error_message}'
+    except URLError as error:
+        return '', f'Unable to reach Auth0 token endpoint: {error}'
+    except Exception as error:
+        return '', f'Auth0 token exchange failed: {error}'
+
+    try:
+        exchange_payload = json.loads(response_body)
+    except json.JSONDecodeError:
+        return '', 'Auth0 token endpoint returned an invalid response.'
+
+    auth0_access_token = _normalize_auth0_token(exchange_payload if isinstance(exchange_payload, dict) else {})
+    if not auth0_access_token:
+        return '', 'Auth0 token exchange did not return an access token.'
+
+    return auth0_access_token, ''
 
 
 def _auth_preflight_response():
@@ -416,6 +539,28 @@ def login_options():
 @auth_bp.route('/exchange', methods=['POST'])
 def exchange():
     payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({'error': 'Invalid request payload'}), 400
+
+    auth0_code = _normalize_auth0_text(payload.get('code'))
+    if auth0_code:
+        auth0_code_verifier = _normalize_auth0_text(payload.get('code_verifier'))
+        if not auth0_code_verifier:
+            return jsonify({'error': 'Code verifier is required for authorization code exchange.'}), 400
+
+        auth0_redirect_uri = _normalize_frontend_redirect_uri(payload.get('redirect_uri'))
+        if not auth0_redirect_uri:
+            return jsonify({'error': 'Redirect URI is required for authorization code exchange.'}), 400
+
+        auth0_access_token, exchange_error = _exchange_authorization_code_for_access_token(
+            auth0_code,
+            auth0_code_verifier,
+            auth0_redirect_uri,
+        )
+        if not auth0_access_token:
+            return jsonify({'error': exchange_error or 'Auth0 code exchange failed.'}), 400
+
+    else:
     auth0_access_token = _normalize_auth0_token(payload or {})
 
     if not auth0_access_token:

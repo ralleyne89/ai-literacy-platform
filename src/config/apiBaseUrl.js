@@ -1,5 +1,5 @@
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
-const DEFAULT_RENDER_API_URL = 'https://litmusai-backend.onrender.com'
+const DEFAULT_RENDER_API_URL = 'https://ai-literacy-platform.onrender.com'
 
 const trimTrailingSlashes = (value) => (value || '').replace(/\/+$/, '')
 

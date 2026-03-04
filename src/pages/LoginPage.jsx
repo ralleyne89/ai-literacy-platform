@@ -1,32 +1,26 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Brain, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Brain, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({
-    email: '',
-    password: ''
+    email: ''
   })
-  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [errorCode, setErrorCode] = useState('')
   const [resetNotice, setResetNotice] = useState('')
-  const [showResetForm, setShowResetForm] = useState(false)
   const [lastAction, setLastAction] = useState(null)
   const [retrying, setRetrying] = useState(false)
 
-  const { login, isAuthenticated, loginWithProvider, requestPasswordReset } = useAuth()
+  const { login, isAuthenticated, loginWithProvider } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const from = location.state?.from?.pathname || '/dashboard'
-  const authMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
-  const isAuth0Mode = authMode === 'auth0'
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -49,10 +43,10 @@ const LoginPage = () => {
     setLastAction({ type: 'login' })
     setLoading(true)
 
-    const result = await login(formData.email, formData.password)
+    const result = await login(formData.email)
 
     if (result.success) {
-      if (!isAuth0Mode) {
+      if (result.user) {
         navigate(from, { replace: true })
       }
       setLoading(false)
@@ -77,23 +71,6 @@ const LoginPage = () => {
     }
   }
 
-  const handlePasswordReset = async (e) => {
-    e.preventDefault()
-    setError('')
-    setErrorCode('')
-    setResetNotice('')
-    setLastAction({ type: 'reset' })
-
-    const result = await requestPasswordReset(formData.email)
-    if (result.success) {
-      setResetNotice('Password reset email sent. Check your inbox for next steps.')
-      setShowResetForm(false)
-    } else {
-      setError(result.error || 'Unable to send reset email.')
-      setErrorCode(result.code || '')
-    }
-  }
-
   const handleRetry = async () => {
     if (!lastAction) {
       return
@@ -106,9 +83,9 @@ const LoginPage = () => {
 
     try {
       if (lastAction.type === 'login') {
-        const result = await login(formData.email, formData.password)
+        const result = await login(formData.email)
         if (result.success) {
-          if (!isAuth0Mode) {
+          if (result.user) {
             navigate(from, { replace: true })
           }
           setLoading(false)
@@ -128,17 +105,6 @@ const LoginPage = () => {
         }
         return
       }
-
-      if (lastAction.type === 'reset') {
-        const result = await requestPasswordReset(formData.email)
-        if (result.success) {
-          setResetNotice('Password reset email sent. Check your inbox for next steps.')
-          setShowResetForm(false)
-        } else {
-          setError(result.error || 'Unable to send reset email.')
-          setErrorCode(result.code || '')
-        }
-      }
     } finally {
       setRetrying(false)
     }
@@ -152,24 +118,13 @@ const LoginPage = () => {
             <Brain className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
-            {isAuth0Mode ? 'Sign in to continue' : 'Sign in to your account'}
+            Sign in to continue
           </h2>
           <p className="mt-2 text-gray-600">
-            {isAuth0Mode ? (
-              <>
-                New here?{' '}
-                <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-                  create an account with Auth0
-                </Link>
-              </>
-            ) : (
-              <>
-                Or{' '}
-                <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-                  create a new account
-                </Link>
-              </>
-            )}
+            New here?{' '}
+            <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
+              create an account with Auth0
+            </Link>
           </p>
         </div>
 
@@ -202,175 +157,53 @@ const LoginPage = () => {
             </div>
           )}
 
-          {isAuth0Mode ? (
-            <>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email (optional)
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    autoComplete="email"
-                    type="email"
-                    required={false}
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                    placeholder="Continue with email or use a social provider"
-                  />
-                </div>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email (optional)
+              </label>
+              <input
+                id="email"
+                name="email"
+                autoComplete="email"
+                type="email"
+                required={false}
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                placeholder="Continue with email or use a social provider"
+              />
+            </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Redirecting...' : 'Continue with Auth0'}
-                </button>
-              </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Redirecting...' : 'Continue with Auth0'}
+            </button>
+          </div>
 
-              <p className="text-sm text-gray-600 text-center">
-                Prefer a social provider? Use one of the options below.
-              </p>
+          <p className="text-sm text-gray-600 text-center">
+            Prefer a social provider? Use one of the options below.
+          </p>
 
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('google')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('facebook')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Facebook
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email address
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    autoComplete="email"
-                    type="email"
-                    required={!isAuth0Mode}
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      required={!isAuth0Mode}
-                      value={formData.password}
-                      onChange={handleChange}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
-                      placeholder="Enter your password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                    Remember me
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setShowResetForm(prev => !prev)}
-                    className="text-primary-600 hover:text-primary-500 font-medium"
-                  >
-                    Forgot your password?
-                  </button>
-                </div>
-              </div>
-
-              {showResetForm && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <p className="text-sm text-gray-700 mb-3">Send a password reset link to your email address.</p>
-                  <button
-                    type="button"
-                    onClick={handlePasswordReset}
-                    className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition-colors"
-                  >
-                    Send Reset Link
-                  </button>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Signing in...' : 'Sign in'}
-              </button>
-
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('google')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProviderLogin('facebook')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Facebook
-                </button>
-              </div>
-
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  Don't have an account?{' '}
-                  <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-                    Sign up for free
-                  </Link>
-                </p>
-              </div>
-            </>
-          )}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('google')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleProviderLogin('facebook')}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Continue with Facebook
+            </button>
+          </div>
         </form>
       </div>
     </div>
