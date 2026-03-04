@@ -12,6 +12,10 @@
   # Disable secrets scanning (secrets are in environment variables, not in code)
   SECRETS_SCAN_ENABLED = "false"
 
+[context.production.environment]
+  VITE_API_URL = "https://litmusai-backend.onrender.com"
+  VITE_AUTH_MODE = "backend"
+
 # Redirect API calls to Netlify Functions
 [[redirects]]
   from = "/api/billing/config"

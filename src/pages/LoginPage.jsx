@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Brain, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
+const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
+
 const LoginPage = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -11,8 +13,13 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState('')
+  const [resetNotice, setResetNotice] = useState('')
+  const [showResetForm, setShowResetForm] = useState(false)
+  const [lastAction, setLastAction] = useState(null)
+  const [retrying, setRetrying] = useState(false)
 
-  const { login, isAuthenticated, loginWithProvider } = useAuth()
+  const { login, isAuthenticated, loginWithProvider, requestPasswordReset } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -35,6 +42,9 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setErrorCode('')
+    setResetNotice('')
+    setLastAction({ type: 'login' })
     setLoading(true)
 
     const result = await login(formData.email, formData.password)
@@ -43,6 +53,7 @@ const LoginPage = () => {
       navigate(from, { replace: true })
     } else {
       setError(result.error)
+      setErrorCode(result.code || '')
     }
 
     setLoading(false)
@@ -50,9 +61,76 @@ const LoginPage = () => {
 
   const handleProviderLogin = async (provider) => {
     setError('')
+    setErrorCode('')
+    setResetNotice('')
+    setLastAction({ type: 'provider', provider })
     const result = await loginWithProvider(provider)
     if (!result.success && result.error) {
       setError(result.error)
+      setErrorCode(result.code || '')
+    }
+  }
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setErrorCode('')
+    setResetNotice('')
+    setLastAction({ type: 'reset' })
+
+    const result = await requestPasswordReset(formData.email)
+    if (result.success) {
+      setResetNotice('Password reset email sent. Check your inbox for next steps.')
+      setShowResetForm(false)
+    } else {
+      setError(result.error || 'Unable to send reset email.')
+      setErrorCode(result.code || '')
+    }
+  }
+
+  const handleRetry = async () => {
+    if (!lastAction) {
+      return
+    }
+
+    setRetrying(true)
+    setError('')
+    setErrorCode('')
+    setResetNotice('')
+
+    try {
+      if (lastAction.type === 'login') {
+        const result = await login(formData.email, formData.password)
+        if (result.success) {
+          navigate(from, { replace: true })
+        } else {
+          setError(result.error)
+          setErrorCode(result.code || '')
+        }
+        return
+      }
+
+      if (lastAction.type === 'provider' && lastAction.provider) {
+        const result = await loginWithProvider(lastAction.provider)
+        if (!result.success) {
+          setError(result.error || 'Unable to start social sign-in right now.')
+          setErrorCode(result.code || '')
+        }
+        return
+      }
+
+      if (lastAction.type === 'reset') {
+        const result = await requestPasswordReset(formData.email)
+        if (result.success) {
+          setResetNotice('Password reset email sent. Check your inbox for next steps.')
+          setShowResetForm(false)
+        } else {
+          setError(result.error || 'Unable to send reset email.')
+          setErrorCode(result.code || '')
+        }
+      }
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -74,9 +152,30 @@ const LoginPage = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <span className="text-red-700">{error}</span>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="text-red-700">{error}</span>
+                {errorCode === RETRYABLE_AUTH_ERROR_CODE && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      disabled={retrying}
+                      className="inline-flex items-center rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      {retrying ? 'Retrying...' : 'Retry'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {resetNotice && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <span className="text-green-700">{resetNotice}</span>
             </div>
           )}
 
@@ -137,11 +236,28 @@ const LoginPage = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="text-primary-600 hover:text-primary-500 font-medium">
+              <button
+                type="button"
+                onClick={() => setShowResetForm(prev => !prev)}
+                className="text-primary-600 hover:text-primary-500 font-medium"
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
+
+          {showResetForm && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm text-gray-700 mb-3">Send a password reset link to your email address.</p>
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                className="w-full rounded-lg bg-gray-900 text-white px-4 py-2 text-sm font-semibold hover:bg-black transition-colors"
+              >
+                Send Reset Link
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -15,6 +15,8 @@ import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
 import AuthCallback from './pages/AuthCallback'
 import BillingPage from './pages/BillingPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -37,6 +39,8 @@ function App() {
             <Route path="/enterprise" element={<EnterprisePage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardPage />

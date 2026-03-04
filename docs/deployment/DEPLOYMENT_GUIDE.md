@@ -1,7 +1,7 @@
 # Deployment Instructions - LitmusAI Platform
 
 **Date:** 2025-10-09  
-**Branch:** feat/phase2-auth-dashboard  
+**Branch:** feature branch (e.g., current feature branch name)
 **Status:** Ready to push and deploy
 
 ---
@@ -120,7 +120,7 @@ chore: Add utility scripts for database migrations and setup
 ```bash
 # If you have GitHub CLI installed
 gh auth login
-git push origin feat/phase2-auth-dashboard
+git push origin <your-feature-branch>
 ```
 
 ### Option B: Using Personal Access Token
@@ -130,7 +130,7 @@ git push origin feat/phase2-auth-dashboard
 # 3. Copy the token
 # 4. Push with token:
 
-git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git feat/phase2-auth-dashboard
+git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git <your-feature-branch>
 ```
 
 ### Option C: Using SSH (If configured)
@@ -139,14 +139,14 @@ git push https://YOUR_TOKEN@github.com/ralleyne89/ai-literacy-platform.git feat/
 git remote set-url origin git@github.com:ralleyne89/ai-literacy-platform.git
 
 # Push
-git push origin feat/phase2-auth-dashboard
+git push origin <your-feature-branch>
 ```
 
 ---
 
-## 🔄 Step 2: Merge to Main (Optional)
+## 🔄 Step 2: Merge to Main (Required for Release)
 
-If you want to merge the feature branch to main:
+Open a pull request first for review, then merge to main.
 
 ```bash
 # Switch to main
@@ -156,13 +156,13 @@ git checkout main
 git pull origin main
 
 # Merge feature branch
-git merge feat/phase2-auth-dashboard
+git merge <your-feature-branch>
 
 # Push to main
 git push origin main
 ```
 
-Or create a Pull Request on GitHub for review.
+Or create a Pull Request on GitHub and then merge it from the GitHub UI (preferred).
 
 ---
 
@@ -407,8 +407,8 @@ Deployment is successful when:
 
 ---
 
-**Status:** Ready for Deployment  
-**Branch:** feat/phase2-auth-dashboard  
+**Status:** Ready for Deployment
+**Branch:** current feature branch
 **Commits:** 7 commits ready to push  
 **Deployment:** Automatic via Netlify (after push)
 

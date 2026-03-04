@@ -1,5 +1,14 @@
 # Backend Deployment Guide
 
+## Recommended PR -> main merge flow
+
+For frontend-hosted Netlify releases, use the same pattern:
+
+1. Deploy and validate your backend changes on a feature branch.
+2. Open a pull request targeting `main`.
+3. Merge the PR after checks.
+4. Netlify redeploys frontend production from `main` automatically once the merged branch updates.
+
 ## Option 1: Deploy to Render (Recommended - Free Tier)
 
 ### Step 1: Create a Render Account
@@ -12,7 +21,7 @@
 
 - **Name**: `litmusai-backend`
 - **Region**: Oregon (US West)
-- **Branch**: `feat/phase2-auth-dashboard` (or `main` after merging)
+- **Branch**: your feature branch (or `main` after merge)
 - **Root Directory**: Leave blank
 - **Environment**: Python 3
 - **Build Command**: `pip install -r requirements.txt && cd backend && flask db upgrade`
@@ -165,3 +174,35 @@ For Railway:
 - Verify all Stripe keys are set correctly
 - Check if using test keys vs live keys
 - Ensure webhook secret matches Stripe dashboard
+
+---
+
+## Auth mode and database option notes
+
+Authentication can run in three modes:
+
+- `backend` (recommended on constrained Supabase plans): set `VITE_AUTH_MODE=backend` so the app uses `/api/auth/register` and `/api/auth/login`.
+- `supabase` (social login enabled): unset `VITE_AUTH_MODE` (auto) or set `VITE_AUTH_MODE=supabase`.
+- For production builds using `VITE_AUTH_MODE=auto`, treat `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as required.
+- `auth0` (delegated identity): set `VITE_AUTH_MODE=auth0` and configure `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`.
+
+Required environment notes by mode (production):
+
+- Backend mode requires `VITE_API_URL` plus backend secrets (`JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`) for issued tokens.
+- Supabase mode requires `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `SUPABASE_JWT_SECRET` for token validation.
+- Auth0 mode requires `VITE_AUTH0_*` values and backend token signing secret (`JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`).
+
+Low-cost PostgreSQL hosting alternatives for `DATABASE_URL`:
+
+- Neon (strong free tier for small projects)
+- Render PostgreSQL (free and paid plans)
+- Railway PostgreSQL (free credits, then low-cost paid)
+- Supabase Postgres
+- Aiven PostgreSQL
+- ElephantSQL
+
+Migration checklist for switching providers:
+
+1. Update `DATABASE_URL` in your backend host
+2. `cd backend && flask db upgrade`
+3. Re-run seeders (`flask seed-training-modules --force`, `flask seed-certifications --force`, `flask seed-course-content --force`) where required

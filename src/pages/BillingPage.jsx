@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
@@ -40,7 +40,7 @@ const FALLBACK_PLANS = [
     id: 'premium',
     name: 'Premium',
     description: 'Unlock premium training, certifications, and analytics.',
-    amount: 15,
+    amount: 49,
     currency: 'usd',
     billing_interval: 'month',
     features: [
@@ -53,29 +53,62 @@ const FALLBACK_PLANS = [
     is_free: false,
     checkout_enabled: true,
     configured: true
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    description: 'Tailored enablement for teams and departments.',
-    amount: 99,
-    currency: 'usd',
-    billing_interval: 'month',
-    features: [
-      'Custom learning paths',
-      'Dedicated customer success',
-      'SSO & advanced reporting',
-      'Licensing & partnerships'
-    ],
-    cta: 'Upgrade to Enterprise',
-    is_free: false,
-    checkout_enabled: false,
-    configured: false // Temporarily hidden
   }
 ]
 
+const isHtmlPayload = (payload) => {
+  if (typeof payload === 'string') {
+    const normalized = payload.trim().toLowerCase()
+    return normalized.startsWith('<!doctype html') || normalized.startsWith('<html')
+  }
+
+  return false
+}
+
+const buildSyntheticHttpError = (response, message = 'Invalid API response') => {
+  const error = new Error(message)
+  error.response = response
+  return error
+}
+
+const getBillingApiFallbackMessage = (err) => {
+  if (!err?.response) {
+    return 'Unable to reach billing API. Displaying standard plan information instead.'
+  }
+
+  const data = err.response.data
+  if (isHtmlPayload(data)) {
+    return 'Billing API returned HTML instead of JSON. Displaying standard plan information instead.'
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    return data.error || data.message || 'Unable to reach billing API. Displaying standard plan information instead.'
+  }
+
+  return 'Unable to reach billing API. Displaying standard plan information instead.'
+}
+
+const getBillingActionError = (err, fallbackMessage) => {
+  if (!err?.response) {
+    return `${fallbackMessage} Please check your connection and try again.`
+  }
+
+  const data = err.response.data
+  if (isHtmlPayload(data)) {
+    return `${fallbackMessage} Billing API routing appears misconfigured.`
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    const message = data.error || data.message || fallbackMessage
+    const details = data.details || data.hint
+    return details ? `${message} (${details})` : message
+  }
+
+  return fallbackMessage
+}
+
 const BillingPage = () => {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const location = useLocation()
 
   const [plans, setPlans] = useState([])
@@ -83,14 +116,74 @@ const BillingPage = () => {
   const [checkoutPlan, setCheckoutPlan] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [manualEmail, setManualEmail] = useState('')
+  const [checkoutEmail, setCheckoutEmail] = useState('')
   const [subscription, setSubscription] = useState(null)
   const [loadingPortal, setLoadingPortal] = useState(false)
+  const [mockMode, setMockMode] = useState(false)
+  const [usingFallbackPlans, setUsingFallbackPlans] = useState(false)
+  const [retryingPlans, setRetryingPlans] = useState(false)
 
   const queryMessages = useMemo(() => ({
-    success: 'Subscription activated successfully. Welcome aboard! 🎉',
+    success: 'Subscription activated successfully. Welcome aboard.',
     canceled: 'Checkout canceled. You have not been charged.'
   }), [])
+
+  const fetchPlans = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) {
+      setLoading(true)
+    }
+
+    try {
+      const response = await axios.get('/api/billing/config')
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
+        throw buildSyntheticHttpError(response, 'Invalid billing payload')
+      }
+
+      const remotePlans = Array.isArray(payload.plans) && payload.plans.length > 0 ? payload.plans : null
+      const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
+
+      setPlans(filteredPlans)
+      setMockMode(Boolean(payload.mock_mode))
+      setUsingFallbackPlans(false)
+    } catch (err) {
+      setPlans(FALLBACK_PLANS)
+      setMockMode(false)
+      setUsingFallbackPlans(true)
+      setNotice(getBillingApiFallbackMessage(err))
+    } finally {
+      if (showSpinner) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  const fetchSubscription = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSubscription(null)
+      return
+    }
+
+    try {
+      const response = await axios.get('/api/billing/subscription')
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
+        throw buildSyntheticHttpError(response, 'Invalid billing subscription payload')
+      }
+
+      setSubscription(payload)
+    } catch (err) {
+      if (err?.response?.status !== 401) {
+        setError(getBillingActionError(err, 'Unable to load your current subscription status.'))
+      }
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    setCheckoutEmail(user?.email || '')
+  }, [user?.email])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -102,127 +195,60 @@ const BillingPage = () => {
   }, [location.search, queryMessages])
 
   useEffect(() => {
-    const fetchPlans = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const { data } = await axios.get('/api/billing/config')
-        const remotePlans = Array.isArray(data?.plans) && data.plans.length > 0 ? data.plans : null
-        // Filter to only show configured plans
-        const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
-        setPlans(filteredPlans)
-        if (!remotePlans) {
-          setNotice('Using standard plan information. Connect the backend billing service to enable live checkout.')
-        }
-      } catch (err) {
-        console.error('Failed to load billing config:', err)
-        // Filter fallback plans too
-        const filteredFallback = FALLBACK_PLANS.filter(plan => plan.configured !== false)
-        setPlans(filteredFallback)
-        setNotice('Unable to reach billing API. Displaying standard plan information instead.')
-      } finally {
-        setLoading(false)
-      }
-    }
+    fetchPlans({ showSpinner: true })
+  }, [fetchPlans])
 
-    fetchPlans()
-  }, [])
-
-  // Fetch subscription status from localStorage (set by webhook or after checkout)
   useEffect(() => {
-    const storedSubscription = localStorage.getItem('subscription_data')
-    if (storedSubscription) {
-      try {
-        setSubscription(JSON.parse(storedSubscription))
-      } catch (e) {
-        console.error('Failed to parse subscription data:', e)
-      }
-    }
-  }, [])
+    fetchSubscription()
+  }, [fetchSubscription])
+
+  const handleRetryPlans = async () => {
+    setRetryingPlans(true)
+    setNotice('')
+    await fetchPlans({ showSpinner: false })
+    setRetryingPlans(false)
+  }
 
   const handleCheckout = async (planId) => {
-    let emailToUse = (user?.email || manualEmail || '').trim()
+    const emailToUse = checkoutEmail.trim()
     if (!emailToUse) {
-      const entered = window.prompt('Enter the email address for this subscription:', '')
-      if (!entered || !entered.trim()) {
-        setError('Email is required to start checkout.')
-        return
-      }
-      emailToUse = entered.trim()
-      setManualEmail(emailToUse)
+      setError('Please enter an email address before starting checkout.')
+      return
     }
 
     setCheckoutPlan(planId)
     setError('')
 
-    console.log('[Checkout] Starting checkout for plan:', planId, 'email:', emailToUse)
-    console.log('[Checkout] Axios baseURL:', axios.defaults.baseURL)
-    console.log('[Checkout] Current origin:', window.location.origin)
-
     try {
-      const requestUrl = '/api/billing/checkout-session'
-      const requestData = { plan: planId, email: emailToUse }
+      const response = await axios.post('/api/billing/checkout-session', { plan: planId, email: emailToUse })
+      const payload = response?.data
 
-      console.log('[Checkout] Making POST request to:', requestUrl)
-      console.log('[Checkout] Request data:', requestData)
-
-      const response = await axios.post(requestUrl, requestData)
-
-      console.log('[Checkout] Response status:', response.status)
-      console.log('[Checkout] Response data:', response.data)
-
-      const { data } = response
-
-      if (data?.url) {
-        console.log('[Checkout] Redirecting to:', data.url)
-        window.location.href = data.url
-      } else {
-        console.error('[Checkout] No URL in response:', data)
-        throw new Error('Missing checkout URL from server')
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
+        throw buildSyntheticHttpError(response, 'Missing checkout URL from server')
       }
+
+      window.location.href = payload.url
     } catch (err) {
-      console.error('[Checkout] Error caught:', err)
-      console.error('[Checkout] Error type:', err.constructor.name)
-      console.error('[Checkout] Error message:', err.message)
-      console.error('[Checkout] Error response:', err?.response)
-      console.error('[Checkout] Error response data:', err?.response?.data)
-      console.error('[Checkout] Error response status:', err?.response?.status)
-
-      const responseData = err?.response?.data
-      const message = responseData?.error || 'We could not start the checkout session.'
-      const details = responseData?.details || responseData?.hint
-
-      const fullError = details ? `${message} (${details})` : message
-      console.error('[Checkout] Setting error message:', fullError)
-
-      setError(fullError)
+      setError(getBillingActionError(err, 'We could not start the checkout session.'))
       setCheckoutPlan('')
     }
   }
 
   const handleManageSubscription = async () => {
-    if (!subscription?.customer_id) {
-      setError('No active subscription found')
-      return
-    }
-
     setLoadingPortal(true)
     setError('')
+
     try {
-      const { data } = await axios.post('/api/billing/customer-portal', {
-        customer_id: subscription.customer_id
-      })
-      if (data?.url) {
-        window.location.href = data.url
-      } else {
-        throw new Error('Missing portal URL from server')
+      const response = await axios.post('/api/billing/customer-portal', {})
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
+        throw buildSyntheticHttpError(response, 'Missing portal URL from server')
       }
+
+      window.location.href = payload.url
     } catch (err) {
-      console.error('Portal failed:', err)
-      const responseData = err?.response?.data
-      const message = responseData?.error || 'Unable to open customer portal.'
-      const details = responseData?.details
-      setError(details ? `${message} (${details})` : message)
+      setError(getBillingActionError(err, 'Unable to open customer portal.'))
     } finally {
       setLoadingPortal(false)
     }
@@ -242,7 +268,10 @@ const BillingPage = () => {
     }
 
     const disabled = !plan.checkout_enabled || checkoutPlan === plan.id
-    const label = plan.checkout_enabled ? plan.cta : 'Contact sales'
+    const label = plan.checkout_enabled
+      ? (mockMode && !plan.is_free ? `Simulate ${plan.name}` : plan.cta)
+      : 'Contact sales'
+    const redirectingLabel = mockMode ? 'Opening sandbox...' : 'Redirecting...'
 
     return (
       <button
@@ -258,7 +287,7 @@ const BillingPage = () => {
         {checkoutPlan === plan.id ? (
           <span className="flex items-center justify-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Redirecting…
+            {redirectingLabel}
           </span>
         ) : (
           label
@@ -278,7 +307,7 @@ const BillingPage = () => {
           </p>
         </div>
 
-        {subscription && subscription.has_subscription && (
+        {subscription?.has_subscription && (
           <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -312,9 +341,19 @@ const BillingPage = () => {
         )}
 
         {notice && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-3">
             <CheckCircle2 className="h-4 w-4" />
-            {notice}
+            <span className="flex-1">{notice}</span>
+            {usingFallbackPlans && (
+              <button
+                type="button"
+                onClick={handleRetryPlans}
+                disabled={retryingPlans}
+                className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+              >
+                {retryingPlans ? 'Retrying...' : 'Retry API'}
+              </button>
+            )}
           </div>
         )}
 
@@ -324,6 +363,23 @@ const BillingPage = () => {
             {error}
           </div>
         )}
+
+        <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-gray-200 bg-white p-4">
+          <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-2">
+            Billing email
+          </label>
+          <input
+            id="checkout-email"
+            type="email"
+            value={checkoutEmail}
+            onChange={(event) => setCheckoutEmail(event.target.value)}
+            placeholder="you@company.com"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+          />
+          <p className="mt-2 text-xs text-gray-500">
+            This email will be used for checkout receipts and subscription notices.
+          </p>
+        </div>
 
         {loading ? (
           <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">

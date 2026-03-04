@@ -3,7 +3,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 // Supabase client for updating user subscriptions
 const { createClient } = require("@supabase/supabase-js");
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let supabase = null;
@@ -12,8 +12,9 @@ if (supabaseUrl && supabaseServiceKey) {
 }
 
 exports.handler = async (event, context) => {
+  const allowedOrigin = process.env.FRONTEND_URL || event.headers.origin || event.headers.Origin || "http://localhost:5173";
   const headers = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, Stripe-Signature",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };

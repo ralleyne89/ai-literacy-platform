@@ -1,11 +1,14 @@
 from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import create_access_token
 from models import db, User
+from logging_config import get_logger
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError, ProgrammingError
 import bcrypt
 import re
 from routes import supabase_jwt_required, get_supabase_identity, get_supabase_claims
 
 auth_bp = Blueprint('auth', __name__)
+logger = get_logger(__name__)
 
 def validate_email(email):
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -23,23 +26,86 @@ def validate_password(password):
         return False
     return True
 
+
+def _is_valid_bcrypt_hash(stored_hash):
+    if not isinstance(stored_hash, str) or not stored_hash.strip():
+        return False
+
+    encoded_hash = stored_hash.encode('utf-8')
+    return (
+        encoded_hash.startswith((b'$2a$', b'$2b$', b'$2x$', b'$2y$'))
+        and len(encoded_hash) >= 60
+    )
+
+
+def _email_log_context(email):
+    if not isinstance(email, str) or '@' not in email:
+        return {'email_domain': 'unknown'}
+
+    local_part, domain = email.rsplit('@', 1)
+    return {
+        'email_domain': domain.lower(),
+        'email_local_length': len(local_part),
+    }
+
+
+def _build_registration_error_details(exc):
+    details = {
+        'type': 'RegistrationError',
+        'error_code': 'unknown',
+    }
+
+    if exc is None:
+        return details
+
+    details['type'] = exc.__class__.__name__
+
+    origin = getattr(exc, 'orig', None)
+    if origin is not None:
+        details['origin_type'] = origin.__class__.__name__
+        details['origin_message'] = str(origin).strip()[:120]
+        db_error_code = getattr(origin, 'sqlstate', None) or getattr(origin, 'pgcode', None)
+        if db_error_code:
+            details['origin_code'] = db_error_code
+    else:
+        details['origin_type'] = None
+
+    raw_code = getattr(exc, 'code', None)
+    if raw_code:
+        details['error_code'] = str(raw_code)
+
+    try:
+        message = str(exc).strip()
+    except Exception:
+        return details
+
+    if message:
+        details['message'] = message[:200]
+
+    return details
+
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
+    email = None
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Invalid request payload'}), 400
         
         # Validate required fields
         required_fields = ['email', 'password', 'first_name', 'last_name']
         for field in required_fields:
-            if not data.get(field):
+            value = data.get(field)
+            if not isinstance(value, str) or not value.strip():
                 return jsonify({'error': f'{field} is required'}), 400
         
-        email = data['email'].lower().strip()
+        email = data['email'].strip().lower()
         password = data['password']
         first_name = data['first_name'].strip()
         last_name = data['last_name'].strip()
-        role = data.get('role', '').strip()
-        organization = data.get('organization', '').strip()
+        role = (data.get('role') or '').strip()
+        organization = (data.get('organization') or '').strip()
         
         # Validate email format
         if not validate_email(email):
@@ -53,7 +119,10 @@ def register():
         
         # Check if user already exists
         if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email already registered'}), 409
+            return jsonify({
+                'error': 'Email already registered',
+                'code': 'EMAIL_ALREADY_REGISTERED',
+            }), 409
         
         # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -88,29 +157,96 @@ def register():
             }
         }), 201
         
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.warning(
+            'auth_register_integrity_error',
+            error=str(getattr(e, 'orig', e)),
+            **_email_log_context(email),
+        )
+
+        return jsonify({
+            'error': 'Email already registered',
+            'code': 'EMAIL_ALREADY_REGISTERED',
+        }), 409
+    except (OperationalError, ProgrammingError) as e:
+        db.session.rollback()
+        logger.exception(
+            'auth_register_schema_or_db_error',
+            error=str(getattr(e, 'orig', e)),
+            **_email_log_context(email),
+        )
+
+        return jsonify({
+            'error': 'Registration is temporarily unavailable. Please try again shortly.',
+            'code': 'REGISTRATION_BACKEND_UNAVAILABLE',
+        }), 503
+    except DataError as e:
+        db.session.rollback()
+        logger.warning(
+            'auth_register_invalid_data',
+            error=str(getattr(e, 'orig', e)),
+            **_email_log_context(email),
+        )
+
+        return jsonify({
+            'error': 'Registration data is invalid.',
+            'code': 'REGISTRATION_INVALID_DATA',
+        }), 400
+    except (ValueError, TypeError) as e:
+        db.session.rollback()
+        logger.warning(
+            'auth_register_auth_processing_error',
+            error=str(e),
+            **_email_log_context(email),
+        )
+
+        return jsonify({
+            'error': 'Registration failed due to invalid authentication data.',
+            'code': 'REGISTRATION_AUTH_PROCESSING_ERROR',
+        }), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Registration failed', 'details': str(e)}), 500
+        logger.exception(
+            'auth_register_unexpected_error',
+            error=str(e),
+            **_email_log_context(email),
+        )
+        details = _build_registration_error_details(e)
+        return jsonify({
+            'error': 'Registration failed. Please try again.',
+            'code': 'REGISTRATION_UNEXPECTED_ERROR',
+            'details': details,
+        }), 500
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'Invalid request payload'}), 400
         
-        if not data.get('email') or not data.get('password'):
+        email = data.get('email')
+        password = data.get('password')
+        if not isinstance(email, str) or not isinstance(password, str) or not email.strip() or not password:
             return jsonify({'error': 'Email and password are required'}), 400
         
-        email = data['email'].lower().strip()
-        password = data['password']
+        email = email.strip().lower()
         
         # Find user
         user = User.query.filter_by(email=email).first()
         
         if not user:
             return jsonify({'error': 'Invalid email or password'}), 401
+
+        if not _is_valid_bcrypt_hash(user.password_hash):
+            return jsonify({'error': 'Invalid email or password'}), 401
         
         # Check password
-        if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        try:
+            if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                return jsonify({'error': 'Invalid email or password'}), 401
+        except (ValueError, TypeError):
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Create access token
@@ -231,6 +367,15 @@ def sync_user():
         user = User.query.get(supabase_user_id)
 
         if not user:
+            existing_user = User.query.filter_by(email=email).first()
+            if existing_user and existing_user.id != supabase_user_id:
+                return jsonify({
+                    'error': 'Email already exists for a legacy account',
+                    'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
+                    'message': 'A legacy account with this email already exists. Please sign in using email/password first, then link your social provider if needed.',
+                    'existing_user_id': existing_user.id
+                }), 409
+
             user = User(
                 id=supabase_user_id,
                 email=email,

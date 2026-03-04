@@ -8,9 +8,13 @@ Follow these steps in order. I'll help you with each one!
 
 I've opened the Netlify environment variables page in your browser.
 
-**Check that you have these 2 variables**:
+**Check that you have these core variables**:
 - [ ] `STRIPE_SECRET_KEY` = `sk_live_...`
 - [ ] `STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
+- [ ] `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co`
+- [ ] `VITE_SUPABASE_ANON_KEY` = `ey...`
+
+If your deployment is intentionally backend-only (legacy email/password users only), you can skip the two Supabase values. In all other cases, they should be present so Google/Facebook login works.
 
 **If they're there**: ✅ Great! Move to Step 2.
 
@@ -193,8 +197,9 @@ netlify deploy --prod
 ✅ STRIPE_SECRET_KEY (Already set)
 ✅ STRIPE_PUBLISHABLE_KEY (Already set)
 ⏳ STRIPE_WEBHOOK_SECRET (Add in Step 2)
-⏳ VITE_SUPABASE_URL (Optional - Step 4)
-⏳ SUPABASE_SERVICE_ROLE_KEY (Optional - Step 4)
+⏳ VITE_SUPABASE_URL (Required for OAuth/social login; skip only for backend-only mode)
+⏳ VITE_SUPABASE_ANON_KEY (Required for OAuth/social login; skip only for backend-only mode)
+✅ SUPABASE_SERVICE_ROLE_KEY (Only for optional DB integration step)
 ```
 
 ### Stripe Dashboard Links:

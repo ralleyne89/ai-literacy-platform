@@ -25,7 +25,25 @@ https://app.netlify.com/sites/litmusai/configuration/env
 - **Value**: `pk_live_...` (Get from backend/.env file)
 - **Scopes**: All scopes (default)
 
-### After Adding Both Variables:
+### Add Supabase OAuth Variables (Required for Social Login)
+
+If you want Google/Facebook login to work, add these two frontend variables too. This is needed even when `VITE_AUTH_MODE=backend` is enabled and you still want provider login.
+
+- **Variable 3:**
+
+- **Key**: `VITE_SUPABASE_URL`
+- **Value**: Your Supabase project URL (e.g. `https://your-project-id.supabase.co`)
+- **Scopes**: All scopes (default)
+
+- **Variable 4:**
+
+- **Key**: `VITE_SUPABASE_ANON_KEY`
+- **Value**: Your Supabase public anon key
+- **Scopes**: All scopes (default)
+
+If you intentionally run legacy-only backend auth, you can omit these two keys; in that mode OAuth is unavailable and backend email/password auth still works.
+
+### After adding variables:
 
 1. Click "Save" or the variables will save automatically
 2. **Trigger a new deploy** (Netlify should prompt you, or go to Deploys → Trigger deploy → Deploy site)
