@@ -1,8 +1,45 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Award, CheckCircle, Clock, Shield, ExternalLink, AlertCircle, Loader2 } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Award, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocation } from 'react-router-dom'
+
+const isHtmlPayload = (payload) => {
+  if (typeof payload === 'string') {
+    const normalized = payload.trim().toLowerCase()
+    return normalized.startsWith('<!doctype html') || normalized.startsWith('<html')
+  }
+
+  return false
+}
+
+const buildSyntheticHttpError = (response, message = 'Invalid API response') => {
+  const error = new Error(message)
+  error.response = response
+  return error
+}
+
+const parseCertificationsPayload = (response) => {
+  const data = response?.data
+  if (isHtmlPayload(data) || !data || typeof data !== 'object') {
+    throw buildSyntheticHttpError(response, 'Invalid API payload')
+  }
+
+  return Array.isArray(data.certifications) ? data.certifications : []
+}
+
+const getApiErrorMessage = (error, fallbackMessage) => {
+  if (!error?.response) {
+    return `${fallbackMessage} Please check your connection and try again.`
+  }
+
+  const data = error.response.data
+  if (isHtmlPayload(data)) {
+    return `${fallbackMessage} API endpoint returned HTML instead of JSON.`
+  }
+
+  return data?.message || data?.error || fallbackMessage
+}
 
 const CertificationPage = () => {
   const { isAuthenticated } = useAuth()
@@ -12,35 +49,66 @@ const CertificationPage = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('available')
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [notice, setNotice] = useState('')
   const [applyingId, setApplyingId] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
   const [verifyLoading, setVerifyLoading] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)
 
-  const fetchCertifications = async () => {
+  const fetchCertifications = useCallback(async () => {
     setLoading(true)
     setError('')
+    setWarning('')
 
-    try {
-      const requests = [axios.get('/api/certification/available')]
-      if (isAuthenticated) {
-        requests.push(axios.get('/api/certification/earned'))
-      }
-
-      const [availableResponse, earnedResponse] = await Promise.all(requests)
-      setAvailableCerts(Array.isArray(availableResponse?.data?.certifications) ? availableResponse.data.certifications : [])
-      setEarnedCerts(Array.isArray(earnedResponse?.data?.certifications) ? earnedResponse.data.certifications : [])
-    } catch {
-      setError('Failed to load certifications. Please try again later.')
-    } finally {
-      setLoading(false)
+    const requests = [axios.get('/api/certification/available')]
+    if (isAuthenticated) {
+      requests.push(axios.get('/api/certification/earned'))
     }
-  }
+
+    const [availableResult, earnedResult] = await Promise.allSettled(requests)
+    let availableLoaded = false
+
+    if (availableResult.status === 'fulfilled') {
+      try {
+        const parsedAvailable = parseCertificationsPayload(availableResult.value)
+        setAvailableCerts(parsedAvailable)
+        availableLoaded = true
+      } catch (parseError) {
+        setAvailableCerts([])
+        setError(getApiErrorMessage(parseError, 'Failed to load certification catalog.'))
+      }
+    } else {
+      setAvailableCerts([])
+      setError(getApiErrorMessage(availableResult.reason, 'Failed to load certification catalog.'))
+    }
+
+    if (isAuthenticated) {
+      if (earnedResult?.status === 'fulfilled') {
+        try {
+          setEarnedCerts(parseCertificationsPayload(earnedResult.value))
+        } catch (parseError) {
+          setEarnedCerts([])
+          if (availableLoaded) {
+            setWarning(getApiErrorMessage(parseError, 'Unable to load your earned certifications right now.'))
+          }
+        }
+      } else {
+        setEarnedCerts([])
+        if (availableLoaded) {
+          setWarning(getApiErrorMessage(earnedResult?.reason, 'Unable to load your earned certifications right now.'))
+        }
+      }
+    } else {
+      setEarnedCerts([])
+    }
+
+    setLoading(false)
+  }, [isAuthenticated])
 
   useEffect(() => {
     fetchCertifications()
-  }, [isAuthenticated])
+  }, [fetchCertifications])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -58,6 +126,7 @@ const CertificationPage = () => {
 
     setApplyingId(cert.id)
     setError('')
+    setWarning('')
     setNotice('')
 
     try {
@@ -70,8 +139,7 @@ const CertificationPage = () => {
       await fetchCertifications()
       setActiveTab('earned')
     } catch (applyError) {
-      const message = applyError?.response?.data?.message || applyError?.response?.data?.error || 'Failed to apply for certification.'
-      setError(message)
+      setError(getApiErrorMessage(applyError, 'Failed to apply for certification.'))
     } finally {
       setApplyingId('')
     }
@@ -90,6 +158,10 @@ const CertificationPage = () => {
 
     try {
       const { data } = await axios.get(`/api/certification/verify/${encodeURIComponent(trimmed)}`)
+      if (isHtmlPayload(data)) {
+        throw new Error('Certification verify endpoint returned HTML.')
+      }
+
       setVerifyResult(data)
       if (data?.valid) {
         setNotice('Certification verified successfully.')
@@ -97,12 +169,12 @@ const CertificationPage = () => {
         setError('Certification not found or invalid.')
       }
     } catch (verifyError) {
-      const data = verifyError?.response?.data
+      const responseData = verifyError?.response?.data
       if (verifyError?.response?.status === 404) {
-        setVerifyResult(data)
-        setError(data?.message || 'Certification not found or invalid.')
+        setVerifyResult(responseData)
+        setError(responseData?.message || 'Certification not found or invalid.')
       } else {
-        setError(data?.error || 'Unable to verify certification right now.')
+        setError(getApiErrorMessage(verifyError, 'Unable to verify certification right now.'))
       }
     } finally {
       setVerifyLoading(false)
@@ -213,10 +285,24 @@ const CertificationPage = () => {
           </div>
         )}
 
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+        {warning && (
+          <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
-            {error}
+            {warning}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-3">
+            <AlertCircle className="h-4 w-4" />
+            <span className="flex-1">{error}</span>
+            <button
+              type="button"
+              onClick={fetchCertifications}
+              className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -324,12 +410,14 @@ const CertificationPage = () => {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Applying...
                     </span>
-                  ) : !isAuthenticated ? (
-                    'Sign in to apply'
-                  ) : cert.eligible ? (
-                    cert.is_premium ? 'Apply for Certification' : 'Start Free Certification'
+                  ) : isAuthenticated ? (
+                    cert.eligible
+                      ? cert.is_premium
+                        ? 'Apply for Certification'
+                        : 'Start Free Certification'
+                      : 'Requirements Not Met'
                   ) : (
-                    'Requirements Not Met'
+                    'Sign in to apply'
                   )}
                 </button>
               </div>
@@ -345,7 +433,7 @@ const CertificationPage = () => {
                   <div key={cert.id} className="card border-2 border-green-200 bg-green-50">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-2">
-                        <Shield className="w-6 h-6 text-green-600" />
+                        <CheckCircle className="w-6 h-6 text-green-600" />
                         <span className="text-sm text-green-600 font-medium">Certified</span>
                       </div>
                       <div className="text-right">
@@ -383,10 +471,9 @@ const CertificationPage = () => {
                       </button>
                       <button
                         onClick={() => handleShareCertificate(cert)}
-                        className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium flex items-center justify-center space-x-1"
+                        className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium"
                       >
-                        <span>Share</span>
-                        <ExternalLink className="w-4 h-4" />
+                        Share
                       </button>
                     </div>
                   </div>
@@ -412,23 +499,24 @@ const CertificationPage = () => {
 
         <div className="mt-16 bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <div className="text-center">
-            <Shield className="w-12 h-12 text-primary-600 mx-auto mb-4" />
+            <Award className="w-12 h-12 text-primary-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Verify a Certification</h2>
             <p className="text-gray-600 mb-6">
               Enter a verification code to confirm the authenticity of an AI literacy certification.
             </p>
+
             <div className="max-w-md mx-auto flex space-x-4">
               <input
                 type="text"
                 placeholder="Enter verification code"
                 value={verifyCode}
-                onChange={(event) => setVerifyCode(event.target.value)}
+                onChange={(e) => setVerifyCode(e.target.value)}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               />
               <button
                 onClick={handleVerify}
-                className="btn-primary"
                 disabled={verifyLoading}
+                className="btn-primary"
               >
                 {verifyLoading ? (
                   <span className="inline-flex items-center gap-2">
@@ -440,6 +528,7 @@ const CertificationPage = () => {
                 )}
               </button>
             </div>
+
             {verifyCard}
           </div>
         </div>

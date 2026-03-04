@@ -6,10 +6,16 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
-    "build": "vite build",
+    "validate:prod-env": "node scripts/validate-prod-env.mjs",
+    "build": "npm run validate:prod-env && vite build",
     "backend": "cd backend && FLASK_DEBUG=0 PORT=${PORT:-5001} ${PYTHON_CMD:-venv/bin/python} app.py",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e:install": "playwright install",
+    "e2e": "npm run e2e:flow",
+    "e2e:flow": "playwright test e2e/platform.spec.ts",
+    "e2e:smoke": "playwright test e2e/platform-smoke.spec.ts",
+    "e2e:headed": "npm run e2e:flow -- --headed"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -25,6 +31,7 @@
     "tailwind-merge": "^2.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.1.1",

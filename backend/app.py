@@ -10,6 +10,11 @@ import bcrypt
 import click
 from flask.cli import with_appcontext
 from logging_config import configure_logging
+from schema_readiness import (
+    SchemaReadinessError,
+    should_enforce_schema_readiness,
+    validate_signup_schema_or_raise,
+)
 
 load_dotenv()
 configure_logging()
@@ -63,6 +68,7 @@ from routes.billing import billing_bp
 from routes.course_content import course_content_bp
 from seeders.training import seed_training_modules as seed_training_modules_fixture
 from seeders.certifications import seed_certification_types as seed_certification_types_fixture
+from seeders.course_content import seed_course_content as seed_course_content_fixture
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(assessment_bp, url_prefix='/api/assessment')
@@ -70,6 +76,24 @@ app.register_blueprint(training_bp, url_prefix='/api/training')
 app.register_blueprint(certification_bp, url_prefix='/api/certification')
 app.register_blueprint(billing_bp, url_prefix='/api/billing')
 app.register_blueprint(course_content_bp, url_prefix='/api/course')
+
+
+def _enforce_startup_schema_readiness() -> None:
+    if not should_enforce_schema_readiness():
+        app.logger.info('startup_schema_readiness_check_skipped')
+        return
+
+    with app.app_context():
+        validate_signup_schema_or_raise(db)
+
+    app.logger.info('startup_schema_readiness_check_passed')
+
+
+try:
+    _enforce_startup_schema_readiness()
+except SchemaReadinessError as exc:
+    app.logger.critical('startup_schema_readiness_check_failed: %s', exc)
+    raise
 
 
 @app.cli.command('seed-training-modules')
@@ -88,6 +112,15 @@ def seed_training_modules_command(force: bool, silent: bool):
 def seed_certifications_command(force: bool, silent: bool):
     """Seed the certification catalog with curated defaults."""
     seed_certification_types_fixture(force=force, silent=silent)
+
+
+@app.cli.command('seed-course-content')
+@click.option('--force', is_flag=True, help='Update existing course content with fixture data')
+@click.option('--silent', is_flag=True, help='Suppress console output')
+@with_appcontext
+def seed_course_content_command(force: bool, silent: bool):
+    """Seed the course lesson catalog with curated defaults."""
+    seed_course_content_fixture(force=force, silent=silent)
 
 
 @app.cli.command('migrate-add-target-domains')

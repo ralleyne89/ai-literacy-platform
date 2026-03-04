@@ -5,12 +5,13 @@ import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
 const STORAGE_KEY = 'assessmentProgress_v2'
-const ASSESSMENT_VERSION = '2024-05-15'
+const ASSESSMENT_VERSION = '2026-03-03-randomized-v1'
 
 const AssessmentPage = () => {
   const [questions, setQuestions] = useState([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState({})
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -37,11 +38,13 @@ const AssessmentPage = () => {
   const persistProgress = ({
     questions: persistedQuestions = questions,
     answers: persistedAnswers = answers,
+    selectedQuestionIds: persistedSelectedQuestionIds = selectedQuestionIds,
     currentIndex = currentQuestion
   }) => {
     const payload = {
       questions: persistedQuestions,
       answers: persistedAnswers,
+      selectedQuestionIds: persistedSelectedQuestionIds,
       currentQuestion: currentIndex,
       version: ASSESSMENT_VERSION
     }
@@ -69,10 +72,20 @@ const AssessmentPage = () => {
       const parsed = JSON.parse(saved)
       const isValidVersion = parsed?.version === ASSESSMENT_VERSION
       const hasQuestions = Array.isArray(parsed?.questions) && parsed.questions.length === 15
+      const persistedSelectedIds = Array.isArray(parsed?.selectedQuestionIds)
+        ? parsed.selectedQuestionIds
+        : Array.isArray(parsed?.selected_question_ids)
+          ? parsed.selected_question_ids
+          : Array.isArray(parsed?.selected_ids)
+            ? parsed.selected_ids
+            : Array.isArray(parsed?.questionIds)
+              ? parsed.questionIds
+              : []
 
       if (isValidVersion && hasQuestions) {
         setQuestions(parsed.questions)
         setAnswers(parsed.answers || {})
+        setSelectedQuestionIds(persistedSelectedIds.length ? persistedSelectedIds : parsed.questions.map((question) => question.id))
         setCurrentQuestion(parsed.currentQuestion || 0)
         setHasStarted(true)
         setShowIntroModal(false)
@@ -92,10 +105,21 @@ const AssessmentPage = () => {
     setError('')
     setResults(null)
     setAnswers({})
+    setSelectedQuestionIds([])
     setCurrentQuestion(0)
     try {
       const response = await axios.get('/api/assessment/questions')
       const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
+      const payloadSelectedQuestionIds = Array.isArray(response.data?.selectedQuestionIds)
+        ? response.data.selectedQuestionIds
+        : Array.isArray(response.data?.selected_question_ids)
+          ? response.data.selected_question_ids
+          : Array.isArray(response.data?.selected_ids)
+            ? response.data.selected_ids
+            : []
+      const normalizedSelectedQuestionIds = payloadSelectedQuestionIds.length === loadedQuestions.length
+        ? payloadSelectedQuestionIds
+        : loadedQuestions.map((question) => question.id)
       if (loadedQuestions.length !== 15) {
         setError('We are updating the assessment. Please refresh in a moment to access the full 15-question experience.')
         setHasStarted(false)
@@ -103,12 +127,14 @@ const AssessmentPage = () => {
         return
       }
       setQuestions(loadedQuestions)
+      setSelectedQuestionIds(normalizedSelectedQuestionIds)
       setHasStarted(true)
       setShowIntroModal(false)
       setResumeDetected(false)
 
       persistProgress({
         questions: loadedQuestions,
+        selectedQuestionIds: normalizedSelectedQuestionIds,
         answers: {},
         currentIndex: 0
       })
@@ -160,11 +186,16 @@ const AssessmentPage = () => {
         }
         return acc
       }, {})
-
-      const response = await axios.post('/api/assessment/submit', {
+      const payload = {
         answers,
-        option_map: optionMap
-      })
+        option_map: optionMap,
+        selected_question_ids: selectedQuestionIds
+      }
+      if (selectedQuestionIds.length) {
+        payload.selected_ids = selectedQuestionIds
+      }
+
+      const response = await axios.post('/api/assessment/submit', payload)
       setResults(response.data)
       clearProgress()
     } catch (error) {

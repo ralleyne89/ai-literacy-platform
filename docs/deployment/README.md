@@ -40,11 +40,46 @@ This directory contains all deployment-related documentation for the LitmusAI pl
 **Already deployed?**
 - Use [PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md) for updates
 
+## 🔐 Auth and Session Modes
+
+The frontend supports two authentication paths:
+
+- Supabase mode (default): keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
+- Backend mode: set `VITE_AUTH_MODE=backend` and rely on `/api/auth/register`, `/api/auth/login`, and `/api/auth/profile`.
+  - Keep Supabase vars set to preserve Google/Facebook provider login while backend mode remains active.
+
+In backend mode, configure:
+
+- `VITE_API_URL`
+- `SECRET_KEY`
+- `JWT_SECRET_KEY`
+- `DATABASE_URL`
+
+To enable Supabase OAuth providers, keep Supabase variables configured. Provider login is available when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set, regardless of `VITE_AUTH_MODE`.
+
+## 🗄️ Database Providers and Migration Notes
+
+Recommended PostgreSQL options for constrained budgets:
+
+- Neon
+- Render PostgreSQL
+- Railway PostgreSQL
+- Supabase Postgres
+- Aiven
+- ElephantSQL (where available)
+
+A deployment migration checklist:
+
+1. Update `DATABASE_URL`
+2. Run `cd backend && FLASK_APP=app.py flask db upgrade`
+3. Re-run seeder scripts where required
+
 ## 🔑 Key Topics
 
 ### Authentication
 - GitHub authentication (Personal Access Token, SSH, Git Credential Manager)
 - Supabase setup
+- Backend auth mode (`VITE_AUTH_MODE=backend`)
 - Environment variables
 
 ### Database

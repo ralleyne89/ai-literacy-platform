@@ -20,6 +20,8 @@ DOMAINS = [
     'Strategic Understanding'
 ]
 
+QUESTIONS_PER_DOMAIN = 3
+
 SAMPLE_QUESTIONS = [
     {
         "id": "1",
@@ -185,8 +187,211 @@ SAMPLE_QUESTIONS = [
         "option_d": "Focusing only on cost savings",
         "correct_answer": "B",
         "explanation": "Successful AI adoption depends on skilled people and clear ethical guardrails, not just technology investments."
+    },
+    {
+        "id": "16",
+        "domain": "AI Fundamentals",
+        "question_text": "Which phrase best describes “training data” for AI models?",
+        "option_a": "Data used to operate software without user input",
+        "option_b": "Examples that teach the model patterns and relationships",
+        "option_c": "The final output produced by the model",
+        "option_d": "A list of software bugs to fix",
+        "correct_answer": "B",
+        "explanation": "Training data consists of examples that let the model learn patterns over many iterations."
+    },
+    {
+        "id": "17",
+        "domain": "AI Fundamentals",
+        "question_text": "Why is data quality important for AI systems?",
+        "option_a": "Better data always makes models run faster",
+        "option_b": "High-quality data improves reliability and reduces harmful outputs",
+        "option_c": "Poor data is only a user interface issue",
+        "option_d": "Data quality does not matter once a model is deployed",
+        "correct_answer": "B",
+        "explanation": "Model quality is tied closely to the quality of the data used to train it, especially for fairness and accuracy."
+    },
+    {
+        "id": "18",
+        "domain": "Practical Usage",
+        "question_text": "If an AI-generated response includes wrong details, what should you do first?",
+        "option_a": "Ignore it and move on",
+        "option_b": "Verify with trusted references",
+        "option_c": "Ask the AI to confirm its confidence",
+        "option_d": "Post it immediately to stakeholders",
+        "correct_answer": "B",
+        "explanation": "Verification with trusted sources is the fastest way to correct possible inaccuracies."
+    },
+    {
+        "id": "19",
+        "domain": "Practical Usage",
+        "question_text": "Which prompt style is most useful for brainstorming ideas?",
+        "option_a": "A strict, single-word instruction",
+        "option_b": "A broad open prompt with role, context, constraints, and format",
+        "option_c": "A request without context",
+        "option_d": "No prompt is needed; AI auto-generates ideas by default",
+        "correct_answer": "B",
+        "explanation": "Rich context and constraints help AI give outputs that are easier to use and evaluate."
+    },
+    {
+        "id": "20",
+        "domain": "Ethics & Critical Thinking",
+        "question_text": "What should you do if AI output reveals sensitive personal data?",
+        "option_a": "Share it with your team immediately",
+        "option_b": "Redact or report it through your privacy process",
+        "option_c": "Store it and forget about it",
+        "option_d": "Use it in your marketing campaign",
+        "correct_answer": "B",
+        "explanation": "Sensitive outputs should be handled under privacy and data-protection practices, not treated as ordinary output."
+    },
+    {
+        "id": "21",
+        "domain": "Ethics & Critical Thinking",
+        "question_text": "Which practice helps reduce model bias risks in production?",
+        "option_a": "Testing with diverse user groups and auditing outputs",
+        "option_b": "Restricting model updates forever",
+        "option_c": "Only using one dataset source",
+        "option_d": "Avoiding any feedback process",
+        "correct_answer": "A",
+        "explanation": "Ongoing evaluation with diverse scenarios is key to catching fairness gaps before harm occurs."
+    },
+    {
+        "id": "22",
+        "domain": "AI Impact & Applications",
+        "question_text": "Where is AI most commonly adopted for short-cycle operational gain?",
+        "option_a": "Only for legal sentencing decisions",
+        "option_b": "Customer support triage and document automation",
+        "option_c": "Replacing board-level leadership roles",
+        "option_d": "Replacing all manual tasks instantly",
+        "correct_answer": "B",
+        "explanation": "AI often delivers fast ROI in repetitive support, routing, and document-heavy workflows."
+    },
+    {
+        "id": "23",
+        "domain": "AI Impact & Applications",
+        "question_text": "What is a practical first application for teams new to AI?",
+        "option_a": "Full autonomous company operations",
+        "option_b": "Automated meeting minute drafts with human review",
+        "option_c": "Replacing all strategic decisions with AI",
+        "option_d": "Hiring no human reviewers",
+        "correct_answer": "B",
+        "explanation": "Pilot projects with human review build confidence before scaling AI use."
+    },
+    {
+        "id": "24",
+        "domain": "Strategic Understanding",
+        "question_text": "How should leadership frame AI adoption goals?",
+        "option_a": "As a shortcut for governance and compliance",
+        "option_b": "As measurable business outcomes with responsible guardrails",
+        "option_c": "As a way to reduce all employee ownership",
+        "option_d": "As a trend to satisfy investors only",
+        "correct_answer": "B",
+        "explanation": "AI strategy works best when outcomes, risk controls, and ownership are clearly defined."
+    },
+    {
+        "id": "25",
+        "domain": "Strategic Understanding",
+        "question_text": "What is a strong indicator of AI strategy maturity?",
+        "option_a": "Adopting the newest model every quarter",
+        "option_b": "Measuring outcomes, iterating, and balancing ethics with speed",
+        "option_c": "Avoiding AI whenever uncertainty exists",
+        "option_d": "Deploying without cross-team communication",
+        "correct_answer": "B",
+        "explanation": "Mature strategy couples experimentation with accountability, governance, and measurable value."
     }
 ]
+
+
+def _group_questions_by_domain():
+    questions_by_domain = {domain: [] for domain in DOMAINS}
+    for question in SAMPLE_QUESTIONS:
+        domain = question['domain']
+        if domain in questions_by_domain:
+            questions_by_domain[domain].append(question)
+    return questions_by_domain
+
+
+def _select_random_questions(questions_by_domain):
+    selected_questions = []
+    for domain in DOMAINS:
+        domain_questions = questions_by_domain.get(domain, [])
+        if len(domain_questions) >= QUESTIONS_PER_DOMAIN:
+            selected_questions.extend(
+                random.sample(domain_questions, QUESTIONS_PER_DOMAIN)
+            )
+        else:
+            selected_questions.extend(domain_questions)
+
+    random.shuffle(selected_questions)
+    return selected_questions
+
+
+def _normalize_question_id(raw_question_id):
+    if raw_question_id is None:
+        return None
+    normalized = str(raw_question_id).strip()
+    return normalized if normalized else None
+
+
+def _normalize_question_id_list(raw_question_ids):
+    if not isinstance(raw_question_ids, list):
+        return []
+
+    normalized = []
+    seen = set()
+    for raw_question_id in raw_question_ids:
+        normalized_id = _normalize_question_id(raw_question_id)
+        if normalized_id is None or normalized_id in seen:
+            continue
+        seen.add(normalized_id)
+        normalized.append(normalized_id)
+    return normalized
+
+
+def _get_questions_by_ids(selected_question_ids):
+    question_by_id = {str(question['id']): question for question in SAMPLE_QUESTIONS}
+    return [
+        question_by_id[question_id]
+        for question_id in _normalize_question_id_list(selected_question_ids)
+        if question_id in question_by_id
+    ]
+
+
+def _resolve_grading_questions(answers, selected_question_ids):
+    selected_questions = _get_questions_by_ids(selected_question_ids)
+    if selected_questions:
+        return selected_questions
+
+    answer_ids = _normalize_question_id_list(list(answers.keys()))
+    fallback_questions = _get_questions_by_ids(answer_ids)
+    return fallback_questions if fallback_questions else SAMPLE_QUESTIONS
+
+
+def _format_question(question):
+    q = question.copy()
+    option_pairs = [
+        ('A', q['option_a']),
+        ('B', q['option_b']),
+        ('C', q['option_c']),
+        ('D', q['option_d'])
+    ]
+    original_correct_text = dict(option_pairs)[q['correct_answer'].upper()]
+    random.shuffle(option_pairs)
+
+    for idx, (_, text) in enumerate(option_pairs):
+        letter = chr(ord('A') + idx)
+        q[f'option_{letter.lower()}'] = text
+        if text == original_correct_text:
+            q['correct_answer'] = letter
+
+    return {
+        'id': q['id'],
+        'domain': q['domain'],
+        'question_text': q['question_text'],
+        'option_a': q['option_a'],
+        'option_b': q['option_b'],
+        'option_c': q['option_c'],
+        'option_d': q['option_d']
+    }
 
 DOMAIN_TOTALS = {
     domain: sum(1 for question in SAMPLE_QUESTIONS if question['domain'] == domain)
@@ -199,35 +404,11 @@ def get_assessment_questions():
     try:
         # In production, this would query the database
         # For now, return sample questions
-        questions = []
-        for base in SAMPLE_QUESTIONS:
-            q = base.copy()
-            option_pairs = [
-                ('A', base['option_a']),
-                ('B', base['option_b']),
-                ('C', base['option_c']),
-                ('D', base['option_d'])
-            ]
-            original_correct_text = dict(option_pairs)[q['correct_answer'].upper()]
-            random.shuffle(option_pairs)
-
-            for idx, (_, text) in enumerate(option_pairs):
-                letter = chr(ord('A') + idx)
-                q[f'option_{letter.lower()}'] = text
-                if text == original_correct_text:
-                    q['correct_answer'] = letter
-
-            questions.append({
-                'id': q['id'],
-                'domain': q['domain'],
-                'question_text': q['question_text'],
-                'option_a': q['option_a'],
-                'option_b': q['option_b'],
-                'option_c': q['option_c'],
-                'option_d': q['option_d']
-            })
-
-        random.shuffle(questions)
+        questions_by_domain = _group_questions_by_domain()
+        selected_questions = _select_random_questions(questions_by_domain)
+        questions = [
+            _format_question(question) for question in selected_questions
+        ]
 
         return jsonify({
             'questions': questions,
@@ -248,24 +429,34 @@ def submit_assessment():
         
         if not data.get('answers'):
             return jsonify({'error': 'Answers are required'}), 400
+        if not isinstance(data.get('answers'), dict):
+            return jsonify({'error': 'Answers must be an object keyed by question id'}), 400
 
         answers = data['answers']  # Expected format: {'1': 'A', '2': 'B', ...}
         option_map_payload = data.get('option_map', {})
         time_taken = data.get('time_taken_minutes', 0)
+        raw_selected_question_ids = data.get('selected_question_ids') or data.get('selectedQuestionIds') or data.get(
+            'selected_ids'
+        ) or data.get('question_ids')
+        selected_question_ids = _normalize_question_id_list(raw_selected_question_ids)
+        selected_questions = _resolve_grading_questions(answers, selected_question_ids)
         
         # Calculate scores
         total_score = 0
-        max_score = len(SAMPLE_QUESTIONS)
+        max_score = len(selected_questions)
         domain_scores = {domain: 0 for domain in DOMAINS}
         domain_totals = {domain: 0 for domain in DOMAINS}
         
         detailed_results = []
         
-        for question in SAMPLE_QUESTIONS:
+        for question in selected_questions:
             q_id = question['id']
             domain = question['domain']
             correct = question['correct_answer']
             user_answer = answers.get(q_id, '')
+            if user_answer is None:
+                user_answer = ''
+            user_answer = str(user_answer).strip()
             answer_options = option_map_payload.get(q_id, {})
             user_answer_text = answer_options.get(user_answer.upper(), '')
             correct_answer_text = question[f"option_{correct.lower()}"]

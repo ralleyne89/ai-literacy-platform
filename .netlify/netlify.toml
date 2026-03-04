@@ -15,6 +15,8 @@ functions = "/Users/reggiealleyne/Projects/ai-literacy-platform/netlify/function
 NODE_VERSION = "18"
 PYTHON_VERSION = ""
 SECRETS_SCAN_ENABLED = "false"
+VITE_API_URL = "https://litmusai-backend.onrender.com"
+VITE_AUTH_MODE = "backend"
 
 [build.processing]
 

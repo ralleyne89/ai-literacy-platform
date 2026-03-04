@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
@@ -56,6 +56,57 @@ const FALLBACK_PLANS = [
   }
 ]
 
+const isHtmlPayload = (payload) => {
+  if (typeof payload === 'string') {
+    const normalized = payload.trim().toLowerCase()
+    return normalized.startsWith('<!doctype html') || normalized.startsWith('<html')
+  }
+
+  return false
+}
+
+const buildSyntheticHttpError = (response, message = 'Invalid API response') => {
+  const error = new Error(message)
+  error.response = response
+  return error
+}
+
+const getBillingApiFallbackMessage = (err) => {
+  if (!err?.response) {
+    return 'Unable to reach billing API. Displaying standard plan information instead.'
+  }
+
+  const data = err.response.data
+  if (isHtmlPayload(data)) {
+    return 'Billing API returned HTML instead of JSON. Displaying standard plan information instead.'
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    return data.error || data.message || 'Unable to reach billing API. Displaying standard plan information instead.'
+  }
+
+  return 'Unable to reach billing API. Displaying standard plan information instead.'
+}
+
+const getBillingActionError = (err, fallbackMessage) => {
+  if (!err?.response) {
+    return `${fallbackMessage} Please check your connection and try again.`
+  }
+
+  const data = err.response.data
+  if (isHtmlPayload(data)) {
+    return `${fallbackMessage} Billing API routing appears misconfigured.`
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    const message = data.error || data.message || fallbackMessage
+    const details = data.details || data.hint
+    return details ? `${message} (${details})` : message
+  }
+
+  return fallbackMessage
+}
+
 const BillingPage = () => {
   const { user, isAuthenticated } = useAuth()
   const location = useLocation()
@@ -69,11 +120,66 @@ const BillingPage = () => {
   const [subscription, setSubscription] = useState(null)
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [mockMode, setMockMode] = useState(false)
+  const [usingFallbackPlans, setUsingFallbackPlans] = useState(false)
+  const [retryingPlans, setRetryingPlans] = useState(false)
 
   const queryMessages = useMemo(() => ({
     success: 'Subscription activated successfully. Welcome aboard.',
     canceled: 'Checkout canceled. You have not been charged.'
   }), [])
+
+  const fetchPlans = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) {
+      setLoading(true)
+    }
+
+    try {
+      const response = await axios.get('/api/billing/config')
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
+        throw buildSyntheticHttpError(response, 'Invalid billing payload')
+      }
+
+      const remotePlans = Array.isArray(payload.plans) && payload.plans.length > 0 ? payload.plans : null
+      const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
+
+      setPlans(filteredPlans)
+      setMockMode(Boolean(payload.mock_mode))
+      setUsingFallbackPlans(false)
+    } catch (err) {
+      setPlans(FALLBACK_PLANS)
+      setMockMode(false)
+      setUsingFallbackPlans(true)
+      setNotice(getBillingApiFallbackMessage(err))
+    } finally {
+      if (showSpinner) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  const fetchSubscription = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSubscription(null)
+      return
+    }
+
+    try {
+      const response = await axios.get('/api/billing/subscription')
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
+        throw buildSyntheticHttpError(response, 'Invalid billing subscription payload')
+      }
+
+      setSubscription(payload)
+    } catch (err) {
+      if (err?.response?.status !== 401) {
+        setError(getBillingActionError(err, 'Unable to load your current subscription status.'))
+      }
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     setCheckoutEmail(user?.email || '')
@@ -89,45 +195,19 @@ const BillingPage = () => {
   }, [location.search, queryMessages])
 
   useEffect(() => {
-    const fetchPlans = async () => {
-      setLoading(true)
-      try {
-        const { data } = await axios.get('/api/billing/config')
-        const remotePlans = Array.isArray(data?.plans) && data.plans.length > 0 ? data.plans : null
-        const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
-        setPlans(filteredPlans)
-        setMockMode(Boolean(data?.mock_mode))
-      } catch {
-        setPlans(FALLBACK_PLANS)
-        setMockMode(false)
-        setNotice('Unable to reach billing API. Displaying standard plan information instead.')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchPlans()
-  }, [])
+    fetchPlans({ showSpinner: true })
+  }, [fetchPlans])
 
   useEffect(() => {
-    const fetchSubscription = async () => {
-      if (!isAuthenticated) {
-        setSubscription(null)
-        return
-      }
-
-      try {
-        const { data } = await axios.get('/api/billing/subscription')
-        setSubscription(data)
-      } catch (err) {
-        if (err?.response?.status !== 401) {
-          setError('Unable to load your current subscription status.')
-        }
-      }
-    }
-
     fetchSubscription()
-  }, [isAuthenticated])
+  }, [fetchSubscription])
+
+  const handleRetryPlans = async () => {
+    setRetryingPlans(true)
+    setNotice('')
+    await fetchPlans({ showSpinner: false })
+    setRetryingPlans(false)
+  }
 
   const handleCheckout = async (planId) => {
     const emailToUse = checkoutEmail.trim()
@@ -140,16 +220,16 @@ const BillingPage = () => {
     setError('')
 
     try {
-      const { data } = await axios.post('/api/billing/checkout-session', { plan: planId, email: emailToUse })
-      if (!data?.url) {
-        throw new Error('Missing checkout URL from server')
+      const response = await axios.post('/api/billing/checkout-session', { plan: planId, email: emailToUse })
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
+        throw buildSyntheticHttpError(response, 'Missing checkout URL from server')
       }
-      window.location.href = data.url
+
+      window.location.href = payload.url
     } catch (err) {
-      const responseData = err?.response?.data
-      const message = responseData?.error || 'We could not start the checkout session.'
-      const details = responseData?.details || responseData?.hint
-      setError(details ? `${message} (${details})` : message)
+      setError(getBillingActionError(err, 'We could not start the checkout session.'))
       setCheckoutPlan('')
     }
   }
@@ -157,17 +237,18 @@ const BillingPage = () => {
   const handleManageSubscription = async () => {
     setLoadingPortal(true)
     setError('')
+
     try {
-      const { data } = await axios.post('/api/billing/customer-portal', {})
-      if (!data?.url) {
-        throw new Error('Missing portal URL from server')
+      const response = await axios.post('/api/billing/customer-portal', {})
+      const payload = response?.data
+
+      if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
+        throw buildSyntheticHttpError(response, 'Missing portal URL from server')
       }
-      window.location.href = data.url
+
+      window.location.href = payload.url
     } catch (err) {
-      const responseData = err?.response?.data
-      const message = responseData?.error || 'Unable to open customer portal.'
-      const details = responseData?.details
-      setError(details ? `${message} (${details})` : message)
+      setError(getBillingActionError(err, 'Unable to open customer portal.'))
     } finally {
       setLoadingPortal(false)
     }
@@ -260,9 +341,19 @@ const BillingPage = () => {
         )}
 
         {notice && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-3">
             <CheckCircle2 className="h-4 w-4" />
-            {notice}
+            <span className="flex-1">{notice}</span>
+            {usingFallbackPlans && (
+              <button
+                type="button"
+                onClick={handleRetryPlans}
+                disabled={retryingPlans}
+                className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+              >
+                {retryingPlans ? 'Retrying...' : 'Retry API'}
+              </button>
+            )}
           </div>
         )}
 

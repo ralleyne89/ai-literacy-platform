@@ -79,3 +79,4 @@ Thumbs.db
 # Deployment helper files with secrets (keep local only)
 render_env_vars.txt
 RENDER_DEPLOYMENT_CHECKLIST.md
+scripts/recovery/*.sql

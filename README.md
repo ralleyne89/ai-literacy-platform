@@ -23,7 +23,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: JWT-based auth system
+- **Authentication**: Supabase auth by default, with optional backend JWT auth fallback via `VITE_AUTH_MODE=backend`
 - **Deployment**: Replit-ready configuration
 
 ## 📋 Prerequisites
@@ -57,7 +57,7 @@ npm run backend
 
 The frontend will be available at `http://localhost:5173`
 
-> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` (or your deployed API URL) so the frontend can reach the backend when built outside of Vite's dev server.
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed non-localhost API URL.
 
 ### 3. Backend Setup
 
@@ -197,14 +197,31 @@ ai-literacy-platform/
 - [ ] API documentation
 - [ ] More courses and content
 
+## 🔐 Authentication Modes
+
+The app supports two authentication modes:
+
+- **Supabase-first mode (default)**: uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for email/password and OAuth providers.
+- **Backend compatibility mode (`VITE_AUTH_MODE=backend`)**: uses `/api/auth/register` and `/api/auth/login`; JWT tokens are stored client-side and sent with API requests.
+  - Keep Supabase vars set to enable Google/Facebook OAuth while backend mode remains active.
+
+Notes:
+
+- Backend mode is useful when you want legacy credential-based auth only or when Supabase credentials are not available.
+- Google/Facebook OAuth is available whenever `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured, even when `VITE_AUTH_MODE=backend` is set.
+- Set `VITE_AUTH_MODE=backend` to use backend-auth for email/password while still allowing OAuth if Supabase variables are present.
+
 ## 🔐 Social Sign-In Setup
 
-LitmusAI uses Supabase authentication with optional Google and Facebook OAuth providers.
+In Supabase mode, LitmusAI supports optional Google and Facebook OAuth providers.
 
 1. In Supabase → Authentication → Providers, enable Google and Facebook.
 2. Supply each provider’s client ID and secret. Add both your local URL (`http://localhost:5173`) and deployed domain (e.g., Netlify) to the authorized redirect list.
 3. Supabase automatically handles the OAuth callback at `/auth/callback`. No additional frontend configuration is needed beyond the environment variables already in place.
 4. After issuing new keys, redeploy so the environment has `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
+In legacy-only backend mode (when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are intentionally absent), social login is unavailable and authentication uses backend email/password endpoints only.
+If those vars are set, provider login remains enabled while backend compatibility mode stays active.
 
 ## 🧪 Testing the Application
 
@@ -234,6 +251,85 @@ npm run backend
 python -m pytest -q
 ```
 
+### End-to-End (Playwright) Preconditions
+
+Automated end-to-end workflows expect these runtime conditions:
+
+- Frontend running at `http://127.0.0.1:5173`
+- Backend API running at `http://127.0.0.1:5001`
+- Test environment points to the API with `VITE_API_URL=http://127.0.0.1:5001`
+- A stable dataset seeded for modules, certifications, and course content
+- Supabase auth configured for deterministic automated signup/login in test environments
+
+Required test credentials must come from CI/local env:
+
+- `E2E_TEST_EMAIL` (required)
+- `E2E_TEST_PASSWORD` (required)
+
+Optional admin fallback credentials (recommended in CI):
+
+- `E2E_ADMIN_EMAIL` (defaults to `reggiealleyne89@gmail.com` if unset in the test runner)
+- `E2E_ADMIN_PASSWORD` (must be supplied with `E2E_ADMIN_EMAIL`)
+
+Run the required seed steps from `backend/`:
+
+```bash
+cd backend
+FLASK_APP=app.py flask db upgrade
+FLASK_APP=app.py flask seed-training-modules --force
+FLASK_APP=app.py flask seed-certifications --force
+FLASK_APP=app.py flask seed-course-content --force
+```
+
+For fully automated runs, keep Supabase email confirmation disabled (or ensure the test account used by automation is already confirmed), and avoid relying on social OAuth providers. The Playwright flow uses direct form-driven registration/login flows, so email confirmation/pending states or provider redirects can cause non-deterministic behavior.
+
+Recommended Playwright command usage:
+
+- CI (auth smoke):
+
+```bash
+E2E_TEST_EMAIL=test+ci@example.com E2E_TEST_PASSWORD=strong-password \
+E2E_ADMIN_EMAIL=admin@example.com E2E_ADMIN_PASSWORD=admin-password \
+npm run e2e:smoke
+```
+
+- Local/full verification:
+
+```bash
+E2E_TEST_EMAIL=test+local@example.com E2E_TEST_PASSWORD=strong-password \
+npm run e2e:flow
+```
+
+`npm run e2e` maps to `npm run e2e:flow` for the full journey and is kept for local/manual compatibility.
+
+### Validation runbook (latest execution)
+
+Executed: `2026-02-28` at `09:10 UTC`.
+
+```bash
+# backend prep (from /backend)
+cd backend
+source venv/bin/activate
+PYTHONPATH=. FLASK_APP=app.py flask db upgrade
+PYTHONPATH=. FLASK_APP=app.py flask seed-training-modules --force
+PYTHONPATH=. FLASK_APP=app.py flask seed-certifications --force
+PYTHONPATH=. FLASK_APP=app.py flask seed-course-content --force
+
+# stack + Playwright execution
+npm run backend
+npm run dev -- --host 127.0.0.1 --port 5173
+npm run e2e:install
+npm run e2e:smoke
+```
+
+Checklist:
+
+- [x] Backend reachable at `http://127.0.0.1:5001/api/health` (HTTP 200).
+- [x] Frontend reachable at `http://127.0.0.1:5173/` (HTTP 200).
+- [x] `npm run e2e:install` completed.
+- [ ] Backend DB seed/runbook prep completed end-to-end. `flask db upgrade` and seed chain failed at migration step due pre-existing DB state (`sqlite3.OperationalError: table certification_type already exists` in local workspace).
+- [ ] `npm run e2e` completed with tests. Current run reported `Error: No tests found`.
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -247,6 +343,7 @@ DATABASE_URL=sqlite:///ai_literacy.db
 FLASK_ENV=development
 FLASK_DEBUG=True
 VITE_API_URL=http://localhost:5001
+VITE_AUTH_MODE=backend
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
@@ -258,13 +355,40 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 STRIPE_PRICE_PREMIUM=price_live_or_test_premium
 STRIPE_PRICE_ENTERPRISE=price_live_or_test_enterprise
 FRONTEND_URL=https://your-netlify-site.netlify.app
+E2E_TEST_EMAIL=autotest+playwright@example.com
+E2E_TEST_PASSWORD=super-secret-test-password
+# Optional: override default admin credentials used by E2E fallback path
+E2E_ADMIN_EMAIL=admin@example.com
+E2E_ADMIN_PASSWORD=super-secret-admin-password
 ```
+
+### Production Build Guardrails
+
+`npm run build` runs `scripts/validate-prod-env.mjs` before Vite build. In production contexts (`NETLIFY=true` + `CONTEXT=production`, `NODE_ENV=production`, or `ENFORCE_PROD_ENV=1`), the build will fail when:
+
+- `VITE_API_URL` is missing, invalid, or points to localhost
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required for Supabase/social flows; they are optional only for intentional legacy-only backend mode.
 
 Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
 
 ### Database Setup
 
 The application uses SQLite for development. The database will be automatically created when you first run the Flask application.
+
+Common production databases (free or low-cost):
+
+- Neon
+- Render PostgreSQL
+- Railway PostgreSQL
+- Supabase Postgres
+- Aiven PostgreSQL
+- ElephantSQL (availability may vary)
+
+Migration checklist:
+
+1. Update `DATABASE_URL`
+2. Run `cd backend && FLASK_APP=app.py flask db upgrade`
+3. Re-run seeders where required (`flask seed-training-modules`, `flask seed-certifications`, `flask seed-course-content`)
 
 ## 📚 Documentation
 
@@ -291,6 +415,15 @@ docs/
 ```
 
 See [docs/README.md](docs/README.md) for the complete documentation index.
+
+## 🔄 Recovery Tooling
+
+When recovering from a paused Supabase project backup, use:
+
+- `scripts/extract_supabase_recovery_sql.py`
+- `scripts/import_backup_users_to_backend.py`
+
+Reference usage is documented in `scripts/recovery/README.md`.
 
 ## 📱 Usage
 
