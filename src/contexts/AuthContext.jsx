@@ -3,14 +3,22 @@ import axios from 'axios'
 import supabase from '../services/supabaseClient'
 
 const AuthContext = createContext()
+const AUTH0_AUTH_MODE = 'auth0'
+const BACKEND_AUTH_MODE = 'backend'
+const SUPABASE_AUTH_MODE = 'supabase'
+const AUTO_AUTH_MODE = 'auto'
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
 const RETRYABLE_AUTH_ERROR_MESSAGE = 'Authentication service unavailable. Please try again shortly.'
 const BACKEND_AUTH_ROUTE_ERROR_CODE = 'backend_auth_route_error'
 const BACKEND_AUTH_MALFORMED_RESPONSE_CODE = 'backend_auth_malformed_response'
 const BACKEND_AUTH_UNKNOWN_ERROR_CODE = 'backend_auth_unknown_error'
 const BACKEND_AUTH_ERROR_MESSAGE_MAX_LENGTH = 280
+const AUTH0_AUTH_LOGIN_ERROR_MESSAGE = 'Auth0 is not configured. Set VITE_AUTH0_DOMAIN and VITE_AUTH0_CLIENT_ID.'
 const BACKEND_AUTH_ROUTE_ERROR_MESSAGE =
   'Unable to authenticate: /api/auth returned an HTML page. Verify API routing (for example VITE_API_URL) and ensure /api/auth resolves to your backend endpoint.'
+const AUTH0_RESPONSE_TYPE = 'token'
+const AUTH0_SCOPE = 'openid profile email'
 const BACKEND_AUTH_SESSION_KEY = 'ailiteracy_backend_auth'
 const BACKEND_JWT_SEGMENTS = 3
 const GENERIC_BACKEND_REGISTRATION_ERRORS = new Set([
@@ -18,12 +26,162 @@ const GENERIC_BACKEND_REGISTRATION_ERRORS = new Set([
   'unable to complete registration right now.'
 ])
 
-const isForcedBackendAuth = () => {
-  return (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim() === 'backend'
+const getConfiguredApiBaseUrl = () => {
+  return (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
 }
 
-const shouldUseBackendAuth = () => {
-  return isForcedBackendAuth() || !supabase
+const getBackendAuthEndpointLabel = (path = '/api/auth') => {
+  const apiBase = getConfiguredApiBaseUrl()
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return apiBase ? `${apiBase}${normalizedPath}` : `same-site${normalizedPath}`
+}
+
+const getConfiguredAuthMode = () => {
+  const configuredMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
+  if (
+    configuredMode === AUTH0_AUTH_MODE ||
+    configuredMode === BACKEND_AUTH_MODE ||
+    configuredMode === SUPABASE_AUTH_MODE
+  ) {
+    return configuredMode
+  }
+
+  if (typeof window === 'undefined') {
+    return AUTO_AUTH_MODE
+  }
+
+  const isLocalHost = LOCAL_HOSTNAMES.has(window.location.hostname.toLowerCase())
+  return isLocalHost ? AUTO_AUTH_MODE : BACKEND_AUTH_MODE
+}
+
+const resolveAuthMode = () => {
+  const configuredMode = getConfiguredAuthMode()
+  if (configuredMode !== AUTO_AUTH_MODE) {
+    return configuredMode
+  }
+  const isLocalHost =
+    typeof window !== 'undefined' ? LOCAL_HOSTNAMES.has(window.location.hostname.toLowerCase()) : false
+
+  if (isLocalHost) {
+    return supabase ? SUPABASE_AUTH_MODE : BACKEND_AUTH_MODE
+  }
+
+  return BACKEND_AUTH_MODE
+}
+
+const isBackendSessionMode = () => {
+  const mode = resolveAuthMode()
+  return mode === BACKEND_AUTH_MODE || mode === AUTH0_AUTH_MODE
+}
+
+const buildAuth0ConnectionName = (provider) => {
+  const normalized = String(provider || '').toLowerCase().trim()
+  if (!normalized) {
+    return ''
+  }
+  if (normalized === 'google') {
+    return 'google-oauth2'
+  }
+  if (normalized === 'facebook') {
+    return 'facebook'
+  }
+  return normalized
+}
+
+const getAuth0Domain = () => String(import.meta.env.VITE_AUTH0_DOMAIN || '').trim().replace(/\/+$/, '')
+
+const getAuth0ClientId = () => String(import.meta.env.VITE_AUTH0_CLIENT_ID || '').trim()
+
+const getAuth0Audience = () => String(import.meta.env.VITE_AUTH0_AUDIENCE || '').trim()
+
+const getAuth0RedirectUri = () => {
+  const configured = String(import.meta.env.VITE_AUTH0_REDIRECT_URI || '').trim()
+  if (configured) {
+    return configured
+  }
+  if (typeof window === 'undefined') {
+    return ''
+  }
+  return `${window.location.origin}/auth/callback`
+}
+
+const isValidHttpUrl = (value) => {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const buildAuth0AuthorizeUrl = ({ provider = '', loginHint = '', screenHint = '' } = {}) => {
+  const domain = getAuth0Domain()
+  const clientId = getAuth0ClientId()
+  const audience = getAuth0Audience()
+  const redirectUri = getAuth0RedirectUri()
+  const connection = buildAuth0ConnectionName(provider)
+
+  if (!domain || !clientId || !redirectUri) {
+    return {
+      success: false,
+      message: AUTH0_AUTH_LOGIN_ERROR_MESSAGE
+    }
+  }
+
+  const authorizeHost = domain.includes('://') ? domain : `https://${domain}`
+  if (!isValidHttpUrl(authorizeHost)) {
+    return {
+      success: false,
+      message: 'Auth0 domain must be a valid URL.'
+    }
+  }
+
+  try {
+    const authorizeUrl = new URL('/authorize', authorizeHost)
+    authorizeUrl.searchParams.set('client_id', clientId)
+    authorizeUrl.searchParams.set('redirect_uri', redirectUri)
+    authorizeUrl.searchParams.set('response_type', AUTH0_RESPONSE_TYPE)
+    authorizeUrl.searchParams.set('response_mode', 'fragment')
+    authorizeUrl.searchParams.set('scope', AUTH0_SCOPE)
+
+    if (audience) {
+      authorizeUrl.searchParams.set('audience', audience)
+    }
+
+    if (connection) {
+      authorizeUrl.searchParams.set('connection', connection)
+    }
+
+    if (screenHint) {
+      authorizeUrl.searchParams.set('screen_hint', screenHint)
+    }
+
+    if (loginHint) {
+      authorizeUrl.searchParams.set('login_hint', loginHint)
+    }
+
+    return {
+      success: true,
+      url: authorizeUrl.toString()
+    }
+  } catch {
+    return {
+      success: false,
+      message: 'Unable to construct the Auth0 authorization URL.'
+    }
+  }
+}
+
+const initiateAuth0Login = (options = {}) => {
+  const result = buildAuth0AuthorizeUrl(options)
+  if (!result.success) {
+    return { success: false, error: result.message }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.location.assign(result.url)
+  }
+  return { success: true }
 }
 
 export const useAuth = () => {
@@ -390,6 +548,25 @@ const normalizeBackendAuthPayload = (response, { fallbackMessage, requiresToken 
 }
 
 const getBackendAuthError = (error, fallbackMessage, { preferRegistrationDetails = false } = {}) => {
+  const status = error?.response?.status
+  const requestPath = error?.response?.config?.url
+  const route = requestPath ? requestPath.split('?')[0] : '/api/auth'
+
+  if (status === 404 || status === 405) {
+    return {
+      code: BACKEND_AUTH_ROUTE_ERROR_CODE,
+      message: `Unable to reach backend auth route at ${getBackendAuthEndpointLabel(route)}. Check VITE_API_URL and deployment routing.`
+    }
+  }
+
+  const contentType = error?.response?.headers?.['content-type'] || error?.response?.headers?.get?.('content-type')
+  if (typeof contentType === 'string' && contentType.toLowerCase().includes('text/html')) {
+    return {
+      code: BACKEND_AUTH_ROUTE_ERROR_CODE,
+      message: BACKEND_AUTH_ROUTE_ERROR_MESSAGE
+    }
+  }
+
   const data = error?.response?.data
   if (isHtmlLikePayload(data)) {
     return {
@@ -439,7 +616,10 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
-  const isBackendAuthMode = shouldUseBackendAuth()
+  const authMode = resolveAuthMode()
+  const usesBackendSessionMode = isBackendSessionMode()
+  const isAuth0Enabled = authMode === AUTH0_AUTH_MODE
+  const isBackendAuthMode = authMode === BACKEND_AUTH_MODE
 
   const syncBackendProfile = async (profile) => {
     if (!supabase) {
@@ -479,8 +659,44 @@ export const AuthProvider = ({ children }) => {
     clearBackendSessionStorage()
   }
 
+  const exchangeAuth0Token = async ({ accessToken, authCode } = {}) => {
+    const auth0AccessToken = typeof accessToken === 'string' ? accessToken.trim() : ''
+    const auth0Code = typeof authCode === 'string' ? authCode.trim() : ''
+
+    if (!auth0AccessToken && !auth0Code) {
+      return false
+    }
+
+    try {
+      const response = await axios.post('/api/auth/exchange', {
+        ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
+        ...(auth0Code ? { code: auth0Code } : {})
+      })
+
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Unable to exchange Auth0 token.',
+        requiresToken: true
+      })
+      if (!normalized.success) {
+        console.warn('Auth0 token exchange returned malformed response:', normalized.message)
+        return false
+      }
+
+      setBackendSession(normalized.token, normalized.user, true)
+      return true
+    } catch (error) {
+      const normalized = getBackendAuthError(error, 'Unable to exchange Auth0 credentials.')
+      console.warn('Auth0 token exchange failed:', normalized.message)
+
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        clearBackendSession()
+      }
+      return false
+    }
+  }
+
   useEffect(() => {
-    if (isBackendAuthMode) {
+    if (usesBackendSessionMode) {
       let isMounted = true
 
       const initialize = async () => {
@@ -618,7 +834,13 @@ export const AuthProvider = ({ children }) => {
   }, [session])
 
   const login = async (email, password) => {
-    if (isBackendAuthMode) {
+    if (usesBackendSessionMode) {
+      if (isAuth0Enabled) {
+        return initiateAuth0Login({
+          loginHint: String(email || '').trim().toLowerCase()
+        })
+      }
+
       try {
         const response = await axios.post('/api/auth/login', {
           email: String(email || '').trim().toLowerCase(),
@@ -679,7 +901,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   const register = async (userData) => {
-    if (isBackendAuthMode) {
+    if (usesBackendSessionMode) {
+      if (isAuth0Enabled) {
+        return initiateAuth0Login({
+          loginHint: String(userData?.email || '').trim().toLowerCase(),
+          screenHint: 'signup'
+        })
+      }
+
       try {
         const response = await axios.post('/api/auth/register', {
           email: String(userData.email || '').trim().toLowerCase(),
@@ -776,7 +1005,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = async () => {
-    if (isBackendAuthMode) {
+    if (usesBackendSessionMode) {
       clearBackendSession()
       return
     }
@@ -792,7 +1021,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const updateProfile = async (profileData) => {
-    if (isBackendAuthMode) {
+    if (usesBackendSessionMode) {
       try {
         const response = await axios.put('/api/auth/profile', {
           first_name: profileData.first_name,
@@ -850,6 +1079,12 @@ export const AuthProvider = ({ children }) => {
   }
 
   const loginWithProvider = async (provider) => {
+    if (isAuth0Enabled) {
+      return initiateAuth0Login({
+        provider
+      })
+    }
+
     if (!supabase) {
       return { success: false, error: 'Supabase is not configured' }
     }
@@ -875,6 +1110,13 @@ export const AuthProvider = ({ children }) => {
   }
 
   const requestPasswordReset = async (email) => {
+    if (isAuth0Enabled) {
+      return {
+        success: false,
+        error: 'Password reset is handled in Auth0.'
+      }
+    }
+
     if (isBackendAuthMode) {
       return {
         success: false,
@@ -908,12 +1150,45 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const syncBackendAfterLogin = async () => {
-    if (!supabase) return
+  const syncBackendAfterLogin = async ({ auth0AccessToken = '', auth0Code = '' } = {}) => {
+    if (usesBackendSessionMode) {
+      if (isAuth0Enabled && (auth0AccessToken || auth0Code)) {
+        return await exchangeAuth0Token({
+          authCode: auth0Code,
+          accessToken: auth0AccessToken
+        })
+      }
+
+      const stored = getStoredBackendSession()
+      if (!stored?.token) {
+        clearBackendSession()
+        return false
+      }
+
+      setBackendSession(stored.token, stored.user, true)
+      try {
+        const { data } = await axios.get('/api/auth/profile')
+        const normalizedProfile = normalizeBackendAuthPayload({ data }, {
+          fallbackMessage: 'Unable to load backend auth profile.'
+        })
+
+        if (!normalizedProfile.success || !normalizedProfile.user) {
+          clearBackendSession()
+          return false
+        }
+
+        setBackendSession(stored.token, normalizedProfile.user, true)
+        return true
+      } catch (error) {
+        console.warn('Failed to finalize backend login sync:', error)
+        return false
+      }
+    }
+
     try {
       const { data } = await supabase.auth.getSession()
       const mapped = mapSupabaseUser(data.session?.user)
-      if (!mapped) return
+      if (!mapped) return false
       await syncBackendProfile({
         id: mapped.id,
         email: mapped.email,
@@ -924,8 +1199,10 @@ export const AuthProvider = ({ children }) => {
       })
       setSession(data.session)
       setUser(mapped)
+      return true
     } catch (err) {
       console.warn('Failed to finalize login sync:', err)
+      return false
     }
   }
 

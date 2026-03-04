@@ -508,6 +508,7 @@ const CertificationPage = () => {
             <div className="max-w-md mx-auto flex space-x-4">
               <input
                 type="text"
+                autoComplete="off"
                 placeholder="Enter verification code"
                 value={verifyCode}
                 onChange={(e) => setVerifyCode(e.target.value)}

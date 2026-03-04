@@ -22,10 +22,12 @@ const VideoLesson = ({ lesson, onComplete }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid={`video-lesson-${lesson.id}`}>
       {/* Lesson Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{lesson.title}</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid={`video-lesson-title-${lesson.id}`}>
+          {lesson.title}
+        </h1>
         <p className="text-gray-600">{lesson.description}</p>
       </div>
 
@@ -38,6 +40,7 @@ const VideoLesson = ({ lesson, onComplete }) => {
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
+            data-testid={`video-lesson-iframe-${lesson.id}`}
           ></iframe>
         </div>
       )}
@@ -99,6 +102,7 @@ const VideoLesson = ({ lesson, onComplete }) => {
               ? 'bg-green-600 text-white cursor-default'
               : 'bg-primary-600 text-white hover:bg-primary-700'
           }`}
+          data-testid={`video-lesson-complete-button-${lesson.id}`}
         >
           {isCompleted ? (
             <span className="flex items-center gap-2">

@@ -16,19 +16,35 @@ const extractAuthErrorMessage = (search = '', hash = '') => {
   return errorDescription ? `${error}: ${errorDescription}` : error
 }
 
+const extractAuth0CallbackParams = (search = '', hash = '') => {
+  const query = new URLSearchParams(search)
+  const fragment = hash.startsWith('#') ? hash.substring(1) : hash
+  const hashParams = new URLSearchParams(fragment)
+
+  return {
+    auth0AccessToken: hashParams.get('access_token') || hashParams.get('id_token') || '',
+    auth0Code: query.get('code') || hashParams.get('code') || ''
+  }
+}
+
 const AuthCallback = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { syncBackendAfterLogin, loading } = useAuth()
+  const { syncBackendAfterLogin, loading, isAuthenticated } = useAuth()
   const [statusMessage, setStatusMessage] = useState('Checking your account…')
   const [errorMessage, setErrorMessage] = useState('')
 
   const authErrorMessage = extractAuthErrorMessage(location.search, location.hash)
+  const { auth0AccessToken, auth0Code } = extractAuth0CallbackParams(location.search, location.hash)
 
   useEffect(() => {
     let isActive = true
 
     const finalize = async () => {
+      if (loading) {
+        return
+      }
+
       if (authErrorMessage) {
         setErrorMessage(`OAuth callback error: ${authErrorMessage}`)
         setStatusMessage('Redirecting to sign in...')
@@ -36,13 +52,21 @@ const AuthCallback = () => {
         return
       }
 
-      await syncBackendAfterLogin?.()
+      const authenticated = await syncBackendAfterLogin?.({
+        auth0AccessToken,
+        auth0Code
+      })
 
       if (!isActive) {
         return
       }
 
-      navigate('/dashboard', { replace: true })
+      if (authenticated || isAuthenticated) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+
+      navigate('/login', { replace: true })
     }
 
     finalize().catch((err) => {
@@ -59,7 +83,7 @@ const AuthCallback = () => {
     return () => {
       isActive = false
     }
-  }, [authErrorMessage, navigate, syncBackendAfterLogin])
+  }, [auth0AccessToken, auth0Code, authErrorMessage, loading, navigate, syncBackendAfterLogin, isAuthenticated])
 
   useEffect(() => {
     setStatusMessage(loading ? 'Checking your account…' : 'Finishing sign-in…')

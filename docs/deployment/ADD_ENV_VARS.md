@@ -25,23 +25,19 @@ https://app.netlify.com/sites/litmusai/configuration/env
 - **Value**: `pk_live_...` (Get from backend/.env file)
 - **Scopes**: All scopes (default)
 
-### Add Supabase OAuth Variables (Required for Social Login)
+### Add Auth Provider Variables
 
-If you want Google/Facebook login to work, add these two frontend variables too. This is needed even when `VITE_AUTH_MODE=backend` is enabled and you still want provider login.
+- If your `VITE_AUTH_MODE` is `auto` or `supabase`, add:
+  - **Variable**: `VITE_SUPABASE_URL` = Supabase project URL (e.g. `https://your-project-id.supabase.co`)
+  - **Variable**: `VITE_SUPABASE_ANON_KEY` = Supabase public anon key
 
-- **Variable 3:**
+- If your `VITE_AUTH_MODE` is `auth0`, add:
+  - **Variable**: `VITE_AUTH0_DOMAIN` = Auth0 domain (e.g. `https://your-domain.auth0.com`)
+  - **Variable**: `VITE_AUTH0_CLIENT_ID` = Auth0 app client ID
+  - **Variable**: `VITE_AUTH0_AUDIENCE` = Auth0 audience
+  - **Variable**: `VITE_AUTH0_REDIRECT_URI` = OAuth callback URL (usually `https://your-site.com/auth/callback`)
 
-- **Key**: `VITE_SUPABASE_URL`
-- **Value**: Your Supabase project URL (e.g. `https://your-project-id.supabase.co`)
-- **Scopes**: All scopes (default)
-
-- **Variable 4:**
-
-- **Key**: `VITE_SUPABASE_ANON_KEY`
-- **Value**: Your Supabase public anon key
-- **Scopes**: All scopes (default)
-
-If you intentionally run legacy-only backend auth, you can omit these two keys; in that mode OAuth is unavailable and backend email/password auth still works.
+- If your `VITE_AUTH_MODE` is `backend`, neither set is required for baseline backend email/password authentication.
 
 ### After adding variables:
 

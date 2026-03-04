@@ -1,4 +1,5 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const { buildCorsHeaders } = require("./_cors");
 
 // Supabase client for updating user subscriptions
 const { createClient } = require("@supabase/supabase-js");
@@ -12,12 +13,10 @@ if (supabaseUrl && supabaseServiceKey) {
 }
 
 exports.handler = async (event, context) => {
-  const allowedOrigin = process.env.FRONTEND_URL || event.headers.origin || event.headers.Origin || "http://localhost:5173";
-  const headers = {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type, Stripe-Signature",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
+  const headers = buildCorsHeaders(event, {
+    methods: "POST, OPTIONS",
+    allowedHeaders: "Content-Type, Stripe-Signature"
+  });
 
   // Handle preflight requests
   if (event.httpMethod === "OPTIONS") {

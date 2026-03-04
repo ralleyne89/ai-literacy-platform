@@ -248,10 +248,20 @@ const AssessmentPage = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             <div className="text-center mb-8">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Assessment Complete!</h1>
-              <p className="text-gray-600">Here are your AI literacy results</p>
+              <h1
+                className="text-3xl font-bold text-gray-900 mb-2"
+                data-testid="assessment-results-title"
+              >
+                Assessment Complete!
+              </h1>
+              <p className="text-gray-600" data-testid="assessment-results-subtitle">
+                Here are your AI literacy results
+              </p>
               {results.saved && (
-                <p className="mt-2 text-sm text-primary-600 font-medium">
+                <p
+                  className="mt-2 text-sm text-primary-600 font-medium"
+                  data-testid="assessment-results-saved"
+                >
                   Results saved to your dashboard. Review them anytime.
                 </p>
               )}
@@ -299,12 +309,21 @@ const AssessmentPage = () => {
             {/* Recommendations */}
             <div className="mb-8">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Personalized Recommendations</h3>
-              <div className="space-y-4">
+              <div className="space-y-4" data-testid="assessment-recommendations-list">
                 {results.recommendations.map((rec, index) => (
-                  <div key={index} className="border-l-4 border-primary-600 bg-primary-50 p-4 rounded-r-lg">
+                  <div
+                    key={index}
+                    className="border-l-4 border-primary-600 bg-primary-50 p-4 rounded-r-lg"
+                    data-testid={`assessment-recommendation-${index}`}
+                  >
                     <h4 className="font-semibold text-gray-900 mb-1">{rec.title}</h4>
                     <p className="text-gray-700 mb-2">{rec.description}</p>
-                    <p className="text-sm text-primary-600 font-medium">{rec.action}</p>
+                    <p
+                      className="text-sm text-primary-600 font-medium"
+                      data-testid={`assessment-recommendation-${index}-action`}
+                    >
+                      {rec.action}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -324,10 +343,18 @@ const AssessmentPage = () => {
                     Create an account to save your assessment results and track your progress through training modules.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link to="/register" className="btn-primary text-sm">
+                    <Link
+                      to="/register"
+                      className="btn-primary text-sm"
+                      data-testid="assessment-results-create-account-link"
+                    >
                       Create Account
                     </Link>
-                    <Link to="/login" className="btn-outline text-sm">
+                    <Link
+                      to="/login"
+                      className="btn-outline text-sm"
+                      data-testid="assessment-results-signin-link"
+                    >
                       Sign In
                     </Link>
                   </div>
@@ -335,11 +362,19 @@ const AssessmentPage = () => {
               )}
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/training" className="btn-primary">
+                <Link
+                  to="/training"
+                  className="btn-primary"
+                  data-testid="assessment-results-start-training-link"
+                >
                   Start Training Modules
                 </Link>
                 {isAuthenticated && (
-                  <Link to="/dashboard" className="btn-outline">
+                  <Link
+                    to="/dashboard"
+                    className="btn-outline"
+                    data-testid="assessment-results-dashboard-link"
+                  >
                     View Dashboard
                   </Link>
                 )}
@@ -425,6 +460,7 @@ const AssessmentPage = () => {
                   type="button"
                   onClick={handleNotNow}
                   className="btn-outline"
+                  data-testid="assessment-modal-not-now"
                 >
                   Not now
                 </button>
@@ -433,6 +469,7 @@ const AssessmentPage = () => {
                   onClick={startAssessment}
                   className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={loading}
+                  data-testid="assessment-start-button"
                 >
                   Start the test
                 </button>
@@ -463,10 +500,10 @@ const AssessmentPage = () => {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600" data-testid="assessment-progress-label">
               Question {currentQuestion + 1} of {questions.length}
             </span>
-            <span className="text-sm text-gray-600 sm:text-right">
+            <span className="text-sm text-gray-600 sm:text-right" data-testid="assessment-progress-percent">
               {progressDisplay}% Complete
             </span>
           </div>
@@ -479,12 +516,12 @@ const AssessmentPage = () => {
         </div>
 
         {/* Question Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8" data-testid="assessment-question-card">
           <div className="mb-6">
             <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-4 ${getDomainColor(question.domain)} bg-gray-100`}>
               {question.domain} Domain
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4" data-testid={`assessment-question-${question.id}-text`}>
               {question.question_text}
             </h2>
           </div>
@@ -498,6 +535,7 @@ const AssessmentPage = () => {
                     ? 'border-primary-600 bg-primary-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
+                data-testid={`assessment-question-${question.id}-option-${option}`}
               >
                 <input
                   type="radio"
@@ -506,6 +544,7 @@ const AssessmentPage = () => {
                   checked={answers[question.id] === option}
                   onChange={() => handleAnswerSelect(question.id, option)}
                   className="sr-only"
+                  data-testid={`assessment-question-${question.id}-input-${option}`}
                 />
                 <div className="flex items-start space-x-3">
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
@@ -534,6 +573,7 @@ const AssessmentPage = () => {
               onClick={handleSubmit}
               disabled={!answers[question.id] || isSubmitting}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid={`assessment-question-${question.id}-submit`}
             >
               {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
             </button>
@@ -542,6 +582,7 @@ const AssessmentPage = () => {
               onClick={handleNext}
               disabled={!answers[question.id]}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              data-testid={`assessment-question-${question.id}-next`}
             >
               <span>Next</span>
               <ArrowRight className="w-5 h-5" />

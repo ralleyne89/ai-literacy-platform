@@ -11,10 +11,15 @@ I've opened the Netlify environment variables page in your browser.
 **Check that you have these core variables**:
 - [ ] `STRIPE_SECRET_KEY` = `sk_live_...`
 - [ ] `STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
-- [ ] `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co`
-- [ ] `VITE_SUPABASE_ANON_KEY` = `ey...`
+- [ ] `VITE_AUTH_MODE` = `auto` | `backend` | `supabase` | `auth0`
+- [ ] `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co` (required in `auto` / `supabase`)
+- [ ] `VITE_SUPABASE_ANON_KEY` = `ey...` (required in `auto` / `supabase`)
+- [ ] `VITE_AUTH0_DOMAIN` = `https://your-domain.auth0.com` (required in `auth0`)
+- [ ] `VITE_AUTH0_CLIENT_ID` = `...` (required in `auth0`)
+- [ ] `VITE_AUTH0_AUDIENCE` = `...` (required in `auth0`)
+- [ ] `VITE_AUTH0_REDIRECT_URI` = `https://your-site.com/auth/callback` (required in `auth0`)
 
-If your deployment is intentionally backend-only (legacy email/password users only), you can skip the two Supabase values. In all other cases, they should be present so Google/Facebook login works.
+If your deployment is intentionally backend-only (`VITE_AUTH_MODE=backend`), you can skip the Supabase values. In `auth0` mode, skip Supabase values and provide the Auth0 values above.
 
 **If they're there**: ✅ Great! Move to Step 2.
 
@@ -197,8 +202,12 @@ netlify deploy --prod
 ✅ STRIPE_SECRET_KEY (Already set)
 ✅ STRIPE_PUBLISHABLE_KEY (Already set)
 ⏳ STRIPE_WEBHOOK_SECRET (Add in Step 2)
-⏳ VITE_SUPABASE_URL (Required for OAuth/social login; skip only for backend-only mode)
-⏳ VITE_SUPABASE_ANON_KEY (Required for OAuth/social login; skip only for backend-only mode)
+⏳ VITE_SUPABASE_URL (Required in `auto` and `supabase` modes)
+⏳ VITE_SUPABASE_ANON_KEY (Required in `auto` and `supabase` modes)
+⏳ VITE_AUTH0_DOMAIN (Required in `auth0` mode)
+⏳ VITE_AUTH0_CLIENT_ID (Required in `auth0` mode)
+⏳ VITE_AUTH0_AUDIENCE (Required in `auth0` mode)
+⏳ VITE_AUTH0_REDIRECT_URI (Required in `auth0` mode)
 ✅ SUPABASE_SERVICE_ROLE_KEY (Only for optional DB integration step)
 ```
 

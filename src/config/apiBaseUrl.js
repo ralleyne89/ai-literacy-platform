@@ -1,4 +1,5 @@
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
+const DEFAULT_RENDER_API_URL = 'https://litmusai-backend.onrender.com'
 
 const trimTrailingSlashes = (value) => (value || '').replace(/\/+$/, '')
 
@@ -19,6 +20,16 @@ const isLocalUrl = (value) => {
 }
 
 const getLocalFallback = (origin) => origin.replace(/:\d+$/, ':5001')
+const getRenderApiFallback = () => {
+  const configuredRenderUrl = trimTrailingSlashes(import.meta.env.VITE_RENDER_API_URL)
+  const configuredRenderParsed = parseUrl(configuredRenderUrl)
+
+  if (configuredRenderUrl && !configuredRenderParsed) {
+    console.error('VITE_RENDER_API_URL is not a valid absolute URL. Falling back to the default Render backend.')
+  }
+
+  return configuredRenderParsed ? configuredRenderUrl : DEFAULT_RENDER_API_URL
+}
 
 export const resolveApiBaseUrl = () => {
   const configuredBaseUrl = trimTrailingSlashes(import.meta.env.VITE_API_URL)
@@ -43,7 +54,7 @@ export const resolveApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     const origin = window.location.origin
     const isLocalOrigin = LOCAL_HOSTNAMES.has(window.location.hostname)
-    return isLocalOrigin ? getLocalFallback(origin) : origin
+    return isLocalOrigin ? getLocalFallback(origin) : getRenderApiFallback()
   }
 
   return configuredBaseUrl

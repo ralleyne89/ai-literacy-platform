@@ -1,0 +1,68 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "LitmusAI Assessment · Training · Certification" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - img [ref=e11]
+        - generic [ref=e14]:
+          - generic [ref=e15]: LitmusAI
+          - generic [ref=e16]: Assessment · Training · Certification
+      - generic [ref=e17]:
+        - link "Assessment" [ref=e18] [cursor=pointer]:
+          - /url: /assessment
+          - text: Assessment
+        - link "Training" [ref=e19] [cursor=pointer]:
+          - /url: /training
+          - text: Training
+        - link "Certification" [ref=e20] [cursor=pointer]:
+          - /url: /certification
+          - text: Certification
+        - link "Enterprise" [ref=e21] [cursor=pointer]:
+          - /url: /enterprise
+          - text: Enterprise
+        - link "Pricing" [ref=e22] [cursor=pointer]:
+          - /url: /billing
+          - text: Pricing
+      - generic [ref=e23]:
+        - link "Sign In" [ref=e24] [cursor=pointer]:
+          - /url: /login
+        - link "Start free assessment" [ref=e25] [cursor=pointer]:
+          - /url: /assessment
+  - generic [ref=e27]:
+    - generic [ref=e28]:
+      - img [ref=e30]
+      - heading "Sign in to your account" [level=2] [ref=e33]
+      - paragraph [ref=e34]:
+        - text: Or
+        - link "create a new account" [ref=e35] [cursor=pointer]:
+          - /url: /register
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]: Email address
+          - textbox "Email address" [ref=e40]:
+            - /placeholder: Enter your email
+        - generic [ref=e41]:
+          - generic [ref=e42]: Password
+          - generic [ref=e43]:
+            - textbox "Password" [ref=e44]:
+              - /placeholder: Enter your password
+            - button [ref=e45] [cursor=pointer]:
+              - img [ref=e46]
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - checkbox "Remember me" [ref=e51]
+          - generic [ref=e52]: Remember me
+        - button "Forgot your password?" [ref=e54] [cursor=pointer]
+      - button "Sign in" [ref=e55] [cursor=pointer]
+      - generic [ref=e56]:
+        - button "Continue with Google" [ref=e57] [cursor=pointer]
+        - button "Continue with Facebook" [ref=e58] [cursor=pointer]
+      - paragraph [ref=e60]:
+        - text: Don't have an account?
+        - link "Sign up for free" [ref=e61] [cursor=pointer]:
+          - /url: /register
+```

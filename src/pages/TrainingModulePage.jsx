@@ -107,7 +107,10 @@ const TrainingModulePage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center"
+        data-testid="training-module-loading"
+      >
         <div className="flex items-center gap-3 text-gray-600">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span>Loading module...</span>
@@ -118,7 +121,10 @@ const TrainingModulePage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center px-4"
+        data-testid="training-module-error"
+      >
         <div className="max-w-md text-center">
           <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h1>
@@ -126,6 +132,7 @@ const TrainingModulePage = () => {
           <button
             onClick={() => navigate('/training')}
             className="btn-primary"
+            data-testid="training-module-error-back-link"
           >
             Back to Training Hub
           </button>
@@ -146,7 +153,11 @@ const TrainingModulePage = () => {
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <Link to="/training" className="text-sm font-medium text-primary-600 hover:text-primary-700">
+          <Link
+            to="/training"
+            className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            data-testid="training-module-back-link"
+          >
             ← Back to Training Hub
           </Link>
         </div>
@@ -160,6 +171,7 @@ const TrainingModulePage = () => {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 h-full w-full"
+                data-testid={`training-module-iframe-${moduleId}`}
               />
             </div>
           ) : (
@@ -176,6 +188,7 @@ const TrainingModulePage = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 font-semibold text-gray-900 shadow-lg hover:bg-white/90"
+                    data-testid="training-module-external-link"
                   >
                     {metadata.cta_text || 'Open course'}
                     <ExternalLink className="h-4 w-4" />
@@ -205,6 +218,7 @@ const TrainingModulePage = () => {
                   <Link
                     to={`/training/modules/${moduleId}/learn`}
                     className="btn-primary text-center"
+                    data-testid="training-module-learn-link"
                   >
                     {progress && progress.progress_percentage > 0 ? 'Continue Learning' : 'Start Learning'}
                   </Link>
@@ -212,6 +226,7 @@ const TrainingModulePage = () => {
                   <button
                     onClick={() => navigate('/login', { state: { from: `/training/modules/${moduleId}` } })}
                     className="btn-primary"
+                  data-testid="training-module-login-button"
                   >
                     Sign in to Track Progress
                   </button>
@@ -222,6 +237,7 @@ const TrainingModulePage = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-primary inline-flex items-center justify-center gap-2"
+                    data-testid="training-module-external-cta-link"
                   >
                     {metadata.cta_text || 'Visit course site'}
                     <ExternalLink className="h-4 w-4" />
@@ -232,6 +248,7 @@ const TrainingModulePage = () => {
                     onClick={handleEnroll}
                     disabled={enrolling}
                     className="btn-outline disabled:opacity-60"
+                    data-testid="training-module-enroll-button"
                   >
                     {enrolling ? 'Enrolling...' : 'Enroll in Module'}
                   </button>
@@ -241,6 +258,7 @@ const TrainingModulePage = () => {
                     onClick={handleMarkComplete}
                     disabled={progressUpdating || isCompleted}
                     className="btn-outline disabled:opacity-60"
+                  data-testid="training-module-complete-button"
                   >
                     {isCompleted ? 'Module Completed' : progressUpdating ? 'Saving...' : 'Mark as Complete'}
                   </button>

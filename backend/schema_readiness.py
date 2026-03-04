@@ -16,6 +16,8 @@ SIGNUP_REQUIRED_USER_COLUMNS = (
     'last_name',
     'subscription_tier',
 )
+PASSWORD_HASH_COLUMN = 'password_hash'
+PASSWORD_HASH_MIN_LENGTH = 60
 
 
 class SchemaReadinessError(RuntimeError):
@@ -54,6 +56,33 @@ def _missing_required_columns(existing_columns: Iterable[str]) -> Set[str]:
     }
 
 
+def _validate_password_hash_column(columns):
+    password_hash_column = None
+    for column in columns:
+        if column.get('name', '').lower() == PASSWORD_HASH_COLUMN:
+            password_hash_column = column
+            break
+
+    if password_hash_column is None:
+        raise SchemaReadinessError(
+            "Signup schema check failed: missing required 'password_hash' column."
+        )
+
+    if password_hash_column.get('nullable') is True:
+        raise SchemaReadinessError(
+            'Signup schema check failed: password_hash column is nullable; '
+            'backend authentication requires non-null values.'
+        )
+
+    column_type = password_hash_column.get('type')
+    max_length = getattr(column_type, 'length', None)
+    if max_length is not None and max_length < PASSWORD_HASH_MIN_LENGTH:
+        raise SchemaReadinessError(
+            'Signup schema check failed: password_hash column is too short '
+            f'({max_length}). At least {PASSWORD_HASH_MIN_LENGTH} characters are required.'
+        )
+
+
 def validate_signup_schema_or_raise(db) -> None:
     """Validate signup-critical schema and raise on drift."""
     try:
@@ -83,6 +112,8 @@ def validate_signup_schema_or_raise(db) -> None:
             'Signup schema check failed: missing required user columns '
             f'[{missing_formatted}].'
         )
+
+    _validate_password_hash_column(user_columns)
 
     logger.info(
         'signup_schema_check_passed',

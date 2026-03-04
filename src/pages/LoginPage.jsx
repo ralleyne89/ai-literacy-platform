@@ -24,6 +24,8 @@ const LoginPage = () => {
   const location = useLocation()
 
   const from = location.state?.from?.pathname || '/dashboard'
+  const authMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
+  const isAuth0Mode = authMode === 'auth0'
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -50,7 +52,11 @@ const LoginPage = () => {
     const result = await login(formData.email, formData.password)
 
     if (result.success) {
-      navigate(from, { replace: true })
+      if (!isAuth0Mode) {
+        navigate(from, { replace: true })
+      }
+      setLoading(false)
+      return
     } else {
       setError(result.error)
       setErrorCode(result.code || '')
@@ -102,7 +108,11 @@ const LoginPage = () => {
       if (lastAction.type === 'login') {
         const result = await login(formData.email, formData.password)
         if (result.success) {
-          navigate(from, { replace: true })
+          if (!isAuth0Mode) {
+            navigate(from, { replace: true })
+          }
+          setLoading(false)
+          return
         } else {
           setError(result.error)
           setErrorCode(result.code || '')
@@ -187,8 +197,9 @@ const LoginPage = () => {
               <input
                 id="email"
                 name="email"
+                autoComplete="email"
                 type="email"
-                required
+                required={!isAuth0Mode}
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -205,7 +216,8 @@ const LoginPage = () => {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  required
+                autoComplete={isAuth0Mode ? 'off' : 'current-password'}
+                required={!isAuth0Mode}
                   value={formData.password}
                   onChange={handleChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"

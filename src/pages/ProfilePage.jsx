@@ -93,6 +93,7 @@ const ProfilePage = () => {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 value={user?.email || ''}
                 disabled
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
@@ -108,6 +109,7 @@ const ProfilePage = () => {
                 <input
                   id="first_name"
                   name="first_name"
+                  autoComplete="given-name"
                   type="text"
                   required
                   value={formData.first_name}
@@ -122,6 +124,7 @@ const ProfilePage = () => {
                 <input
                   id="last_name"
                   name="last_name"
+                  autoComplete="family-name"
                   type="text"
                   required
                   value={formData.last_name}
@@ -138,6 +141,7 @@ const ProfilePage = () => {
               <select
                 id="role"
                 name="role"
+                  autoComplete="off"
                 value={formData.role}
                 onChange={handleChange}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -155,6 +159,7 @@ const ProfilePage = () => {
               <input
                 id="organization"
                 name="organization"
+                  autoComplete="off"
                 type="text"
                 value={formData.organization}
                 onChange={handleChange}

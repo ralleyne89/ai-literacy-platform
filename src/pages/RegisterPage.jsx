@@ -21,6 +21,8 @@ const RegisterPage = () => {
 
   const { register, isAuthenticated, loginWithProvider } = useAuth()
   const navigate = useNavigate()
+  const authMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
+  const isAuth0Mode = authMode === 'auth0'
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -49,6 +51,22 @@ const RegisterPage = () => {
     e.preventDefault()
     setError('')
     setMessage('')
+
+    if (isAuth0Mode) {
+      setLoading(true)
+      const result = await register({
+        email: formData.email
+      })
+
+      if (result.success) {
+        setLoading(false)
+        return
+      }
+
+      setError(result.error)
+      setLoading(false)
+      return
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
@@ -130,8 +148,9 @@ const RegisterPage = () => {
                 <input
                   id="firstName"
                   name="firstName"
+                autoComplete="given-name"
                   type="text"
-                  required
+                required={!isAuth0Mode}
                   value={formData.firstName}
                   onChange={handleChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -145,8 +164,9 @@ const RegisterPage = () => {
                 <input
                   id="lastName"
                   name="lastName"
+                autoComplete="family-name"
                   type="text"
-                  required
+                required={!isAuth0Mode}
                   value={formData.lastName}
                   onChange={handleChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -162,8 +182,9 @@ const RegisterPage = () => {
               <input
                 id="email"
                 name="email"
+                autoComplete="email"
                 type="email"
-                required
+                required={!isAuth0Mode}
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
@@ -212,7 +233,8 @@ const RegisterPage = () => {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  required
+                autoComplete="new-password"
+                required={!isAuth0Mode}
                   value={formData.password}
                   onChange={handleChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
@@ -237,7 +259,8 @@ const RegisterPage = () => {
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
-                  required
+                autoComplete="new-password"
+                required={!isAuth0Mode}
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent pr-10"
@@ -259,7 +282,7 @@ const RegisterPage = () => {
               id="terms"
               name="terms"
               type="checkbox"
-              required
+              required={!isAuth0Mode}
               className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
             />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">

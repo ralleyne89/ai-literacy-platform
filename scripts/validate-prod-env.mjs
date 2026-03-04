@@ -48,6 +48,41 @@ if (!isProductionBuild) {
 
 const errors = []
 
+const SUPPORTED_AUTH_MODES = new Set(['auto', 'backend', 'supabase', 'auth0'])
+const parseAuthMode = () => {
+  const configured = (getEnv('VITE_AUTH_MODE') || '').toLowerCase()
+  if (!configured) {
+    return 'auto'
+  }
+  if (SUPPORTED_AUTH_MODES.has(configured)) {
+    return configured
+  }
+  return `unsupported:${configured}`
+}
+
+const authMode = parseAuthMode()
+if (authMode.startsWith('unsupported:')) {
+  const badValue = authMode.split(':', 2)[1]
+  errors.push(`Unsupported VITE_AUTH_MODE="${badValue}". Supported values: auto, backend, supabase, auth0.`)
+}
+
+const resolvedAuthMode = authMode.startsWith('unsupported:') ? 'auto' : authMode
+const requiresSupabase = ['auto', 'supabase'].includes(resolvedAuthMode)
+const requiresAuth0 = resolvedAuthMode === 'auth0'
+const requiresBackendJwtSecret = ['backend', 'auth0'].includes(resolvedAuthMode)
+const isValidHttpUrl = (value) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) {
+    return false
+  }
+  try {
+    const parsed = new URL(normalized)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 const apiUrl = getEnv('VITE_API_URL')
 if (!apiUrl) {
   errors.push('VITE_API_URL is required for production builds.')
@@ -66,27 +101,68 @@ if (!apiUrl) {
   }
 }
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL')
-if (!supabaseUrl) {
-  errors.push('VITE_SUPABASE_URL is required for production builds.')
-} else {
-  let parsedSupabase
-  try {
-    parsedSupabase = new URL(supabaseUrl)
-  } catch {
-    parsedSupabase = null
+if (requiresSupabase) {
+  const supabaseUrl = getEnv('VITE_SUPABASE_URL')
+  if (!supabaseUrl) {
+    errors.push('VITE_SUPABASE_URL is required for production builds when VITE_AUTH_MODE is auto or supabase.')
+  } else {
+    let parsedSupabase
+    try {
+      parsedSupabase = new URL(supabaseUrl)
+    } catch {
+      parsedSupabase = null
+    }
+
+    if (!parsedSupabase || parsedSupabase.protocol !== 'https:') {
+      errors.push('VITE_SUPABASE_URL must be a valid https URL.')
+    } else if (!parsedSupabase.hostname.endsWith('.supabase.co')) {
+      errors.push('VITE_SUPABASE_URL must point to a *.supabase.co host.')
+    }
   }
 
-  if (!parsedSupabase || parsedSupabase.protocol !== 'https:') {
-    errors.push('VITE_SUPABASE_URL must be a valid https URL.')
-  } else if (!parsedSupabase.hostname.endsWith('.supabase.co')) {
-    errors.push('VITE_SUPABASE_URL must point to a *.supabase.co host.')
+  const anonKey = getEnv('VITE_SUPABASE_ANON_KEY')
+  if (!anonKey) {
+    errors.push('VITE_SUPABASE_ANON_KEY is required for production builds when VITE_AUTH_MODE is auto or supabase.')
+  }
+
+  const supabaseJwtSecret = getEnv('SUPABASE_JWT_SECRET')
+  if (!supabaseJwtSecret) {
+    errors.push('SUPABASE_JWT_SECRET is required for production builds when VITE_AUTH_MODE is auto or supabase.')
   }
 }
 
-const anonKey = getEnv('VITE_SUPABASE_ANON_KEY')
-if (!anonKey) {
-  errors.push('VITE_SUPABASE_ANON_KEY is required for production builds.')
+if (requiresAuth0) {
+  const auth0Domain = getEnv('VITE_AUTH0_DOMAIN')
+  const auth0ClientId = getEnv('VITE_AUTH0_CLIENT_ID')
+  const auth0Audience = getEnv('VITE_AUTH0_AUDIENCE')
+  const auth0RedirectUri = getEnv('VITE_AUTH0_REDIRECT_URI')
+
+  if (!auth0Domain) {
+    errors.push('VITE_AUTH0_DOMAIN is required for production builds when VITE_AUTH_MODE=auth0.')
+  }
+  if (auth0Domain.includes('://') && !isValidHttpUrl(auth0Domain)) {
+    errors.push('VITE_AUTH0_DOMAIN must be a valid URL when it includes a protocol.')
+  }
+
+  if (!auth0ClientId) {
+    errors.push('VITE_AUTH0_CLIENT_ID is required for production builds when VITE_AUTH_MODE=auth0.')
+  }
+  if (!auth0Audience) {
+    errors.push('VITE_AUTH0_AUDIENCE is required for production builds when VITE_AUTH_MODE=auth0.')
+  }
+  if (!auth0RedirectUri) {
+    errors.push('VITE_AUTH0_REDIRECT_URI is required for production builds when VITE_AUTH_MODE=auth0.')
+  } else if (!isValidHttpUrl(auth0RedirectUri)) {
+    errors.push('VITE_AUTH0_REDIRECT_URI must be a valid absolute http(s) URL.')
+  }
+}
+
+if (requiresBackendJwtSecret) {
+  const supabaseJwtSecret = getEnv('SUPABASE_JWT_SECRET')
+  const jwtSecret = getEnv('JWT_SECRET_KEY')
+  if (!supabaseJwtSecret && !jwtSecret) {
+    errors.push('One of SUPABASE_JWT_SECRET or JWT_SECRET_KEY is required for backend/auth0 token handling in production.')
+  }
 }
 
 if (errors.length > 0) {

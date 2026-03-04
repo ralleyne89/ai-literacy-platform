@@ -36,25 +36,57 @@ jwt = JWTManager(app)
 migrate = Migrate(app, db)
 frontend_url = os.getenv('FRONTEND_URL', '').strip()
 allowed_origins_env = os.getenv('ALLOWED_ORIGINS', '')
-allowed_origins = [origin.strip() for origin in allowed_origins_env.split(',') if origin.strip()]
 
-if frontend_url and frontend_url not in allowed_origins:
-    allowed_origins.append(frontend_url)
 
-environment = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
-if environment not in ('production', 'prod'):
-    for local_origin in ('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'):
-        if local_origin not in allowed_origins:
-            allowed_origins.append(local_origin)
+def _normalize_origin(value):
+    origin = str(value or '').strip().rstrip('/')
+    return origin
 
-if allowed_origins:
-    CORS(
-        app,
-        resources={r'/api/*': {'origins': allowed_origins}},
-        supports_credentials=True
-    )
-else:
-    CORS(app)
+
+def _build_allowed_origins():
+    origins = []
+    for value in (frontend_url, *[origin for origin in allowed_origins_env.split(',') if origin.strip()]):
+        normalized = _normalize_origin(value)
+        if not normalized:
+            continue
+        if normalized not in origins:
+            origins.append(normalized)
+
+    environment = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
+    if environment not in ('production', 'prod'):
+        for local_origin in ('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'):
+            normalized_local_origin = _normalize_origin(local_origin)
+            if normalized_local_origin and normalized_local_origin not in origins:
+                origins.append(normalized_local_origin)
+
+    return origins
+
+
+ALLOWED_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+ALLOWED_HEADERS = [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    'Origin',
+    'X-Requested-With',
+    'Cache-Control',
+]
+EXPOSE_HEADERS = ['Content-Type', 'Authorization']
+
+allowed_origins = _build_allowed_origins()
+has_specific_origins = bool(allowed_origins)
+cors_options = {
+    'resources': {r'/api/*': {'origins': allowed_origins if has_specific_origins else ['*']}},
+    'supports_credentials': has_specific_origins,
+    'send_wildcard': not has_specific_origins,
+    'methods': ALLOWED_METHODS,
+    'allow_headers': ALLOWED_HEADERS,
+    'expose_headers': EXPOSE_HEADERS,
+    'max_age': 86400,
+    'automatic_options': True,
+}
+
+CORS(app, **cors_options)
 
 # Import models and routes after app initialization
 # This will be done after db initialization to avoid circular imports

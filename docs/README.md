@@ -19,6 +19,9 @@ Implementation summaries, status reports, and technical implementation details.
 ### `/archive`
 Older documentation and historical records (kept for reference).
 
+### `/database`
+Database setup, migration scripts, and readiness checklists.
+
 ## 🚀 Quick Start
 
 **New to the project?** Start here:
@@ -29,6 +32,9 @@ Older documentation and historical records (kept for reference).
 **Deploying?** See:
 - [deployment/DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md)
 - [deployment/PUSH_AND_DEPLOY_GUIDE.md](deployment/PUSH_AND_DEPLOY_GUIDE.md)
+
+**Pre-flight DB checks?** See:
+- [database/DB_PRE_FLIGHT_RECOMMENDATION_READINESS.md](database/DB_PRE_FLIGHT_RECOMMENDATION_READINESS.md)
 
 **Adding content?** See:
 - [course-content/COURSE_ENHANCEMENT_STRATEGY.md](course-content/COURSE_ENHANCEMENT_STRATEGY.md)

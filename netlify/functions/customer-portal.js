@@ -1,5 +1,6 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { createClient } = require("@supabase/supabase-js");
+const { buildCorsHeaders } = require("./_cors");
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -7,25 +8,11 @@ const supabase = supabaseUrl && supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey)
   : null;
 
-const resolveAllowedOrigin = (event) => {
-  const configured = process.env.FRONTEND_URL || "";
-  const requestOrigin = event.headers.origin || event.headers.Origin || "";
-  if (configured) {
-    return configured;
-  }
-  if (requestOrigin) {
-    return requestOrigin;
-  }
-  return "http://localhost:5173";
-};
-
 exports.handler = async (event) => {
-  const allowedOrigin = resolveAllowedOrigin(event);
-  const headers = {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
+  const headers = buildCorsHeaders(event, {
+    methods: "POST, OPTIONS",
+    allowedHeaders: "Content-Type, Authorization"
+  });
 
   if (event.httpMethod === "OPTIONS") {
     return {

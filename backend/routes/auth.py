@@ -5,10 +5,18 @@ from logging_config import get_logger
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError, ProgrammingError
 import bcrypt
 import re
-from routes import supabase_jwt_required, get_supabase_identity, get_supabase_claims
+from werkzeug.security import check_password_hash as check_legacy_password_hash
+from routes import (
+    supabase_jwt_required,
+    get_supabase_claims,
+    get_supabase_claims_for_token,
+    get_supabase_identity,
+    get_supabase_identity_for_token,
+)
 
 auth_bp = Blueprint('auth', __name__)
 logger = get_logger(__name__)
+MANAGED_PASSWORD_HASH_MARKERS = {'auth0_managed', 'supabase_managed'}
 
 def validate_email(email):
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -38,6 +46,65 @@ def _is_valid_bcrypt_hash(stored_hash):
     )
 
 
+def _normalize_password_hash(stored_hash):
+    if not isinstance(stored_hash, str):
+        return ''
+    return stored_hash.strip()
+
+
+def _is_managed_password_hash(stored_hash):
+    return _normalize_password_hash(stored_hash) in MANAGED_PASSWORD_HASH_MARKERS
+
+
+def _hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def _build_password_hash_status(stored_hash, password):
+    """
+    Return (is_valid, requires_rebuild).
+    """
+    normalized_hash = _normalize_password_hash(stored_hash)
+    if not normalized_hash:
+        return False, False, 'missing_hash'
+
+    if _is_managed_password_hash(normalized_hash):
+        return False, False, 'managed_hash'
+
+    if _is_valid_bcrypt_hash(normalized_hash):
+        try:
+            if bcrypt.checkpw(password.encode('utf-8'), normalized_hash.encode('utf-8')):
+                return True, False, None
+            return False, False, 'bcrypt_mismatch'
+        except ValueError as exc:
+            logger.warning('auth_login_invalid_bcrypt_hash', error=str(exc), password_hash='invalid_prefix_or_length')
+            return False, False, 'invalid_bcrypt_hash'
+        except Exception as exc:
+            logger.warning('auth_login_bcrypt_check_failed', error=str(exc))
+            return False, False, 'bcrypt_check_failed'
+
+    try:
+        if check_legacy_password_hash(normalized_hash, password):
+            return True, True, None
+        return False, False, 'legacy_mismatch'
+    except ValueError as exc:
+        logger.warning('auth_login_invalid_legacy_hash', error=str(exc))
+        return False, False, 'invalid_legacy_hash'
+    except Exception as exc:
+        logger.warning('auth_login_legacy_hash_check_error', error=str(exc))
+        return False, False, 'legacy_hash_check_error'
+
+
+def _ensure_user_password_hash_compatibility(user, password):
+    is_valid, requires_rebuild, reason = _build_password_hash_status(user.password_hash, password)
+    if not is_valid:
+        return False, requires_rebuild, reason
+
+    if requires_rebuild:
+        user.password_hash = _hash_password(password)
+    return True, True, None
+
+
 def _email_log_context(email):
     if not isinstance(email, str) or '@' not in email:
         return {'email_domain': 'unknown'}
@@ -47,6 +114,58 @@ def _email_log_context(email):
         'email_domain': domain.lower(),
         'email_local_length': len(local_part),
     }
+
+
+def _build_user_payload(user):
+    return {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'role': user.role,
+        'organization': user.organization,
+        'subscription_tier': user.subscription_tier,
+    }
+
+
+def _extract_auth0_name(claims):
+    user_metadata = claims.get('user_metadata')
+    if not isinstance(user_metadata, dict):
+        user_metadata = {}
+
+    first_name = (
+        claims.get('given_name')
+        or user_metadata.get('first_name')
+        or claims.get('name')
+        or ''
+    ).strip()
+    last_name = (
+        claims.get('family_name')
+        or user_metadata.get('last_name')
+        or ''
+    ).strip()
+
+    if first_name and not last_name and ' ' in claims.get('name', ''):
+        name_parts = claims.get('name', '').strip().split()
+        first_name = name_parts[0]
+        last_name = ' '.join(name_parts[1:])
+
+    return first_name, last_name
+
+
+def _normalize_auth0_token(data):
+    if not isinstance(data, dict):
+        return ''
+
+    token = data.get('access_token') or data.get('token')
+    if isinstance(token, str):
+        return token.strip()
+
+    return ''
+
+
+def _auth_preflight_response():
+    return '', 204
 
 
 def _build_registration_error_details(exc):
@@ -239,16 +358,35 @@ def login():
         if not user:
             return jsonify({'error': 'Invalid email or password'}), 401
 
-        if not _is_valid_bcrypt_hash(user.password_hash):
+        password_is_valid, did_rebuild, reason = _ensure_user_password_hash_compatibility(user, password)
+        if not password_is_valid:
+            logger.warning(
+                'auth_login_invalid_password_hash',
+                email=email,
+                user_id=user.id,
+                reason=reason,
+                legacy_password_hash=(
+                    f"{_normalize_password_hash(user.password_hash)[:20]}..."
+                    if _normalize_password_hash(user.password_hash)
+                    else None
+                )
+            )
             return jsonify({'error': 'Invalid email or password'}), 401
-        
-        # Check password
-        try:
-            if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
-                return jsonify({'error': 'Invalid email or password'}), 401
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Invalid email or password'}), 401
-        
+
+        if did_rebuild:
+            try:
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                logger.warning(
+                    'auth_login_password_rebuild_failed',
+                    error=str(exc),
+                    email=email,
+                )
+                return jsonify({
+                    'error': 'Login temporarily unavailable. Please try again shortly.',
+                    'code': 'LOGIN_PASSWORD_REBUILD_FAILED',
+                }), 503
         # Create access token
         access_token = create_access_token(identity=user.id)
         
@@ -268,6 +406,87 @@ def login():
         
     except Exception as e:
         return jsonify({'error': 'Login failed', 'details': str(e)}), 500
+
+
+@auth_bp.route('/login', methods=['OPTIONS'])
+def login_options():
+    return _auth_preflight_response()
+
+
+@auth_bp.route('/exchange', methods=['POST'])
+def exchange():
+    payload = request.get_json(silent=True)
+    auth0_access_token = _normalize_auth0_token(payload or {})
+
+    if not auth0_access_token:
+        return jsonify({'error': 'Access token is required'}), 400
+
+    try:
+        claims = get_supabase_claims_for_token(auth0_access_token, optional=False)
+        if not isinstance(claims, dict) or not claims.get('iss') or not claims.get('aud'):
+            return jsonify({'error': 'Invalid access token'}), 401
+    except Exception:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    user_id = get_supabase_identity_for_token(auth0_access_token)
+    if not user_id:
+        return jsonify({'error': 'Invalid access token'}), 401
+
+    email = (claims.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'Token missing email claim'}), 400
+
+    first_name, last_name = _extract_auth0_name(claims)
+    if not first_name:
+        first_name = 'AI'
+    if not last_name:
+        last_name = 'Learner'
+
+    user_metadata = claims.get('user_metadata')
+    if not isinstance(user_metadata, dict):
+        user_metadata = {}
+
+    role = claims.get('role') or user_metadata.get('role')
+    organization = claims.get('organization') or user_metadata.get('organization')
+
+    try:
+        user = User.query.get(user_id)
+        if user is None:
+            existing_user = User.query.filter_by(email=email).first()
+            if existing_user and existing_user.id != user_id:
+                return jsonify({
+                    'error': 'Email already exists for a legacy account',
+                    'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
+                }), 409
+
+            user = User(
+                id=user_id,
+                email=email,
+                password_hash='auth0_managed',
+                first_name=first_name,
+                last_name=last_name,
+                role=role or None,
+                organization=organization or None,
+            )
+            db.session.add(user)
+        else:
+            user.email = email
+            user.first_name = first_name
+            user.last_name = last_name
+            user.role = role or user.role
+            user.organization = organization or user.organization
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Exchange failed', 'details': str(e)}), 500
+
+    access_token = create_access_token(identity=user.id)
+    return jsonify({
+        'message': 'Token exchange successful',
+        'access_token': access_token,
+        'user': _build_user_payload(user),
+    }), 200
 
 @auth_bp.route('/profile', methods=['GET'])
 @supabase_jwt_required()
@@ -294,6 +513,11 @@ def get_profile():
         
     except Exception as e:
         return jsonify({'error': 'Failed to get profile', 'details': str(e)}), 500
+
+
+@auth_bp.route('/profile', methods=['OPTIONS'])
+def profile_options():
+    return _auth_preflight_response()
 
 @auth_bp.route('/profile', methods=['PUT'])
 @supabase_jwt_required()

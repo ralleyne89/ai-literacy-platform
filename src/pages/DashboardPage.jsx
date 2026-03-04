@@ -4,6 +4,153 @@ import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
+const getStringValue = (value, fallback = '') => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || fallback
+  }
+
+  return fallback
+}
+
+const parseNumericValue = (value, fallback = null) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
+  return fallback
+}
+
+const normalizeDifficultyLevel = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const level = value.trim().toLowerCase()
+    if (level === 'beginner') {
+      return 1
+    }
+    if (level === 'intermediate') {
+      return 2
+    }
+    if (level === 'advanced' || level === 'expert') {
+      return 3
+    }
+    return value.trim()
+  }
+
+  return 'N/A'
+}
+
+const normalizeRecommendationForDashboard = (recommendation, index, fallbackPrefix = 'recommendation') => {
+  if (typeof recommendation === 'string') {
+    return {
+      id: `${fallbackPrefix}-${index}`,
+      title: recommendation,
+      description: getStringValue(
+        recommendation,
+        'Recommended next step based on your assessment.'
+      ),
+      reason: '',
+      difficulty_level: 'N/A',
+      estimated_duration_minutes: null,
+      content_type: 'module',
+      is_premium: false,
+      priority: 'low'
+    }
+  }
+
+  if (!recommendation || typeof recommendation !== 'object') {
+    return null
+  }
+
+  const title = getStringValue(
+    recommendation.title,
+    getStringValue(recommendation.name, `Recommendation ${index + 1}`)
+  )
+  const description = getStringValue(
+    recommendation.description,
+    getStringValue(
+      recommendation.summary,
+      getStringValue(recommendation.action, 'Recommended next step based on your assessment.')
+    )
+  )
+  const duration = parseNumericValue(
+    recommendation.estimated_duration_minutes,
+    parseNumericValue(
+      recommendation.estimated_duration,
+      parseNumericValue(
+        recommendation.duration_minutes,
+        parseNumericValue(recommendation.duration, null)
+      )
+    )
+  )
+
+  return {
+    id: getStringValue(
+      recommendation.id,
+      getStringValue(
+        recommendation.module_id,
+        getStringValue(recommendation.moduleId, `${fallbackPrefix}-${index}`)
+      )
+    ),
+    title,
+    description,
+    reason: getStringValue(recommendation.reason, recommendation.action),
+    difficulty_level: normalizeDifficultyLevel(recommendation.difficulty_level),
+    estimated_duration_minutes: duration,
+    content_type: getStringValue(recommendation.content_type, 'module'),
+    is_premium:
+      recommendation.is_premium === true ||
+      getStringValue(recommendation.is_premium) === 'true',
+    priority: getStringValue(recommendation.priority, 'low')
+  }
+}
+
+const normalizeRecommendations = (recommendations, sourceTag = 'recommendation') => {
+  if (!Array.isArray(recommendations)) {
+    return []
+  }
+
+  return recommendations
+    .map((recommendation, index) => normalizeRecommendationForDashboard(recommendation, index, sourceTag))
+    .filter(Boolean)
+}
+
+const normalizeAssessmentRecord = (record) => {
+  if (!record || typeof record !== 'object') {
+    return null
+  }
+
+  const totalScore = parseNumericValue(record.total_score, parseNumericValue(record.score, 0))
+  const maxScore = parseNumericValue(record.max_score, parseNumericValue(record.total_questions, 0))
+  const computedPercentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
+  const percentage = parseNumericValue(record.percentage, computedPercentage)
+
+  return {
+    ...record,
+    percentage: parseNumericValue(percentage, 0),
+    domain_scores: safeParseJSON(record.domain_scores, {}),
+    recommendations: Array.isArray(record.recommendations) ? record.recommendations : [],
+    time_taken_minutes: parseNumericValue(record.time_taken_minutes, parseNumericValue(record.time_taken, 0)),
+    total_score: parseNumericValue(totalScore, 0),
+    max_score: parseNumericValue(maxScore, 0),
+    completed_at: getStringValue(
+      record.completed_at,
+      getStringValue(
+        record.completedAt,
+        getStringValue(record.created_at, null)
+      )
+    )
+  }
+}
+
 const safeParseJSON = (value, fallback = {}) => {
   if (value === null || typeof value === 'undefined') {
     return fallback
@@ -58,25 +205,40 @@ const DashboardPage = () => {
           return
         }
 
+        const history = Array.isArray(historyResult.value?.data?.history)
+          ? historyResult.value.data.history.map(normalizeAssessmentRecord).filter(Boolean)
+          : []
+        const latestHistoryAssessment = history[0]
+        const progress = Array.isArray(progressResult.value?.data?.progress)
+          ? progressResult.value.data.progress.map((record) => ({
+              ...record,
+              progress_percentage: parseNumericValue(record?.progress_percentage, 0),
+              time_spent_minutes: parseNumericValue(record?.time_spent_minutes, 0)
+            }))
+          : []
+        const recommendations = recommendationsResult.status === 'fulfilled'
+          ? normalizeRecommendations(recommendationsResult.value?.data?.recommendations, 'course-api')
+          : []
+        const assessmentHistoryRecommendations = latestHistoryAssessment
+          ? normalizeRecommendations(latestHistoryAssessment.recommendations, 'assessment-history')
+          : []
+
         if (historyResult.status === 'fulfilled') {
-          const history = Array.isArray(historyResult.value?.data?.history) ? historyResult.value.data.history : []
           setAssessmentHistory(history)
         } else {
           setAssessmentHistory([])
         }
 
         if (progressResult.status === 'fulfilled') {
-          const progress = Array.isArray(progressResult.value?.data?.progress) ? progressResult.value.data.progress : []
           setTrainingProgress(progress)
         } else {
           setTrainingProgress([])
         }
 
-        if (recommendationsResult.status === 'fulfilled') {
-          const recommendations = Array.isArray(recommendationsResult.value?.data?.recommendations)
-            ? recommendationsResult.value.data.recommendations
-            : []
+        if (recommendations.length > 0) {
           setCourseRecommendations(recommendations)
+        } else if (assessmentHistoryRecommendations.length > 0) {
+          setCourseRecommendations(assessmentHistoryRecommendations)
         } else {
           setCourseRecommendations([])
         }
@@ -108,15 +270,7 @@ const DashboardPage = () => {
   const totalLearningTime = trainingProgress.reduce((total, p) => total + (p.time_spent_minutes || 0), 0)
 
   const assessmentRecommendations = useMemo(() => {
-    if (!latestAssessment) {
-      return []
-    }
-
-    if (Array.isArray(latestAssessment.recommendations)) {
-      return latestAssessment.recommendations
-    }
-
-    return []
+    return latestAssessment ? normalizeRecommendations(latestAssessment.recommendations, 'assessment-recommendation') : []
   }, [latestAssessment])
 
   const resumeModule = useMemo(() => {
@@ -357,7 +511,11 @@ const DashboardPage = () => {
                   <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      <span>{course.estimated_duration_minutes} min</span>
+                      <span>
+                        {course.estimated_duration_minutes != null
+                          ? `${course.estimated_duration_minutes} min`
+                          : 'Duration not set'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <BarChart3 className="w-3 h-3" />
@@ -372,10 +530,10 @@ const DashboardPage = () => {
                   </div>
 
                   <Link
-                    to={`/training/modules/${course.id}/learn`}
+                    to={course.id ? `/training/modules/${course.id}/learn` : '/training'}
                     className="block w-full text-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium"
                   >
-                    Start Learning
+                    {course.id ? 'Start Learning' : 'Browse Courses'}
                   </Link>
                 </div>
               ))}

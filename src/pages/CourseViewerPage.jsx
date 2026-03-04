@@ -87,7 +87,10 @@ const CourseViewerPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center"
+        data-testid="course-viewer-loading"
+      >
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading course...</p>
@@ -97,15 +100,19 @@ const CourseViewerPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex" data-testid="course-viewer-page">
       {/* Sidebar - Lesson List */}
-      <div className={`${sidebarOpen ? 'w-80' : 'w-0'} bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden`}>
+      <div
+        className={`${sidebarOpen ? 'w-80' : 'w-0'} bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden`}
+        data-testid="course-viewer-sidebar"
+      >
         <div className="p-6">
           {/* Course Header */}
           <div className="mb-6">
             <button
               onClick={() => navigate('/training')}
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+              data-testid="course-viewer-back-button"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back to Courses
@@ -142,6 +149,7 @@ const CourseViewerPage = () => {
                     ? 'bg-primary-50 border-2 border-primary-600'
                     : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                 }`}
+                data-testid={`course-viewer-lesson-${lesson.id}-button`}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-1">
@@ -182,6 +190,7 @@ const CourseViewerPage = () => {
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="text-gray-600 hover:text-gray-900"
+              data-testid="course-viewer-sidebar-toggle"
             >
               <BookOpen className="w-6 h-6" />
             </button>
@@ -190,6 +199,7 @@ const CourseViewerPage = () => {
                 onClick={goToPreviousLesson}
                 disabled={currentLessonIndex === 0}
                 className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="course-viewer-previous-lesson"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Previous
@@ -198,6 +208,7 @@ const CourseViewerPage = () => {
                 onClick={goToNextLesson}
                 disabled={currentLessonIndex === lessons.length - 1}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="course-viewer-next-lesson"
               >
                 Next
                 <ChevronRight className="w-4 h-4" />
@@ -209,7 +220,7 @@ const CourseViewerPage = () => {
         {/* Lesson Content */}
         <div className="flex-1 overflow-y-auto">
           {currentLesson && (
-            <div className="max-w-4xl mx-auto p-8">
+            <div className="max-w-4xl mx-auto p-8" data-testid={`course-viewer-lesson-content-${currentLesson.id}`}>
               {currentLesson.content_type === 'video' && (
                 <VideoLesson
                   lesson={currentLesson}

@@ -12,9 +12,11 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "e2e:install": "playwright install",
-    "e2e": "npm run e2e:flow",
-    "e2e:flow": "playwright test e2e/platform.spec.ts",
-    "e2e:smoke": "playwright test e2e/platform-smoke.spec.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:record": "PLAYWRIGHT_RECORD_MODE=1 npm run test:e2e -- --headed --project=chromium",
+    "e2e": "npm run test:e2e -- e2e/platform.spec.ts",
+    "e2e:flow": "npm run test:e2e -- e2e/platform.spec.ts",
+    "e2e:smoke": "npm run test:e2e -- e2e/platform-smoke.spec.ts",
     "e2e:headed": "npm run e2e:flow -- --headed"
   },
   "dependencies": {

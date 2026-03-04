@@ -371,6 +371,7 @@ const BillingPage = () => {
           <input
             id="checkout-email"
             type="email"
+            autoComplete="email"
             value={checkoutEmail}
             onChange={(event) => setCheckoutEmail(event.target.value)}
             placeholder="you@company.com"

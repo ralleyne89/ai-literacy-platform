@@ -1,3 +1,5 @@
+const { buildCorsHeaders } = require("./_cors");
+
 const PLAN_DEFINITIONS = {
   free: {
     id: "free",
@@ -55,13 +57,10 @@ const PLAN_DEFINITIONS = {
 };
 
 exports.handler = async (event, context) => {
-  const allowedOrigin = process.env.FRONTEND_URL || event.headers.origin || event.headers.Origin || "http://localhost:5173";
-  // Enable CORS
-  const headers = {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-  };
+  const headers = buildCorsHeaders(event, {
+    methods: "GET, OPTIONS",
+    allowedHeaders: "Content-Type, Authorization"
+  });
 
   // Handle preflight requests
   if (event.httpMethod === "OPTIONS") {
