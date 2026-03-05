@@ -67,7 +67,7 @@ const getBackendAuthEndpoint = (requestPath = '/api/auth') => {
     return AUTH_ENDPOINTS.base
   }
 
-  if (/^https?:\\/\\//i.test(resolvedPath)) {
+  if (/^https?:\/\//i.test(resolvedPath)) {
     try {
       resolvedPath = new URL(resolvedPath).pathname
     } catch {
