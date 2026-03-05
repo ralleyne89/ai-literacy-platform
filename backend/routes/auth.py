@@ -285,8 +285,6 @@ def _exchange_authorization_code_for_access_token(auth_code, code_verifier, redi
         return '', 'Auth0 token exchange did not return an access token.'
 
     return auth0_access_token, ''
-
-
 def _auth_preflight_response():
     return '', 204
 
