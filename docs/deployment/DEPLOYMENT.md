@@ -61,13 +61,13 @@ AUTH0_AUDIENCE=<your-auth0-audience>
 
 1. Click "Create Web Service"
 2. Wait for deployment to complete (5-10 minutes)
-3. Copy your backend URL (e.g., `https://litmusai-backend.onrender.com`)
+3. Copy your backend URL (for example `https://ai-literacy-platform.onrender.com`)
 
 ### Step 6: Update Frontend
 
 1. Update `.env` file:
    ```
-   VITE_API_URL=https://litmusai-backend.onrender.com
+   VITE_API_URL=https://ai-literacy-platform.onrender.com
    ```
 2. Rebuild and deploy frontend:
    ```bash
@@ -195,8 +195,8 @@ For Railway:
 Authentication can run in three modes:
 
 - `backend` (recommended on constrained Supabase plans): set `VITE_AUTH_MODE=backend` so the app uses `/api/auth/register` and `/api/auth/login`.
-- `supabase` (social login enabled): unset `VITE_AUTH_MODE` (auto) or set `VITE_AUTH_MODE=supabase`.
-- For production builds using `VITE_AUTH_MODE=auto`, treat `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as required.
+- `supabase` (social login enabled): set `VITE_AUTH_MODE=supabase`.
+- `auto` is not supported in production; use explicit `backend`, `supabase`, or `auth0`.
 - `auth0` (delegated identity): set `VITE_AUTH_MODE=auth0` and configure `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`.
 
 Required environment notes by mode (production):

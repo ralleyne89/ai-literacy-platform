@@ -53,8 +53,8 @@ Recommended production path:
 
 The frontend supports three authentication modes:
 
-- Supabase mode (default): keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-  - In production, use `VITE_AUTH_MODE=backend` explicitly if you do not provide Supabase credentials.
+- Supabase mode: set `VITE_AUTH_MODE=supabase` and keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
+- `auto` is not supported in production; always set `VITE_AUTH_MODE=backend`, `VITE_AUTH_MODE=supabase`, or `VITE_AUTH_MODE=auth0`.
 - Backend mode: set `VITE_AUTH_MODE=backend` and rely on `/api/auth/register`, `/api/auth/login`, and `/api/auth/profile`.
   - Supabase variables can be unset in backend mode unless you still need OAuth/social behavior.
 - Auth0 mode: set `VITE_AUTH_MODE=auth0` and configure `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`.
@@ -141,4 +141,3 @@ A deployment migration checklist:
 - Stripe integration
 - Webhook configuration
 - Subscription management
-

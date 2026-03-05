@@ -11,9 +11,9 @@ I've opened the Netlify environment variables page in your browser.
 **Check that you have these core variables**:
 - [ ] `STRIPE_SECRET_KEY` = `sk_live_...`
 - [ ] `STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
-- [ ] `VITE_AUTH_MODE` = `auto` | `backend` | `supabase` | `auth0`
-- [ ] `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co` (required in `auto` / `supabase`)
-- [ ] `VITE_SUPABASE_ANON_KEY` = `ey...` (required in `auto` / `supabase`)
+- [ ] `VITE_AUTH_MODE` = `backend` | `supabase` | `auth0`
+- [ ] `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co` (required in `supabase`)
+- [ ] `VITE_SUPABASE_ANON_KEY` = `ey...` (required in `supabase`)
 - [ ] `VITE_AUTH0_DOMAIN` = `https://your-domain.auth0.com` (required in `auth0`)
 - [ ] `VITE_AUTH0_CLIENT_ID` = `...` (required in `auth0`)
 - [ ] `VITE_AUTH0_AUDIENCE` = `...` (required in `auth0`)
@@ -202,8 +202,8 @@ netlify deploy --prod
 ✅ STRIPE_SECRET_KEY (Already set)
 ✅ STRIPE_PUBLISHABLE_KEY (Already set)
 ⏳ STRIPE_WEBHOOK_SECRET (Add in Step 2)
-⏳ VITE_SUPABASE_URL (Required in `auto` and `supabase` modes)
-⏳ VITE_SUPABASE_ANON_KEY (Required in `auto` and `supabase` modes)
+⏳ VITE_SUPABASE_URL (Required in `supabase` mode)
+⏳ VITE_SUPABASE_ANON_KEY (Required in `supabase` mode)
 ⏳ VITE_AUTH0_DOMAIN (Required in `auth0` mode)
 ⏳ VITE_AUTH0_CLIENT_ID (Required in `auth0` mode)
 ⏳ VITE_AUTH0_AUDIENCE (Required in `auth0` mode)
@@ -270,4 +270,3 @@ netlify deploy --prod
 Once you complete Steps 1-3, you'll have a fully functional subscription system!
 
 **Need help?** Let me know which step you're on and I'll guide you through it.
-

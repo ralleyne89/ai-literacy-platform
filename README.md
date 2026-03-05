@@ -23,7 +23,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: Supabase-first, backend, or Auth0 modes (`VITE_AUTH_MODE=auto|backend|supabase|auth0`).
+- **Authentication**: Explicit auth modes (`VITE_AUTH_MODE=backend|supabase|auth0`). `auto` is not supported in production.
 - **Deployment**: Replit-ready configuration
 
 ## 📋 Prerequisites
@@ -57,7 +57,7 @@ npm run backend
 
 The frontend will be available at `http://localhost:5173`
 
-> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed non-localhost API URL.
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and `VITE_AUTH_MODE` must be explicit.
 
 ### 3. Backend Setup
 
@@ -199,16 +199,16 @@ ai-literacy-platform/
 
 ## 🔐 Authentication Modes
 
-The app supports three modes:
+The app supports three explicit modes:
 
-- **Supabase mode (`auto` or `supabase`, default `auto`)**: Supabase login/signup and social OAuth (`Google` / `Facebook`) using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- **Supabase mode (`VITE_AUTH_MODE=supabase`)**: Supabase login/signup and social OAuth (`Google` / `Facebook`) using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 - **Backend mode (`VITE_AUTH_MODE=backend`)**: email/password via `/api/auth/register` and `/api/auth/login`; JWT is stored client-side and attached to API requests.  
   Keep Supabase vars unset unless you want optional OAuth/social features.
 - **Auth0 mode (`VITE_AUTH_MODE=auth0`)**: form auth is delegated to Auth0 Universal Login (`VITE_AUTH0_*` variables).
 
 Behavior notes:
 
-- `auto` will use Supabase if `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are configured; otherwise it falls back to backend mode. For production builds, set `VITE_AUTH_MODE=backend` explicitly if you do not provide Supabase credentials.
+- `VITE_AUTH_MODE=auto` is no longer allowed in production. Set `backend`, `supabase`, or `auth0` explicitly.
 - In backend mode, password reset is unavailable by default and social login is delegated to Supabase only if those vars are present.
 - In Auth0 mode, password reset is handled by Auth0 and social login is managed in Auth0.
 
@@ -218,7 +218,7 @@ In **Supabase mode**, LitmusAI supports Google and Facebook OAuth through Supaba
 
 1. In Supabase → Authentication → Providers, enable Google and Facebook.
 2. Supply each provider’s client ID and secret. Add both your local URL (`http://localhost:5173`) and deployed domain (e.g., Netlify) to the authorized redirect list.
-3. Supabase handles the OAuth callback at `/auth/callback`. No additional frontend configuration is needed beyond the environment variables already in place.
+3. Supabase handles the OAuth callback at `/auth/callback` (single canonical callback path). No additional frontend routes are required.
 4. After issuing new keys, redeploy so the environment has updated Supabase values.
 
 In **Backend mode**, OAuth is disabled unless you intentionally keep Supabase variables configured for hybrid behavior.
@@ -356,7 +356,7 @@ DATABASE_URL=sqlite:///ai_literacy.db
 FLASK_ENV=development
 FLASK_DEBUG=True
 VITE_API_URL=http://localhost:5001
-VITE_AUTH_MODE=backend
+VITE_AUTH_MODE=auth0
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_JWT_SECRET=your-supabase-jwt-secret
@@ -384,8 +384,9 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 `npm run build` runs `scripts/validate-prod-env.mjs` before Vite build. In production contexts (`NETLIFY=true` + `CONTEXT=production`, `NODE_ENV=production`, or `ENFORCE_PROD_ENV=1`), the build will fail when:
 
 - `VITE_API_URL` is missing, invalid, or points to localhost
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required when `VITE_AUTH_MODE=auto` or `VITE_AUTH_MODE=supabase`.
+- `VITE_AUTH_MODE` must be one of `backend`, `supabase`, or `auth0` (no implicit `auto` fallback in production).
 - `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are required when `VITE_AUTH_MODE=auth0`.
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required when `VITE_AUTH_MODE=supabase`.
 - `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET` is required for backend/Auth0 token flow; `SUPABASE_JWT_SECRET` is additionally required for Supabase-backed token verification.
 
 Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
@@ -394,13 +395,13 @@ Create a Supabase project (or use an existing one) and copy the Project URL and 
 
 Use `VITE_AUTH_MODE` to control login behavior:
 
-`auto` (default): use Supabase auth when configured, otherwise fall back to backend `/api/auth/login` and `/api/auth/register`.
-
 `backend`: always use backend credentials and skip Supabase-first behavior.
 
 `supabase`: force Supabase for login, signup, and social providers (`Google` / `Facebook`).
 
 `auth0`: force Auth0 Universal Login; all email/password and social login flows are handled by Auth0.
+
+`auto`: not supported in production and treated as an invalid mode.
 
 In backend mode, social login is typically unavailable unless you keep Supabase settings for hybrid behavior, and password-reset links remain unavailable unless you add custom backend flows. In Auth0 mode, reset is handled in Auth0.
 

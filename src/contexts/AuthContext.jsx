@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 import { AUTH0_CALLBACK_PATH } from '../config/authRoutes'
+import { AUTH_ENDPOINTS, API_BASE_URL } from '../config/apiEndpoints'
 
 const AuthContext = createContext()
 const AUTH0_AUTH_MODE = 'auth0'
 const BACKEND_AUTH_MODE = 'backend'
 const AUTO_AUTH_MODE = 'auto'
+const SUPABASE_AUTH_MODE = 'supabase'
+const INVALID_AUTH_MODE = '__invalid_auth_mode__'
+const PRODUCTION_AUTH_MODES = new Set([AUTH0_AUTH_MODE, BACKEND_AUTH_MODE, SUPABASE_AUTH_MODE])
+const KNOWN_AUTH_MODES = new Set([AUTO_AUTH_MODE, ...PRODUCTION_AUTH_MODES])
 const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
 const RETRYABLE_AUTH_ERROR_MESSAGE = 'Authentication service unavailable. Please try again shortly.'
 const BACKEND_AUTH_ROUTE_ERROR_CODE = 'backend_auth_route_error'
@@ -27,30 +32,91 @@ const GENERIC_BACKEND_REGISTRATION_ERRORS = new Set([
   'unable to complete registration right now.'
 ])
 
-const getConfiguredApiBaseUrl = () => {
-  return (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
-}
-
-const getBackendAuthEndpointLabel = (path = '/api/auth') => {
-  const apiBase = getConfiguredApiBaseUrl()
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return apiBase ? `${apiBase}${normalizedPath}` : `same-site${normalizedPath}`
-}
-
 const getConfiguredAuthMode = () => {
   const configuredMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
-  if (
-    configuredMode === AUTH0_AUTH_MODE ||
-    configuredMode === BACKEND_AUTH_MODE
-  ) {
-    return configuredMode
+
+  if (!configuredMode) {
+    if (import.meta.env.PROD) {
+      console.error('VITE_AUTH_MODE is required in production builds.')
+      return INVALID_AUTH_MODE
+    }
+    return AUTO_AUTH_MODE
   }
 
-  return AUTO_AUTH_MODE
+  if (!KNOWN_AUTH_MODES.has(configuredMode)) {
+    console.error(`Unsupported VITE_AUTH_MODE="${configuredMode}". Supported values: auto, backend, supabase, auth0.`)
+    return import.meta.env.PROD ? INVALID_AUTH_MODE : AUTO_AUTH_MODE
+  }
+
+  if (import.meta.env.PROD && configuredMode === AUTO_AUTH_MODE) {
+    console.error('VITE_AUTH_MODE="auto" is not allowed in production. Set it explicitly to backend, supabase, or auth0.')
+    return INVALID_AUTH_MODE
+  }
+
+  if (import.meta.env.PROD && !PRODUCTION_AUTH_MODES.has(configuredMode)) {
+    console.error(`Unsupported production auth mode "${configuredMode}".`)
+    return INVALID_AUTH_MODE
+  }
+
+  return configuredMode
+}
+
+const getBackendAuthEndpoint = (requestPath = '/api/auth') => {
+  let resolvedPath = String(requestPath || '').trim()
+  if (!resolvedPath) {
+    return AUTH_ENDPOINTS.base
+  }
+
+  if (/^https?:\\/\\//i.test(resolvedPath)) {
+    try {
+      resolvedPath = new URL(resolvedPath).pathname
+    } catch {
+      // Keep original value if URL parsing fails.
+    }
+  }
+
+  const normalizedPath = resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`
+  const pathWithoutQuery = normalizedPath.split('?')[0].replace(/\/+$/, '')
+
+  switch (pathWithoutQuery) {
+    case '/api/auth':
+      return AUTH_ENDPOINTS.base
+    case '/api/auth/login':
+      return AUTH_ENDPOINTS.login
+    case '/api/auth/register':
+      return AUTH_ENDPOINTS.register
+    case '/api/auth/exchange':
+      return AUTH_ENDPOINTS.exchange
+    case '/api/auth/profile':
+      return AUTH_ENDPOINTS.profile
+    default:
+      return AUTH_ENDPOINTS.base
+  }
+}
+
+const getDebugAuthMode = () => {
+  const configuredMode = (import.meta.env.VITE_AUTH_MODE || '').toLowerCase().trim()
+  if (!configuredMode) {
+    return import.meta.env.PROD ? '(missing)' : AUTO_AUTH_MODE
+  }
+  return configuredMode
+}
+
+if (import.meta.env.PROD) {
+  console.info('[AuthContext] configured auth mode:', getDebugAuthMode())
+  if (API_BASE_URL) {
+    console.info('[AuthContext] configured API base:', API_BASE_URL)
+  }
+} else {
+  console.info('[AuthContext] configured auth mode:', getDebugAuthMode())
 }
 
 const resolveAuthMode = () => {
   const configuredMode = getConfiguredAuthMode()
+  if (configuredMode === INVALID_AUTH_MODE) {
+    return configuredMode
+  }
+
   if (configuredMode !== AUTO_AUTH_MODE) {
     return configuredMode
   }
@@ -257,6 +323,15 @@ const buildAuth0AuthorizeUrl = async ({ provider = '', loginHint = '', screenHin
     if (loginHint) {
       authorizeUrl.searchParams.set('login_hint', loginHint)
     }
+
+    // Keep callback diagnostics explicit when troubleshooting redirect mismatches.
+    console.info('Auth0 authorize request initialized.', {
+      redirect_uri: redirectUri,
+      response_type: AUTH0_RESPONSE_TYPE,
+      response_mode: 'query',
+      screen_hint: screenHint || null,
+      connection: connection || null
+    })
 
     return {
       success: true,
@@ -630,11 +705,12 @@ const getBackendAuthError = (error, fallbackMessage, { preferRegistrationDetails
   const status = error?.response?.status
   const requestPath = error?.response?.config?.url
   const route = requestPath ? requestPath.split('?')[0] : '/api/auth'
+  const endpoint = getBackendAuthEndpoint(route)
 
   if (status === 404 || status === 405) {
     return {
       code: BACKEND_AUTH_ROUTE_ERROR_CODE,
-      message: `Unable to reach backend auth route at ${getBackendAuthEndpointLabel(route)}. Check VITE_API_URL and deployment routing.`
+      message: `Unable to reach backend auth route at ${endpoint}. Check VITE_API_URL and deployment routing.`
     }
   }
 
@@ -722,10 +798,11 @@ export const AuthProvider = ({ children }) => {
     clearBackendSessionStorage()
   }
 
-  const exchangeAuth0Token = async ({ accessToken, authCode, codeVerifier } = {}) => {
+  const exchangeAuth0Token = async ({ accessToken, authCode, codeVerifier, redirectUri } = {}) => {
     const auth0AccessToken = typeof accessToken === 'string' ? accessToken.trim() : ''
     const auth0Code = typeof authCode === 'string' ? authCode.trim() : ''
     const auth0CodeVerifier = typeof codeVerifier === 'string' ? codeVerifier.trim() : ''
+    const auth0RedirectUri = typeof redirectUri === 'string' ? redirectUri.trim() : ''
 
     if (!auth0AccessToken && !auth0Code) {
       return false
@@ -736,9 +813,15 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await axios.post('/api/auth/exchange', {
+      const response = await axios.post(AUTH_ENDPOINTS.exchange, {
         ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
-        ...(auth0Code ? { code: auth0Code, code_verifier: auth0CodeVerifier } : {})
+        ...(auth0Code
+          ? {
+              code: auth0Code,
+              code_verifier: auth0CodeVerifier,
+              redirect_uri: auth0RedirectUri || getAuth0RedirectUri()
+            }
+          : {})
       })
 
       const normalized = normalizeBackendAuthPayload(response, {
@@ -767,6 +850,13 @@ export const AuthProvider = ({ children }) => {
     let isMounted = true
 
     const initialize = async () => {
+      if (!usesBackendSessionMode) {
+        if (isMounted) {
+          setLoading(false)
+        }
+        return
+      }
+
       try {
         const stored = getStoredBackendSession()
         if (!stored?.token) {
@@ -780,7 +870,7 @@ export const AuthProvider = ({ children }) => {
           setBackendSession(stored.token, stored.user, true)
         }
 
-        const { data } = await axios.get('/api/auth/profile')
+        const { data } = await axios.get(AUTH_ENDPOINTS.profile)
         const normalizedProfile = normalizeBackendAuthPayload(
           { data },
           { fallbackMessage: 'Unable to load backend auth profile.' }
@@ -853,7 +943,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await axios.post('/api/auth/login', {
+      const response = await axios.post(AUTH_ENDPOINTS.login, {
         email: String(email || '').trim().toLowerCase(),
         password
       })
@@ -892,7 +982,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await axios.post('/api/auth/register', {
+      const response = await axios.post(AUTH_ENDPOINTS.register, {
         email: String(userData.email || '').trim().toLowerCase(),
         password: userData.password,
         first_name: userData.first_name,
@@ -946,7 +1036,7 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     if (usesBackendSessionMode) {
       try {
-        const response = await axios.put('/api/auth/profile', {
+        const response = await axios.put(AUTH_ENDPOINTS.profile, {
           first_name: profileData.first_name,
           last_name: profileData.last_name,
           role: profileData.role || '',
@@ -1008,14 +1098,16 @@ export const AuthProvider = ({ children }) => {
   const syncBackendAfterLogin = async ({
     auth0AccessToken = '',
     auth0Code = '',
-    auth0CodeVerifier = ''
+    auth0CodeVerifier = '',
+    auth0RedirectUri = ''
   } = {}) => {
     if (usesBackendSessionMode) {
       if (isAuth0Enabled && (auth0AccessToken || auth0Code)) {
         const exchanged = await exchangeAuth0Token({
           authCode: auth0Code,
           accessToken: auth0AccessToken,
-          codeVerifier: auth0CodeVerifier
+          codeVerifier: auth0CodeVerifier,
+          redirectUri: auth0RedirectUri || getAuth0RedirectUri()
         })
         if (auth0Code || auth0AccessToken) {
           clearAuth0PkceSessionData()
@@ -1031,7 +1123,7 @@ export const AuthProvider = ({ children }) => {
 
       setBackendSession(stored.token, stored.user, true)
       try {
-        const { data } = await axios.get('/api/auth/profile')
+        const { data } = await axios.get(AUTH_ENDPOINTS.profile)
         const normalizedProfile = normalizeBackendAuthPayload(
           { data },
           {

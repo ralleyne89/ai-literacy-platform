@@ -27,7 +27,7 @@ https://app.netlify.com/sites/litmusai/configuration/env
 
 ### Add Auth Provider Variables
 
-- If your `VITE_AUTH_MODE` is `auto` or `supabase`, add:
+- If your `VITE_AUTH_MODE` is `supabase`, add:
   - **Variable**: `VITE_SUPABASE_URL` = Supabase project URL (e.g. `https://your-project-id.supabase.co`)
   - **Variable**: `VITE_SUPABASE_ANON_KEY` = Supabase public anon key
 
@@ -35,7 +35,17 @@ https://app.netlify.com/sites/litmusai/configuration/env
   - **Variable**: `VITE_AUTH0_DOMAIN` = Auth0 domain (e.g. `https://your-domain.auth0.com`)
   - **Variable**: `VITE_AUTH0_CLIENT_ID` = Auth0 app client ID
   - **Variable**: `VITE_AUTH0_AUDIENCE` = Auth0 audience
-  - **Variable**: `VITE_AUTH0_REDIRECT_URI` = OAuth callback URL (usually `https://your-site.com/auth/callback`)
+  - **Variable**: `VITE_AUTH0_REDIRECT_URI` = OAuth callback URL (`https://litmusai.netlify.app/auth/callback`)
+  - **Variable**: `AUTH0_DOMAIN` = Auth0 domain for backend token verification (no trailing slash)
+  - **Variable**: `AUTH0_CLIENT_ID` = Auth0 app client ID for backend code exchange
+  - **Variable**: `AUTH0_AUDIENCE` = Auth0 audience for backend token verification
+  - **Variable**: `AUTH0_REDIRECT_URI` = backend fallback redirect URI (`https://litmusai.netlify.app/auth/callback`)
+
+#### Auth0 Dashboard URLs (must match exactly)
+
+- **Allowed Callback URLs**: `https://litmusai.netlify.app/auth/callback`
+- **Allowed Web Origins**: `https://litmusai.netlify.app`
+- **Allowed Logout URLs**: `https://litmusai.netlify.app`
 
 - If your `VITE_AUTH_MODE` is `backend`, neither set is required for baseline backend email/password authentication.
 

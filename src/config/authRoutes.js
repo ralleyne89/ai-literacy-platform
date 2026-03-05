@@ -1,2 +1,1 @@
-export const AUTH0_CALLBACK_PATH = '/auth/callback'
-
+export { AUTH_CALLBACK_PATH as AUTH0_CALLBACK_PATH, AUTH_CALLBACK_PATH } from './apiEndpoints'

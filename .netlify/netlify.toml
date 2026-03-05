@@ -38,10 +38,7 @@ VITE_AUTH0_REDIRECT_URI = "https://litmusai.netlify.app/auth/callback"
 
 [functions."*"]
 
- # Billing routes and Stripe webhook callbacks are owned by the backend API at `VITE_API_URL`.
- # Netlify redirects for `/api/billing/*` and `/api/webhooks/stripe` are intentionally absent.
- # SPA fallback - must be last
- [[redirects]]
+[[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200.0

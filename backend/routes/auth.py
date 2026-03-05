@@ -542,15 +542,22 @@ def exchange():
     if not isinstance(payload, dict):
         return jsonify({'error': 'Invalid request payload'}), 400
 
+    auth0_access_token = ''
     auth0_code = _normalize_auth0_text(payload.get('code'))
     if auth0_code:
         auth0_code_verifier = _normalize_auth0_text(payload.get('code_verifier'))
         if not auth0_code_verifier:
-            return jsonify({'error': 'Code verifier is required for authorization code exchange.'}), 400
+            return jsonify({
+                'error': 'Code verifier is required for authorization code exchange.',
+                'code': 'AUTH0_CODE_VERIFIER_REQUIRED',
+            }), 400
 
         auth0_redirect_uri = _normalize_frontend_redirect_uri(payload.get('redirect_uri'))
         if not auth0_redirect_uri:
-            return jsonify({'error': 'Redirect URI is required for authorization code exchange.'}), 400
+            return jsonify({
+                'error': 'Redirect URI is required for authorization code exchange.',
+                'code': 'AUTH0_REDIRECT_URI_REQUIRED',
+            }), 400
 
         auth0_access_token, exchange_error = _exchange_authorization_code_for_access_token(
             auth0_code,
@@ -558,28 +565,45 @@ def exchange():
             auth0_redirect_uri,
         )
         if not auth0_access_token:
-            return jsonify({'error': exchange_error or 'Auth0 code exchange failed.'}), 400
-
+            return jsonify({
+                'error': exchange_error or 'Auth0 code exchange failed.',
+                'code': 'AUTH0_CODE_EXCHANGE_FAILED',
+            }), 400
     else:
-    auth0_access_token = _normalize_auth0_token(payload or {})
+        auth0_access_token = _normalize_auth0_token(payload or {})
 
     if not auth0_access_token:
-        return jsonify({'error': 'Access token is required'}), 400
+        return jsonify({
+            'error': 'Access token is required',
+            'code': 'AUTH0_ACCESS_TOKEN_REQUIRED',
+        }), 400
 
     try:
         claims = get_supabase_claims_for_token(auth0_access_token, optional=False)
         if not isinstance(claims, dict) or not claims.get('iss') or not claims.get('aud'):
-            return jsonify({'error': 'Invalid access token'}), 401
+            return jsonify({
+                'error': 'Invalid access token',
+                'code': 'AUTH0_INVALID_ACCESS_TOKEN',
+            }), 401
     except Exception:
-        return jsonify({'error': 'Unauthorized'}), 401
+        return jsonify({
+            'error': 'Unauthorized',
+            'code': 'AUTH0_TOKEN_UNAUTHORIZED',
+        }), 401
 
     user_id = get_supabase_identity_for_token(auth0_access_token)
     if not user_id:
-        return jsonify({'error': 'Invalid access token'}), 401
+        return jsonify({
+            'error': 'Invalid access token',
+            'code': 'AUTH0_INVALID_ACCESS_TOKEN',
+        }), 401
 
     email = (claims.get('email') or '').strip().lower()
     if not email:
-        return jsonify({'error': 'Token missing email claim'}), 400
+        return jsonify({
+            'error': 'Token missing email claim',
+            'code': 'AUTH0_EMAIL_CLAIM_REQUIRED',
+        }), 400
 
     first_name, last_name = _extract_auth0_name(claims)
     if not first_name:

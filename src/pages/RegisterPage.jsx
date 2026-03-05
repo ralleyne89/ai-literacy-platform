@@ -72,7 +72,7 @@ const RegisterPage = () => {
           <p className="mt-2 text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-              sign in with Auth0
+              sign in with email and password
             </Link>
           </p>
         </div>
@@ -95,18 +95,22 @@ const RegisterPage = () => {
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email (optional)
+                Email
               </label>
               <input
                 id="email"
                 name="email"
                 autoComplete="email"
                 type="email"
+                required
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                placeholder="Continue with email or use a social provider"
+                placeholder="you@example.com"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                You&apos;ll create your password on the secure Auth0 signup page.
+              </p>
             </div>
 
             <button
@@ -114,7 +118,7 @@ const RegisterPage = () => {
               disabled={loading}
               className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Redirecting...' : 'Continue with Auth0'}
+              {loading ? 'Redirecting...' : 'Continue to Create Account'}
             </button>
           </div>
 

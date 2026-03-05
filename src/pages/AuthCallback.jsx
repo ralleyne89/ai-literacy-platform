@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { AUTH_CALLBACK_PATH } from '@/config/apiEndpoints'
 
 const AUTH0_CODE_VERIFIER_SESSION_KEY = 'ailiteracy_auth0_code_verifier'
 const AUTH0_STATE_SESSION_KEY = 'ailiteracy_auth0_state'
@@ -76,6 +77,10 @@ const AuthCallback = () => {
       }
 
       if (authErrorMessage) {
+        console.error('Auth0 callback returned an OAuth error.', {
+          error: authErrorMessage,
+          callback_search: location.search
+        })
         setErrorMessage(`OAuth callback error: ${authErrorMessage}`)
         setStatusMessage('Redirecting to sign in...')
         clearAuth0PkceCallbackData()
@@ -85,12 +90,18 @@ const AuthCallback = () => {
 
       const auth0ExchangePayload = {
         auth0AccessToken,
-        auth0Code
+        auth0Code,
+        auth0RedirectUri: `${window.location.origin}${AUTH_CALLBACK_PATH}`
       }
       if (auth0Code) {
         const storedState = getStoredAuth0CallbackValue(AUTH0_STATE_SESSION_KEY)
         const storedCodeVerifier = getStoredAuth0CallbackValue(AUTH0_CODE_VERIFIER_SESSION_KEY)
         if (!storedState || !storedCodeVerifier || !auth0State || storedState !== auth0State) {
+          console.error('Auth0 callback state verification failed.', {
+            expected_state_present: Boolean(storedState),
+            received_state_present: Boolean(auth0State),
+            code_verifier_present: Boolean(storedCodeVerifier)
+          })
           setErrorMessage('OAuth callback state verification failed. Please sign in again.')
           setStatusMessage('Redirecting to sign in...')
           clearAuth0PkceCallbackData()
