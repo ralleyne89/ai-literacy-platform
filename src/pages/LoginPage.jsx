@@ -19,6 +19,7 @@ const LoginPage = () => {
   const { login, isAuthenticated, loginWithProvider } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const callbackError = location.state?.authError
 
   const from = location.state?.from?.pathname || '/dashboard'
   // Redirect if already authenticated
@@ -27,6 +28,17 @@ const LoginPage = () => {
       navigate(from, { replace: true })
     }
   }, [isAuthenticated, navigate, from])
+
+  useEffect(() => {
+    if (!callbackError) {
+      return
+    }
+    setError(callbackError.error || 'Unable to complete sign-in.')
+    setErrorCode(callbackError.code || '')
+    if (callbackError.details) {
+      setResetNotice(callbackError.details)
+    }
+  }, [callbackError])
 
   const handleChange = (e) => {
     setFormData(prev => ({

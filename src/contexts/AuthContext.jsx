@@ -22,6 +22,7 @@ const BACKEND_AUTH_ROUTE_ERROR_MESSAGE =
   'Unable to authenticate: /api/auth returned an HTML page. Verify API routing (for example VITE_API_URL) and ensure /api/auth resolves to your backend endpoint.'
 const AUTH0_RESPONSE_TYPE = 'code'
 const AUTH0_SCOPE = 'openid profile email'
+const AUTH0_EXCHANGE_REQUEST_TIMEOUT_MS = 15000
 const BACKEND_AUTH_SESSION_KEY = 'ailiteracy_backend_auth'
 const AUTH0_CODE_VERIFIER_SESSION_KEY = 'ailiteracy_auth0_code_verifier'
 const AUTH0_STATE_SESSION_KEY = 'ailiteracy_auth0_state'
@@ -805,24 +806,51 @@ export const AuthProvider = ({ children }) => {
     const auth0RedirectUri = typeof redirectUri === 'string' ? redirectUri.trim() : ''
 
     if (!auth0AccessToken && !auth0Code) {
-      return false
+      return {
+        success: false,
+        code: 'auth0_missing_credentials',
+        error: 'Auth0 callback did not provide an authorization code or token.'
+      }
     }
     if (auth0Code && !auth0CodeVerifier) {
       console.warn('Auth0 code exchange missing PKCE verifier.')
-      return false
+      return {
+        success: false,
+        code: 'auth0_pkce_verifier_missing',
+        error: 'Missing PKCE verifier for Auth0 code exchange.'
+      }
     }
 
     try {
-      const response = await axios.post(AUTH_ENDPOINTS.exchange, {
-        ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
-        ...(auth0Code
-          ? {
-              code: auth0Code,
-              code_verifier: auth0CodeVerifier,
-              redirect_uri: auth0RedirectUri || getAuth0RedirectUri()
-            }
-          : {})
-      })
+      const response = await axios.post(
+        AUTH_ENDPOINTS.exchange,
+        {
+          ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
+          ...(auth0Code
+            ? {
+                code: auth0Code,
+                code_verifier: auth0CodeVerifier,
+                redirect_uri: auth0RedirectUri || getAuth0RedirectUri()
+              }
+            : {})
+        },
+        {
+          timeout: AUTH0_EXCHANGE_REQUEST_TIMEOUT_MS
+        }
+      )
+
+      const requestSummary = {
+        hasCode: Boolean(auth0Code),
+        hasAccessToken: Boolean(auth0AccessToken),
+        hasCodeVerifier: Boolean(auth0CodeVerifier),
+        redirectUri: auth0RedirectUri || getAuth0RedirectUri()
+      }
+      console.info('Auth0 exchange request prepared:', requestSummary)
+      console.debug('Auth0 exchange endpoint:', AUTH_ENDPOINTS.exchange)
+      const requestPayloadKeys = auth0Code
+        ? ['code', 'code_verifier', 'redirect_uri']
+        : ['access_token']
+      console.info('Auth0 exchange request payload keys:', requestPayloadKeys)
 
       const normalized = normalizeBackendAuthPayload(response, {
         fallbackMessage: 'Unable to exchange Auth0 token.',
@@ -830,11 +858,23 @@ export const AuthProvider = ({ children }) => {
       })
       if (!normalized.success) {
         console.warn('Auth0 token exchange returned malformed response:', normalized.message)
-        return false
+        return {
+          success: false,
+          code: normalized.code,
+          error: normalized.message
+        }
       }
 
       setBackendSession(normalized.token, normalized.user, true)
-      return true
+      console.info('Auth0 token exchange succeeded:', {
+        hasUser: Boolean(normalized.user?.id),
+        hasToken: Boolean(normalized.token)
+      })
+      return {
+        success: true,
+        user: normalized.user,
+        code: 'auth0_exchange_success'
+      }
     } catch (error) {
       const normalized = getBackendAuthError(error, 'Unable to exchange Auth0 credentials.')
       console.warn('Auth0 token exchange failed:', normalized.message)
@@ -842,7 +882,14 @@ export const AuthProvider = ({ children }) => {
       if (error?.response?.status === 401 || error?.response?.status === 403) {
         clearBackendSession()
       }
-      return false
+
+      return {
+        success: false,
+        code: normalized.code || BACKEND_AUTH_UNKNOWN_ERROR_CODE,
+        error: normalized.message,
+        details: normalized.details,
+        status: error?.response?.status
+      }
     }
   }
 
@@ -1103,16 +1150,25 @@ export const AuthProvider = ({ children }) => {
   } = {}) => {
     if (usesBackendSessionMode) {
       if (isAuth0Enabled && (auth0AccessToken || auth0Code)) {
-        const exchanged = await exchangeAuth0Token({
+        const exchangeResult = await exchangeAuth0Token({
           authCode: auth0Code,
           accessToken: auth0AccessToken,
           codeVerifier: auth0CodeVerifier,
           redirectUri: auth0RedirectUri || getAuth0RedirectUri()
         })
+        const isAuthenticated = Boolean(exchangeResult?.success)
         if (auth0Code || auth0AccessToken) {
           clearAuth0PkceSessionData()
         }
-        return exchanged
+        if (isAuthenticated) {
+          return exchangeResult
+        }
+
+        return {
+          success: false,
+          code: exchangeResult?.code || BACKEND_AUTH_UNKNOWN_ERROR_CODE,
+          error: exchangeResult?.error || 'Unable to exchange Auth0 credentials.'
+        }
       }
 
       const stored = getStoredBackendSession()
