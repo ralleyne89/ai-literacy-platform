@@ -25,10 +25,12 @@ const Navbar = () => {
     setUserMenuOpen(false)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
     closeMenus()
-    navigate('/')
+    const result = await logout()
+    if (!result?.redirected) {
+      navigate('/')
+    }
   }
 
   const displayName = user?.first_name || user?.email?.split('@')[0] || 'User'

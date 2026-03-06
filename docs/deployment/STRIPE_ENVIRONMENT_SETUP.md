@@ -9,21 +9,20 @@ This guide covers all required environment variables for the Stripe payment inte
 Set these in your Netlify dashboard (Site settings → Environment variables):
 
 ```bash
-# Stripe API Keys
-STRIPE_SECRET_KEY=sk_live_... # or sk_test_... for testing
-STRIPE_PUBLISHABLE_KEY=pk_live_... # or pk_test_... for testing
-STRIPE_WEBHOOK_SECRET=whsec_... # Get this from Stripe webhook settings
+# Frontend runtime
+VITE_API_URL=https://your-backend-host.onrender.com
+VITE_AUTH_MODE=auth0
+VITE_AUTH0_DOMAIN=https://your-tenant.us.auth0.com
+VITE_AUTH0_CLIENT_ID=your-auth0-client-id
+VITE_AUTH0_AUDIENCE=https://your-api-audience
+VITE_AUTH0_REDIRECT_URI=https://your-site.netlify.app/auth/callback
 
-# Supabase Configuration (for webhook database updates)
-VITE_SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGci... # IMPORTANT: Service role key, not anon key!
+# Stripe publishable key for billing UI
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_... # or pk_test_... for testing
 
-# Frontend URL (for redirects)
-FRONTEND_URL=https://your-site.netlify.app
-URL=https://your-site.netlify.app # Netlify sets this automatically
-
-# Optional: Mock mode for testing without real Stripe calls
-STRIPE_MOCK_MODE=false # Set to "true" to enable mock mode
+# Optional explicit backend URL for legacy Netlify billing/webhook proxy functions.
+# When omitted, the proxy falls back to VITE_API_URL.
+BACKEND_API_URL=https://your-backend-host.onrender.com
 ```
 
 ### 2. Backend Environment Variables (backend/.env)
@@ -33,59 +32,57 @@ STRIPE_MOCK_MODE=false # Set to "true" to enable mock mode
 STRIPE_SECRET_KEY=sk_live_... # or sk_test_... for testing
 STRIPE_PUBLISHABLE_KEY=pk_live_... # or pk_test_... for testing
 STRIPE_WEBHOOK_SECRET=whsec_... # Get this from Stripe webhook settings
-
-# Supabase JWT Secret (for validating tokens)
-SUPABASE_JWT_SECRET=your-jwt-secret
-
-# Frontend URL
-FRONTEND_URL=http://localhost:5173 # or production URL
-
-# Optional: Stripe Price IDs (if using predefined prices instead of dynamic pricing)
 STRIPE_PRICE_PREMIUM=price_... # Optional
 STRIPE_PRICE_ENTERPRISE=price_... # Optional
+
+# Auth + token verification
+JWT_SECRET_KEY=your-backend-jwt-secret
+SUPABASE_JWT_SECRET=your-jwt-secret # Required only if validating Supabase-issued tokens
+AUTH0_DOMAIN=your-tenant.us.auth0.com
+AUTH0_CLIENT_ID=your-auth0-client-id
+AUTH0_AUDIENCE=https://your-api-audience
+AUTH0_REDIRECT_URI=https://your-site.netlify.app/auth/callback
+
+# Frontend origin allowlist
+FRONTEND_URL=https://your-site.netlify.app
+ALLOWED_ORIGINS=https://your-site.netlify.app
 ```
 
 ### 3. Frontend Environment Variables (.env)
 
 ```bash
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGci... # Public anon key
-
-# Stripe Publishable Key
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_... # or pk_test_... for testing
-
-# API URL
-VITE_API_URL=http://localhost:5001 # or production backend URL
+# Local frontend runtime
+VITE_API_URL=http://localhost:5001
+VITE_AUTH_MODE=auth0
+VITE_AUTH0_DOMAIN=https://your-tenant.us.auth0.com
+VITE_AUTH0_CLIENT_ID=your-auth0-client-id
+VITE_AUTH0_AUDIENCE=https://your-api-audience
+VITE_AUTH0_REDIRECT_URI=http://localhost:5173/auth/callback
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
 ## Critical Notes
 
-### SUPABASE_SERVICE_ROLE_KEY vs VITE_SUPABASE_ANON_KEY
+### Canonical billing state lives in Flask
 
-**IMPORTANT:** The webhook handler needs the **Service Role Key**, NOT the anon key!
+**IMPORTANT:** Billing checkout, customer portal access, and Stripe webhook writes must flow through the Flask backend.
 
-- **VITE_SUPABASE_ANON_KEY**: Public key for frontend, limited permissions
-- **SUPABASE_SERVICE_ROLE_KEY**: Private key for backend/webhooks, full database access
-
-To get your Service Role Key:
-1. Go to Supabase Dashboard
-2. Settings → API
-3. Copy the `service_role` key (keep it secret!)
+- The browser should call backend billing routes via `VITE_API_URL`.
+- The backend owns the canonical `User.subscription_*` fields.
+- Legacy Netlify billing functions are now just thin proxies to the backend. Do not treat them as a separate billing system.
 
 ### Webhook Secret Setup
 
 1. Go to Stripe Dashboard → Developers → Webhooks
-2. Add endpoint: `https://your-site.netlify.app/api/webhooks/stripe`
+2. Add endpoint: `https://your-backend-host.onrender.com/api/billing/webhooks/stripe`
 3. Select events to listen for:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
 4. Copy the webhook signing secret (starts with `whsec_`)
-5. Add it to Netlify environment variables as `STRIPE_WEBHOOK_SECRET`
+5. Add it to the backend environment variables as `STRIPE_WEBHOOK_SECRET`
+6. If you must keep an older Netlify webhook URL temporarily, point it at the legacy function only after setting `BACKEND_API_URL`/`VITE_API_URL` so it can proxy through to Flask.
 
 ### Testing vs Production Keys
 
@@ -103,25 +100,25 @@ To get your Service Role Key:
 
 After setting up environment variables:
 
-- [ ] Netlify has all required variables set
-- [ ] Backend .env file has Stripe keys
-- [ ] Frontend .env file has Supabase and Stripe publishable key
-- [ ] Webhook endpoint is configured in Stripe dashboard
-- [ ] SUPABASE_SERVICE_ROLE_KEY is set (not anon key!)
-- [ ] Database migration has been run (see stripe_migration.sql)
-- [ ] Test checkout flow works
-- [ ] Webhook successfully updates database
+- [ ] Netlify has `VITE_API_URL` (and optionally `BACKEND_API_URL`) pointed at the public backend host
+- [ ] Backend environment has Stripe keys, webhook secret, and allowed frontend origins configured
+- [ ] Frontend local `.env` has the correct Auth0 + Stripe publishable settings
+- [ ] Stripe webhook endpoint is configured against the backend `/api/billing/webhooks/stripe` route
+- [ ] Database migration has been run (see `stripe_migration.sql`)
+- [ ] Authenticated checkout flow works
+- [ ] Returning from Stripe syncs subscription state to the Flask `User` record
+- [ ] Webhook successfully updates canonical subscription state for renewals/cancellations
 
 ## Troubleshooting
 
 ### "Webhook secret not configured" error
-- Check that `STRIPE_WEBHOOK_SECRET` is set in Netlify environment variables
+- Check that `STRIPE_WEBHOOK_SECRET` is set in backend environment variables
 - Redeploy after adding the variable
 
-### "Error updating user subscription" in webhook logs
-- Verify `SUPABASE_SERVICE_ROLE_KEY` is set (not anon key)
-- Check that database migration has been run
-- Verify user exists in database with matching email
+### "Webhook processing failed" in backend logs
+- Verify `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are both set on the backend
+- Check that the checkout session metadata includes the authenticated `user_id`
+- Verify the backend can reach Stripe and that the user exists in the Flask database
 
 ### "Stripe is not configured" error on checkout
 - Check that `STRIPE_SECRET_KEY` is set
@@ -129,10 +126,10 @@ After setting up environment variables:
 - Check backend logs for more details
 
 ### Database not updating after successful payment
-- Check Netlify function logs for webhook errors
-- Verify webhook endpoint is receiving events in Stripe dashboard
-- Ensure database columns exist (run migration script)
-- Verify SUPABASE_SERVICE_ROLE_KEY has write permissions
+- Confirm the browser returned to `/billing?success=true&session_id=...`
+- Verify `POST /api/billing/checkout-session/complete` succeeds for the signed-in user
+- Check backend logs for webhook or checkout-complete errors
+- Ensure subscription columns exist on the `user` table
 
 ## Database Schema Requirements
 

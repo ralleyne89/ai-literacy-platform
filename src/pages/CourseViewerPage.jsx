@@ -11,6 +11,7 @@ const CourseViewerPage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
   const [module, setModule] = useState(null)
+  const [moduleProgress, setModuleProgress] = useState(null)
   const [lessons, setLessons] = useState([])
   const [currentLesson, setCurrentLesson] = useState(null)
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0)
@@ -25,14 +26,23 @@ const CourseViewerPage = () => {
     try {
       const response = await axios.get(`/api/course/modules/${moduleId}/lessons`)
       setModule(response.data.module)
-      setLessons(response.data.lessons)
-      
-      // Find first incomplete lesson or first lesson
-      const firstIncomplete = response.data.lessons.findIndex(l => l.status !== 'completed')
-      const startIndex = firstIncomplete >= 0 ? firstIncomplete : 0
-      
-      if (response.data.lessons.length > 0) {
-        loadLesson(response.data.lessons[startIndex].id, startIndex)
+      setModuleProgress(response.data.module_progress || null)
+      const nextLessons = Array.isArray(response.data.lessons) ? response.data.lessons : []
+      setLessons(nextLessons)
+
+      const resumeLessonId = response.data.module_progress?.resume_lesson_id
+      const resumeLessonIndex = resumeLessonId
+        ? nextLessons.findIndex((lesson) => lesson.id === resumeLessonId)
+        : -1
+      const firstIncomplete = nextLessons.findIndex(l => l.status !== 'completed')
+      const startIndex = resumeLessonIndex >= 0
+        ? resumeLessonIndex
+        : firstIncomplete >= 0
+          ? firstIncomplete
+          : 0
+
+      if (nextLessons.length > 0) {
+        loadLesson(nextLessons[startIndex].id, startIndex)
       }
     } catch (error) {
       console.error('Failed to fetch lessons:', error)
@@ -54,15 +64,7 @@ const CourseViewerPage = () => {
   const handleLessonComplete = async (lessonId, data = {}) => {
     try {
       await axios.post(`/api/course/lessons/${lessonId}/complete`, data)
-      
-      // Refresh lessons to update progress
       await fetchModuleLessons()
-      
-      // Move to next lesson if available
-      if (currentLessonIndex < lessons.length - 1) {
-        const nextLesson = lessons[currentLessonIndex + 1]
-        loadLesson(nextLesson.id, currentLessonIndex + 1)
-      }
     } catch (error) {
       console.error('Failed to complete lesson:', error)
     }
@@ -83,7 +85,8 @@ const CourseViewerPage = () => {
   }
 
   const completedLessons = lessons.filter(l => l.status === 'completed').length
-  const progressPercentage = lessons.length > 0 ? Math.round((completedLessons / lessons.length) * 100) : 0
+  const progressPercentage = moduleProgress?.progress_percentage ??
+    (lessons.length > 0 ? Math.round((completedLessons / lessons.length) * 100) : 0)
 
   if (loading) {
     return (

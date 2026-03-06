@@ -54,6 +54,16 @@ def test_checkout_requires_configuration(client, authenticated_user, monkeypatch
     assert 'Stripe is not fully configured' in response.get_json().get('error', '')
 
 
+def test_checkout_requires_authentication(client):
+    response = client.post(
+        '/api/billing/checkout-session',
+        json={'plan': 'premium'}
+    )
+
+    assert response.status_code == 401
+    assert 'Unauthorized' in response.get_json().get('error', '')
+
+
 def test_checkout_session_success(client, authenticated_user, monkeypatch):
     token = authenticated_user['token']
     email = authenticated_user['email']
@@ -86,6 +96,191 @@ def test_checkout_session_success(client, authenticated_user, monkeypatch):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload['url'] == 'https://stripe.example/checkout'
+
+
+def test_checkout_session_uses_authenticated_email(client, authenticated_user, monkeypatch):
+    token = authenticated_user['token']
+    email = authenticated_user['email']
+
+    monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+    monkeypatch.setenv('STRIPE_PRICE_PREMIUM', 'price_mock')
+
+    import routes.billing as billing_routes
+
+    def fake_checkout_session_create(**kwargs):  # noqa: ANN001
+        assert kwargs['customer_email'] == email
+        assert kwargs['metadata']['email'] == email
+        assert kwargs['metadata']['user_id'] == authenticated_user['id']
+
+        class FakeSession:
+            url = 'https://stripe.example/checkout-authenticated'
+
+        return FakeSession()
+
+    monkeypatch.setattr(
+        billing_routes,
+        '_create_stripe_checkout_session',
+        fake_checkout_session_create
+    )
+
+    response = client.post(
+        '/api/billing/checkout-session',
+        json={'plan': 'premium', 'email': 'attacker@example.com'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['url'] == 'https://stripe.example/checkout-authenticated'
+
+
+def test_checkout_session_complete_updates_subscription(client, authenticated_user, monkeypatch):
+    token = authenticated_user['token']
+    user_id = authenticated_user['id']
+    email = authenticated_user['email']
+
+    monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+
+    import routes.billing as billing_routes
+
+    def fake_checkout_session_retrieve(session_id):  # noqa: ANN001
+        assert session_id == 'cs_test_123'
+        return {
+            'id': session_id,
+            'mode': 'subscription',
+            'customer': 'cus_test_123',
+            'subscription': 'sub_test_123',
+            'customer_details': {'email': email},
+            'metadata': {
+                'user_id': user_id,
+                'plan_id': 'premium',
+                'email': email,
+            }
+        }
+
+    def fake_subscription_retrieve(subscription_id):  # noqa: ANN001
+        assert subscription_id == 'sub_test_123'
+        return {
+            'id': 'sub_test_123',
+            'status': 'active',
+            'customer': 'cus_test_123',
+            'items': {
+                'data': [
+                    {
+                        'price': {
+                            'unit_amount': 4900,
+                            'recurring': {'interval': 'month'}
+                        }
+                    }
+                ]
+            }
+        }
+
+    monkeypatch.setattr(
+        billing_routes,
+        '_retrieve_stripe_checkout_session',
+        fake_checkout_session_retrieve
+    )
+    monkeypatch.setattr(
+        billing_routes,
+        '_retrieve_stripe_subscription',
+        fake_subscription_retrieve
+    )
+
+    response = client.post(
+        '/api/billing/checkout-session/complete',
+        json={'session_id': 'cs_test_123'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['has_subscription'] is True
+    assert payload['plan'] == 'premium'
+    assert payload['status'] == 'active'
+
+    with app.app_context():
+        user = User.query.get(user_id)
+        assert user.subscription_tier == 'premium'
+        assert user.subscription_status == 'active'
+        assert user.stripe_customer_id == 'cus_test_123'
+        assert user.stripe_subscription_id == 'sub_test_123'
+
+
+def test_stripe_webhook_checkout_completion_updates_subscription(client, authenticated_user, monkeypatch):
+    user_id = authenticated_user['id']
+    email = authenticated_user['email']
+
+    monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+    monkeypatch.setenv('STRIPE_WEBHOOK_SECRET', 'whsec_test_mock')
+
+    import routes.billing as billing_routes
+
+    def fake_construct_event(payload, signature, secret):  # noqa: ANN001
+        assert signature == 'test-signature'
+        assert secret == 'whsec_test_mock'
+        return {
+            'type': 'checkout.session.completed',
+            'data': {
+                'object': {
+                    'id': 'cs_test_456',
+                    'mode': 'subscription',
+                    'customer': 'cus_test_456',
+                    'subscription': 'sub_test_456',
+                    'customer_details': {'email': email},
+                    'metadata': {
+                        'user_id': user_id,
+                        'plan_id': 'premium',
+                        'email': email,
+                    }
+                }
+            }
+        }
+
+    def fake_subscription_retrieve(subscription_id):  # noqa: ANN001
+        assert subscription_id == 'sub_test_456'
+        return {
+            'id': 'sub_test_456',
+            'status': 'active',
+            'customer': 'cus_test_456',
+            'items': {
+                'data': [
+                    {
+                        'price': {
+                            'unit_amount': 4900,
+                            'recurring': {'interval': 'month'}
+                        }
+                    }
+                ]
+            }
+        }
+
+    monkeypatch.setattr(
+        billing_routes,
+        '_construct_stripe_webhook_event',
+        fake_construct_event
+    )
+    monkeypatch.setattr(
+        billing_routes,
+        '_retrieve_stripe_subscription',
+        fake_subscription_retrieve
+    )
+
+    response = client.post(
+        '/api/billing/webhooks/stripe',
+        data='{}',
+        headers={'Stripe-Signature': 'test-signature'}
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()['received'] is True
+
+    with app.app_context():
+        user = User.query.get(user_id)
+        assert user.subscription_tier == 'premium'
+        assert user.subscription_status == 'active'
+        assert user.stripe_customer_id == 'cus_test_456'
+        assert user.stripe_subscription_id == 'sub_test_456'
 
 
 def test_subscription_endpoint_defaults_to_free(client, authenticated_user):

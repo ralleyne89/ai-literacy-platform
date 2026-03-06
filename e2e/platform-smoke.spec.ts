@@ -1,70 +1,60 @@
-import { expect, Page, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import {
+  PLAYWRIGHT_AUTH0_ACCESS_TOKEN,
+  PLAYWRIGHT_BACKEND_TOKEN,
+  installAuth0AppStubs,
+  readAuth0StubState,
+  readStoredBackendSession,
+  resetBrowserStorage
+} from './auth0TestHelpers'
 
-const FALLBACK_EMAIL =
-  process.env.E2E_ADMIN_EMAIL ||
-  process.env.E2E_TEST_EMAIL ||
-  process.env.PLAYWRIGHT_TEST_EMAIL ||
-  'reggiealleyne89@gmail.com'
-const FALLBACK_PASSWORD =
-  process.env.E2E_ADMIN_PASSWORD || process.env.E2E_TEST_PASSWORD || process.env.PLAYWRIGHT_TEST_PASSWORD || ''
-
-const isVisible = async (page: Page, selector: string | RegExp, timeout = 5000): Promise<boolean> => {
-  const locator = page.getByText(selector)
-  try {
-    await locator.waitFor({ state: 'visible', timeout })
-    return true
-  } catch {
-    return false
-  }
-}
-
-const assertLoginFailureState = async (page: Page): Promise<void> => {
-  await page.goto('/login')
-  await page.getByLabel('Email address').fill('does-not-exist@example.com')
-  await page.getByLabel('Password').fill('WrongPassword1234!')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/login/)
-  const failureMessageVisible = await isVisible(
-    page,
-    /invalid|unable to|does not exist|doesn't exist|doesn'?t exist|not confirmed|not configured|supabase/i,
-    6000
-  )
-  const fallbackErrorBannerVisible = await page.locator('.bg-red-50 .text-red-700').first().isVisible()
-  await expect(failureMessageVisible || fallbackErrorBannerVisible, 'Expected a login failure state.').toBe(true)
-}
-
-const attemptLogin = async (page: Page, email: string, password: string): Promise<boolean> => {
-  await page.goto('/login')
-  await page.getByLabel('Email address').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await page.waitForLoadState('networkidle')
-  return page.url().includes('/dashboard') || page.url().includes('/assessment') || page.url().includes('/training')
-}
-
-const assertDashboardAccessible = async (page: Page): Promise<void> => {
-  await page.goto('/dashboard')
-  await expect(page).toHaveURL(/\/dashboard/)
-  await expect(page.getByLabel('Email address')).not.toBeVisible()
-}
-
-test('Smoke: auth-state assertions only', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.clear()
-    window.sessionStorage.clear()
+test('Smoke: login redirect completes callback exchange and restores dashboard access', async ({ page }) => {
+  await resetBrowserStorage(page)
+  const logs = await installAuth0AppStubs(page, {
+    backendUser: {
+      email: 'ada@example.com',
+      first_name: 'Ada'
+    }
   })
 
-  await assertLoginFailureState(page)
+  await page.goto('/dashboard')
 
-  if (!FALLBACK_PASSWORD) {
-    test.skip(
-      true,
-      'E2E_ADMIN_PASSWORD (or fallback aliases) must be set for auth smoke login assertions'
-    )
-  }
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('heading', { name: 'Sign in to continue' })).toBeVisible()
 
-  const loginSucceeded = await attemptLogin(page, FALLBACK_EMAIL, FALLBACK_PASSWORD)
-  await expect(loginSucceeded, 'Expected admin login to succeed.').toBe(true)
+  await page.getByLabel('Email').fill('ada@example.com')
+  await page.getByRole('button', { name: 'Continue with Email & Password' }).click()
 
-  await assertDashboardAccessible(page)
+  await expect(page).toHaveURL(/\/auth\/callback/)
+
+  const auth0State = await readAuth0StubState(page)
+  expect(auth0State.lastRedirectRequest?.authorizationParams?.login_hint).toBe('ada@example.com')
+  expect(auth0State.lastRedirectRequest?.appState?.returnTo).toBe('/dashboard')
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: /Welcome back, Ada!/i })).toBeVisible()
+
+  expect(logs.exchangeBodies.length).toBeGreaterThan(0)
+  logs.exchangeBodies.forEach((payload) => {
+    expect(payload).toEqual(expect.objectContaining({
+      access_token: PLAYWRIGHT_AUTH0_ACCESS_TOKEN
+    }))
+  })
+  expect(logs.authorizedPaths).toEqual(
+    expect.arrayContaining([
+      '/api/assessment/history',
+      '/api/training/progress',
+      '/api/assessment/recommendations'
+    ])
+  )
+
+  const backendSession = await readStoredBackendSession(page)
+  expect(backendSession).toEqual(
+    expect.objectContaining({
+      token: PLAYWRIGHT_BACKEND_TOKEN,
+      user: expect.objectContaining({
+        email: 'ada@example.com'
+      })
+    })
+  )
 })

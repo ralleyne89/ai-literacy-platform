@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { Auth0Provider, useAuth0 } from '@auth0/auth0-react'
 import axios from 'axios'
-import { AUTH0_CALLBACK_PATH } from '../config/authRoutes'
+import { useNavigate } from 'react-router-dom'
+import {
+  AUTH0_CALLBACK_PATH,
+  clearStoredAuthReturnTo,
+  getStoredAuthReturnTo
+} from '../config/authRoutes'
 import { AUTH_ENDPOINTS, API_BASE_URL } from '../config/apiEndpoints'
 
 const AuthContext = createContext()
@@ -20,13 +26,9 @@ const BACKEND_AUTH_ERROR_MESSAGE_MAX_LENGTH = 280
 const AUTH0_AUTH_LOGIN_ERROR_MESSAGE = 'Auth0 is not configured. Set VITE_AUTH0_DOMAIN and VITE_AUTH0_CLIENT_ID.'
 const BACKEND_AUTH_ROUTE_ERROR_MESSAGE =
   'Unable to authenticate: /api/auth returned an HTML page. Verify API routing (for example VITE_API_URL) and ensure /api/auth resolves to your backend endpoint.'
-const AUTH0_RESPONSE_TYPE = 'code'
 const AUTH0_SCOPE = 'openid profile email'
 const AUTH0_EXCHANGE_REQUEST_TIMEOUT_MS = 15000
 const BACKEND_AUTH_SESSION_KEY = 'ailiteracy_backend_auth'
-const AUTH0_CODE_VERIFIER_SESSION_KEY = 'ailiteracy_auth0_code_verifier'
-const AUTH0_STATE_SESSION_KEY = 'ailiteracy_auth0_state'
-const AUTH0_PKCE_VERIFIER_BYTES = 32
 const BACKEND_JWT_SEGMENTS = 3
 const GENERIC_BACKEND_REGISTRATION_ERRORS = new Set([
   'registration failed',
@@ -124,11 +126,6 @@ const resolveAuthMode = () => {
   return BACKEND_AUTH_MODE
 }
 
-const isBackendSessionMode = () => {
-  const mode = resolveAuthMode()
-  return mode === BACKEND_AUTH_MODE || mode === AUTH0_AUTH_MODE
-}
-
 const buildAuth0ConnectionName = (provider) => {
   const normalized = String(provider || '').toLowerCase().trim()
   if (!normalized) {
@@ -160,202 +157,81 @@ const getAuth0RedirectUri = () => {
   return `${window.location.origin}${AUTH0_CALLBACK_PATH}`
 }
 
-const isValidHttpUrl = (value) => {
+const normalizeAuth0DomainForSdk = () => {
+  const rawDomain = getAuth0Domain()
+  if (!rawDomain) {
+    return ''
+  }
+
   try {
-    const parsed = new URL(value)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    const parsed = new URL(rawDomain.includes('://') ? rawDomain : `https://${rawDomain}`)
+    return parsed.hostname
   } catch {
-    return false
+    return rawDomain.replace(/^https?:\/\//i, '').replace(/\/+$/, '')
   }
 }
 
-const toBase64Url = (value) => {
-  try {
-    const raw = btoa(String.fromCharCode(...new Uint8Array(value)))
-    return raw.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  } catch {
-    return ''
+const isAuth0ClientConfigured = () =>
+  Boolean(normalizeAuth0DomainForSdk() && getAuth0ClientId() && getAuth0RedirectUri())
+
+const getDefaultAuthReturnTo = () => getStoredAuthReturnTo() || '/dashboard'
+
+const getAuth0AuthorizationParams = () => {
+  const params = {
+    redirect_uri: getAuth0RedirectUri(),
+    scope: AUTH0_SCOPE
   }
-}
-
-const generateAuth0RandomValue = () => {
-  if (
-    typeof window === 'undefined' ||
-    !window.crypto ||
-    typeof window.crypto.getRandomValues !== 'function'
-  ) {
-    return ''
-  }
-
-  try {
-    const randomValues = new Uint8Array(AUTH0_PKCE_VERIFIER_BYTES)
-    window.crypto.getRandomValues(randomValues)
-    return toBase64Url(randomValues)
-  } catch {
-    return ''
-  }
-}
-
-const generateCodeVerifier = () => generateAuth0RandomValue()
-
-const generateState = () => generateAuth0RandomValue()
-
-const generateCodeChallenge = async (codeVerifier) => {
-  if (
-    typeof window === 'undefined' ||
-    !window.crypto ||
-    typeof window.crypto.subtle?.digest !== 'function'
-  ) {
-    return ''
-  }
-
-  try {
-    const encoded = new TextEncoder().encode(String(codeVerifier || ''))
-    const digest = await window.crypto.subtle.digest('SHA-256', encoded)
-    return toBase64Url(digest)
-  } catch {
-    return ''
-  }
-}
-
-const setAuth0PkceSessionData = ({ state = '', codeVerifier = '' } = {}) => {
-  if (typeof window === 'undefined' || !window.sessionStorage) {
-    return false
-  }
-
-  try {
-    window.sessionStorage.setItem(AUTH0_CODE_VERIFIER_SESSION_KEY, String(codeVerifier || '').trim())
-    window.sessionStorage.setItem(AUTH0_STATE_SESSION_KEY, String(state || '').trim())
-    return true
-  } catch (error) {
-    console.warn('Failed to persist Auth0 PKCE state:', error)
-    return false
-  }
-}
-
-const clearAuth0PkceSessionData = () => {
-  if (typeof window === 'undefined' || !window.sessionStorage) {
-    return false
-  }
-
-  try {
-    window.sessionStorage.removeItem(AUTH0_CODE_VERIFIER_SESSION_KEY)
-    window.sessionStorage.removeItem(AUTH0_STATE_SESSION_KEY)
-    return true
-  } catch (error) {
-    console.warn('Failed to clear Auth0 PKCE state:', error)
-    return false
-  }
-}
-
-const buildAuth0AuthorizeUrl = async ({ provider = '', loginHint = '', screenHint = '' } = {}) => {
-  const domain = getAuth0Domain()
-  const clientId = getAuth0ClientId()
   const audience = getAuth0Audience()
-  const redirectUri = getAuth0RedirectUri()
+
+  if (audience) {
+    params.audience = audience
+  }
+
+  return params
+}
+
+const buildAuth0RedirectOptions = ({ provider = '', loginHint = '', screenHint = '' } = {}) => {
+  if (!isAuth0ClientConfigured()) {
+    return null
+  }
+
+  const authorizationParams = {
+    ...getAuth0AuthorizationParams()
+  }
   const connection = buildAuth0ConnectionName(provider)
-  const codeVerifier = generateCodeVerifier()
-  const state = generateState()
 
-  if (!domain || !clientId || !redirectUri) {
-    return {
-      success: false,
-      message: AUTH0_AUTH_LOGIN_ERROR_MESSAGE
-    }
+  if (connection) {
+    authorizationParams.connection = connection
   }
 
-  if (!codeVerifier || !state) {
-    return {
-      success: false,
-      message: 'Unable to initialize secure Auth0 login.'
-    }
+  if (screenHint) {
+    authorizationParams.screen_hint = screenHint
   }
 
-  const authorizeHost = domain.includes('://') ? domain : `https://${domain}`
-  if (!isValidHttpUrl(authorizeHost)) {
-    return {
-      success: false,
-      message: 'Auth0 domain must be a valid URL.'
-    }
+  if (loginHint) {
+    authorizationParams.login_hint = loginHint
   }
 
-  try {
-    const codeChallenge = await generateCodeChallenge(codeVerifier)
-    if (!codeChallenge) {
-      return {
-        success: false,
-        message: 'Unable to prepare secure Auth0 login challenge.'
-      }
-    }
-
-    const stored = setAuth0PkceSessionData({
-      state,
-      codeVerifier
-    })
-    if (!stored) {
-      return {
-        success: false,
-        message: 'Unable to start login flow.'
-      }
-    }
-
-    const authorizeUrl = new URL('/authorize', authorizeHost)
-    authorizeUrl.searchParams.set('client_id', clientId)
-    authorizeUrl.searchParams.set('redirect_uri', redirectUri)
-    authorizeUrl.searchParams.set('response_type', AUTH0_RESPONSE_TYPE)
-    authorizeUrl.searchParams.set('response_mode', 'query')
-    authorizeUrl.searchParams.set('scope', AUTH0_SCOPE)
-    authorizeUrl.searchParams.set('code_challenge', codeChallenge)
-    authorizeUrl.searchParams.set('code_challenge_method', 'S256')
-    authorizeUrl.searchParams.set('state', state)
-
-    if (audience) {
-      authorizeUrl.searchParams.set('audience', audience)
-    }
-
-    if (connection) {
-      authorizeUrl.searchParams.set('connection', connection)
-    }
-
-    if (screenHint) {
-      authorizeUrl.searchParams.set('screen_hint', screenHint)
-    }
-
-    if (loginHint) {
-      authorizeUrl.searchParams.set('login_hint', loginHint)
-    }
-
-    // Keep callback diagnostics explicit when troubleshooting redirect mismatches.
-    console.info('Auth0 authorize request initialized.', {
-      redirect_uri: redirectUri,
-      response_type: AUTH0_RESPONSE_TYPE,
-      response_mode: 'query',
-      screen_hint: screenHint || null,
-      connection: connection || null
-    })
-
-    return {
-      success: true,
-      url: authorizeUrl.toString()
-    }
-  } catch {
-    return {
-      success: false,
-      message: 'Unable to construct the Auth0 authorization URL.'
-    }
+  return {
+    appState: {
+      returnTo: getDefaultAuthReturnTo()
+    },
+    authorizationParams
   }
 }
 
-const initiateAuth0Login = async (options = {}) => {
-  const result = await buildAuth0AuthorizeUrl(options)
-  if (!result.success) {
-    return { success: false, error: result.message }
+const getAuth0AccessTokenOptions = () => {
+  const audience = getAuth0Audience()
+  if (!audience) {
+    return undefined
   }
 
-  if (typeof window !== 'undefined') {
-    window.location.assign(result.url)
+  return {
+    authorizationParams: {
+      audience,
+      scope: AUTH0_SCOPE
+    }
   }
-  return { success: true }
 }
 
 export const useAuth = () => {
@@ -768,28 +644,46 @@ const getBackendAuthError = (error, fallbackMessage, { preferRegistrationDetails
   return normalizeAuthError(error, fallbackMessage)
 }
 
-export const AuthProvider = ({ children }) => {
+const buildUnavailableAuthValue = (errorMessage = 'Authentication mode is not configured.') => ({
+  user: null,
+  token: null,
+  loading: false,
+  login: async () => ({ success: false, error: errorMessage }),
+  register: async () => ({ success: false, error: errorMessage }),
+  logout: async () => ({ success: false, error: errorMessage }),
+  updateProfile: async () => ({
+    success: false,
+    error: 'Profile updates are not supported in this authentication mode.'
+  }),
+  loginWithProvider: async () => ({
+    success: false,
+    error: 'Social provider login is only supported in Auth0 mode.'
+  }),
+  requestPasswordReset: async () => ({
+    success: false,
+    error: 'Password reset is not available in this authentication mode.'
+  }),
+  syncBackendAfterLogin: async () => false,
+  isAuthenticated: false
+})
+
+const useBackendSessionStore = () => {
   const [user, setUser] = useState(null)
   const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const authMode = resolveAuthMode()
-  const usesBackendSessionMode = isBackendSessionMode()
-  const isAuth0Enabled = authMode === AUTH0_AUTH_MODE
-  const isBackendAuthMode = authMode === BACKEND_AUTH_MODE
 
-  const clearBackendSession = () => {
+  const clearBackendSession = useCallback(() => {
     setSession(null)
     setUser(null)
-    delete axios.defaults.headers.common['Authorization']
+    delete axios.defaults.headers.common.Authorization
     clearBackendSessionStorage()
-  }
+  }, [])
 
-  const setBackendSession = (backendToken, backendUser, persist = true) => {
+  const setBackendSession = useCallback((backendToken, backendUser, persist = true) => {
     setSession(backendToken ? { access_token: backendToken } : null)
     setUser(mapBackendUser(backendUser))
 
     if (backendToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${backendToken}`
+      axios.defaults.headers.common.Authorization = `Bearer ${backendToken}`
       if (persist) {
         saveBackendSession(backendToken, backendUser)
       }
@@ -797,170 +691,107 @@ export const AuthProvider = ({ children }) => {
     }
 
     clearBackendSessionStorage()
+  }, [])
+
+  return {
+    user,
+    session,
+    clearBackendSession,
+    setBackendSession
+  }
+}
+
+const restoreStoredBackendSession = async ({ setBackendSession, clearBackendSession }) => {
+  const stored = getStoredBackendSession()
+  if (!stored?.token) {
+    clearBackendSession()
+    return false
   }
 
-  const exchangeAuth0Token = async ({ accessToken, authCode, codeVerifier, redirectUri } = {}) => {
-    const auth0AccessToken = typeof accessToken === 'string' ? accessToken.trim() : ''
-    const auth0Code = typeof authCode === 'string' ? authCode.trim() : ''
-    const auth0CodeVerifier = typeof codeVerifier === 'string' ? codeVerifier.trim() : ''
-    const auth0RedirectUri = typeof redirectUri === 'string' ? redirectUri.trim() : ''
+  setBackendSession(stored.token, stored.user, true)
 
-    if (!auth0AccessToken && !auth0Code) {
-      return {
-        success: false,
-        code: 'auth0_missing_credentials',
-        error: 'Auth0 callback did not provide an authorization code or token.'
-      }
-    }
-    if (auth0Code && !auth0CodeVerifier) {
-      console.warn('Auth0 code exchange missing PKCE verifier.')
-      return {
-        success: false,
-        code: 'auth0_pkce_verifier_missing',
-        error: 'Missing PKCE verifier for Auth0 code exchange.'
-      }
+  try {
+    const { data } = await axios.get(AUTH_ENDPOINTS.profile)
+    const normalizedProfile = normalizeBackendAuthPayload(
+      { data },
+      { fallbackMessage: 'Unable to load backend auth profile.' }
+    )
+
+    if (!normalizedProfile.success || !normalizedProfile.user) {
+      clearBackendSession()
+      return false
     }
 
-    try {
-      const response = await axios.post(
-        AUTH_ENDPOINTS.exchange,
-        {
-          ...(auth0AccessToken ? { access_token: auth0AccessToken } : {}),
-          ...(auth0Code
-            ? {
-                code: auth0Code,
-                code_verifier: auth0CodeVerifier,
-                redirect_uri: auth0RedirectUri || getAuth0RedirectUri()
-              }
-            : {})
-        },
-        {
-          timeout: AUTH0_EXCHANGE_REQUEST_TIMEOUT_MS
-        }
-      )
+    setBackendSession(stored.token, normalizedProfile.user, true)
+    return {
+      success: true,
+      token: stored.token,
+      user: normalizedProfile.user
+    }
+  } catch (error) {
+    const status = error?.response?.status
+    if (status === 401 || status === 403 || status === 404) {
+      clearBackendSession()
+      return false
+    }
 
-      const requestSummary = {
-        hasCode: Boolean(auth0Code),
-        hasAccessToken: Boolean(auth0AccessToken),
-        hasCodeVerifier: Boolean(auth0CodeVerifier),
-        redirectUri: auth0RedirectUri || getAuth0RedirectUri()
-      }
-      console.info('Auth0 exchange request prepared:', requestSummary)
-      console.debug('Auth0 exchange endpoint:', AUTH_ENDPOINTS.exchange)
-      const requestPayloadKeys = auth0Code
-        ? ['code', 'code_verifier', 'redirect_uri']
-        : ['access_token']
-      console.info('Auth0 exchange request payload keys:', requestPayloadKeys)
-
-      const normalized = normalizeBackendAuthPayload(response, {
-        fallbackMessage: 'Unable to exchange Auth0 token.',
-        requiresToken: true
-      })
-      if (!normalized.success) {
-        console.warn('Auth0 token exchange returned malformed response:', normalized.message)
-        return {
-          success: false,
-          code: normalized.code,
-          error: normalized.message
-        }
-      }
-
-      setBackendSession(normalized.token, normalized.user, true)
-      console.info('Auth0 token exchange succeeded:', {
-        hasUser: Boolean(normalized.user?.id),
-        hasToken: Boolean(normalized.token)
-      })
-      return {
-        success: true,
-        user: normalized.user,
-        code: 'auth0_exchange_success'
-      }
-    } catch (error) {
-      const normalized = getBackendAuthError(error, 'Unable to exchange Auth0 credentials.')
-      console.warn('Auth0 token exchange failed:', normalized.message)
-
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        clearBackendSession()
-      }
-
-      return {
-        success: false,
-        code: normalized.code || BACKEND_AUTH_UNKNOWN_ERROR_CODE,
-        error: normalized.message,
-        details: normalized.details,
-        status: error?.response?.status
-      }
+    console.warn(
+      'Backend auth session restore failed; keeping local session for retry:',
+      error?.response?.data || error
+    )
+    return {
+      success: true,
+      token: stored.token,
+      user: stored.user
     }
   }
+}
+
+const Auth0SdkProvider = ({ children }) => {
+  const navigate = useNavigate()
+
+  const handleRedirectCallback = useCallback((appState) => {
+    navigate(AUTH0_CALLBACK_PATH, {
+      replace: true,
+      state: {
+        returnTo: appState?.returnTo || getDefaultAuthReturnTo()
+      }
+    })
+  }, [navigate])
+
+  return (
+    <Auth0Provider
+      domain={normalizeAuth0DomainForSdk()}
+      clientId={getAuth0ClientId()}
+      authorizationParams={getAuth0AuthorizationParams()}
+      onRedirectCallback={handleRedirectCallback}
+    >
+      {children}
+    </Auth0Provider>
+  )
+}
+
+const BackendSessionAuthProvider = ({ children }) => {
+  const { user, session, clearBackendSession, setBackendSession } = useBackendSessionStore()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let isMounted = true
 
     const initialize = async () => {
-      if (!usesBackendSessionMode) {
-        if (isMounted) {
-          setLoading(false)
-        }
+      const restored = await restoreStoredBackendSession({
+        setBackendSession,
+        clearBackendSession
+      })
+
+      if (!isMounted) {
         return
       }
 
-      try {
-        const stored = getStoredBackendSession()
-        if (!stored?.token) {
-          if (isMounted) {
-            clearBackendSession()
-          }
-          return
-        }
-
-        if (isMounted) {
-          setBackendSession(stored.token, stored.user, true)
-        }
-
-        const { data } = await axios.get(AUTH_ENDPOINTS.profile)
-        const normalizedProfile = normalizeBackendAuthPayload(
-          { data },
-          { fallbackMessage: 'Unable to load backend auth profile.' }
-        )
-        if (!normalizedProfile.success) {
-          if (normalizedProfile.code === BACKEND_AUTH_ROUTE_ERROR_CODE) {
-            console.error('Backend auth profile route is misconfigured:', normalizedProfile.message)
-          }
-          return
-        }
-
-        const mapped = normalizedProfile.user
-
-        if (!mapped?.id || !isMounted) {
-          if (isMounted) {
-            clearBackendSession()
-          }
-          return
-        }
-
-        if (isMounted) {
-          setBackendSession(stored.token, mapped, true)
-        }
-      } catch (error) {
-        const status = error?.response?.status
-        if (!isMounted) {
-          return
-        }
-
-        if (status === 401 || status === 403 || status === 404) {
-          clearBackendSession()
-          return
-        }
-
-        console.warn(
-          'Backend auth session restore failed; keeping local session for retry:',
-          error?.response?.data || error
-        )
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
+      if (!restored) {
+        clearBackendSession()
       }
+      setLoading(false)
     }
 
     initialize()
@@ -968,27 +799,9 @@ export const AuthProvider = ({ children }) => {
     return () => {
       isMounted = false
     }
-  }, [])
-
-  useEffect(() => {
-    const accessToken = session?.access_token
-    if (accessToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`
-    } else {
-      delete axios.defaults.headers.common['Authorization']
-    }
-  }, [session])
+  }, [clearBackendSession, setBackendSession])
 
   const login = async (email, password) => {
-    if (isAuth0Enabled) {
-      return initiateAuth0Login({
-        loginHint: String(email || '').trim().toLowerCase()
-      })
-    }
-    if (!usesBackendSessionMode) {
-      return { success: false, error: 'Authentication mode is not configured.' }
-    }
-
     try {
       const response = await axios.post(AUTH_ENDPOINTS.login, {
         email: String(email || '').trim().toLowerCase(),
@@ -1008,7 +821,6 @@ export const AuthProvider = ({ children }) => {
       }
 
       setBackendSession(normalized.token, normalized.user, true)
-
       return { success: true, user: normalized.user }
     } catch (error) {
       const normalized = getBackendAuthError(error, 'Unable to sign in right now.')
@@ -1017,17 +829,6 @@ export const AuthProvider = ({ children }) => {
   }
 
   const register = async (userData) => {
-    if (isAuth0Enabled) {
-      return initiateAuth0Login({
-        loginHint: String(userData?.email || '').trim().toLowerCase(),
-        screenHint: 'signup'
-      })
-    }
-
-    if (!usesBackendSessionMode) {
-      return { success: false, error: 'Authentication mode is not configured.' }
-    }
-
     try {
       const response = await axios.post(AUTH_ENDPOINTS.register, {
         email: String(userData.email || '').trim().toLowerCase(),
@@ -1051,7 +852,6 @@ export const AuthProvider = ({ children }) => {
       }
 
       setBackendSession(normalized.token, normalized.user, true)
-
       return {
         success: true,
         user: normalized.user,
@@ -1073,134 +873,33 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = async () => {
-    if (usesBackendSessionMode) {
-      clearBackendSession()
-      return
-    }
-    return { success: false, error: 'Authentication mode is not configured.' }
+    clearBackendSession()
+    clearStoredAuthReturnTo()
+    return { success: true }
   }
 
   const updateProfile = async (profileData) => {
-    if (usesBackendSessionMode) {
-      try {
-        const response = await axios.put(AUTH_ENDPOINTS.profile, {
-          first_name: profileData.first_name,
-          last_name: profileData.last_name,
-          role: profileData.role || '',
-          organization: profileData.organization || ''
-        })
+    try {
+      const response = await axios.put(AUTH_ENDPOINTS.profile, {
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        role: profileData.role || '',
+        organization: profileData.organization || ''
+      })
 
-        const normalized = normalizeBackendAuthPayload(response, {
-          fallbackMessage: 'Failed to load updated profile.'
-        })
-        if (!normalized.success) {
-          return { success: false, error: normalized.message, code: normalized.code }
-        }
-
-        setBackendSession(session?.access_token, normalized.user, true)
-        return { success: true, user: normalized.user }
-      } catch (error) {
-        const normalized = getBackendAuthError(error, 'Unable to update profile right now.')
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Failed to load updated profile.'
+      })
+      if (!normalized.success) {
         return { success: false, error: normalized.message, code: normalized.code }
       }
+
+      setBackendSession(session?.access_token, normalized.user, true)
+      return { success: true, user: normalized.user }
+    } catch (error) {
+      const normalized = getBackendAuthError(error, 'Unable to update profile right now.')
+      return { success: false, error: normalized.message, code: normalized.code }
     }
-    return {
-      success: false,
-      error: 'Profile updates are not supported in this authentication mode.'
-    }
-  }
-
-  const loginWithProvider = async (provider) => {
-    if (isAuth0Enabled) {
-      return initiateAuth0Login({
-        provider
-      })
-    }
-    return {
-      success: false,
-      error: 'Social provider login is only supported in Auth0 mode.'
-    }
-  }
-
-  const requestPasswordReset = async (email) => {
-    if (isAuth0Enabled) {
-      return {
-        success: false,
-        error: 'Password reset is handled in Auth0.'
-      }
-    }
-
-    if (isBackendAuthMode) {
-      return {
-        success: false,
-        error: 'Password reset is not available in backend authentication mode.'
-      }
-    }
-    return {
-      success: false,
-      error: 'Password reset is not available in this authentication mode.'
-    }
-  }
-
-  const syncBackendAfterLogin = async ({
-    auth0AccessToken = '',
-    auth0Code = '',
-    auth0CodeVerifier = '',
-    auth0RedirectUri = ''
-  } = {}) => {
-    if (usesBackendSessionMode) {
-      if (isAuth0Enabled && (auth0AccessToken || auth0Code)) {
-        const exchangeResult = await exchangeAuth0Token({
-          authCode: auth0Code,
-          accessToken: auth0AccessToken,
-          codeVerifier: auth0CodeVerifier,
-          redirectUri: auth0RedirectUri || getAuth0RedirectUri()
-        })
-        const isAuthenticated = Boolean(exchangeResult?.success)
-        if (auth0Code || auth0AccessToken) {
-          clearAuth0PkceSessionData()
-        }
-        if (isAuthenticated) {
-          return exchangeResult
-        }
-
-        return {
-          success: false,
-          code: exchangeResult?.code || BACKEND_AUTH_UNKNOWN_ERROR_CODE,
-          error: exchangeResult?.error || 'Unable to exchange Auth0 credentials.'
-        }
-      }
-
-      const stored = getStoredBackendSession()
-      if (!stored?.token) {
-        clearBackendSession()
-        return false
-      }
-
-      setBackendSession(stored.token, stored.user, true)
-      try {
-        const { data } = await axios.get(AUTH_ENDPOINTS.profile)
-        const normalizedProfile = normalizeBackendAuthPayload(
-          { data },
-          {
-            fallbackMessage: 'Unable to load backend auth profile.'
-          }
-        )
-
-        if (!normalizedProfile.success || !normalizedProfile.user) {
-          clearBackendSession()
-          return false
-        }
-
-        setBackendSession(stored.token, normalizedProfile.user, true)
-        return true
-      } catch (error) {
-        console.warn('Failed to finalize backend login sync:', error)
-        return false
-      }
-    }
-
-    return false
   }
 
   const value = {
@@ -1211,14 +910,350 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
+    loginWithProvider: async () => ({
+      success: false,
+      error: 'Social provider login is only supported in Auth0 mode.'
+    }),
+    requestPasswordReset: async () => ({
+      success: false,
+      error: 'Password reset is not available in backend authentication mode.'
+    }),
+    syncBackendAfterLogin: async () => {
+      const restored = await restoreStoredBackendSession({
+        setBackendSession,
+        clearBackendSession
+      })
+      return restored || false
+    },
+    isAuthenticated: !!user
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+const Auth0SessionAuthProvider = ({ children }) => {
+  const { user, session, clearBackendSession, setBackendSession } = useBackendSessionStore()
+  const [loading, setLoading] = useState(true)
+  const {
+    error: auth0Error,
+    getAccessTokenSilently,
+    isAuthenticated: hasAuth0Session,
+    isLoading: isAuth0Loading,
+    loginWithRedirect,
+    logout: auth0Logout
+  } = useAuth0()
+
+  const exchangeAuth0Token = useCallback(async ({
+    accessToken = '',
+    authCode = '',
+    codeVerifier = '',
+    redirectUri = ''
+  } = {}) => {
+    const auth0AccessToken = typeof accessToken === 'string' ? accessToken.trim() : ''
+    const auth0Code = typeof authCode === 'string' ? authCode.trim() : ''
+    const auth0CodeVerifier = typeof codeVerifier === 'string' ? codeVerifier.trim() : ''
+    const auth0RedirectUri = typeof redirectUri === 'string' ? redirectUri.trim() : ''
+
+    if (!auth0AccessToken && !auth0Code) {
+      return {
+        success: false,
+        code: 'auth0_missing_credentials',
+        error: 'Auth0 session did not provide an access token or authorization code.'
+      }
+    }
+
+    if (auth0Code && !auth0CodeVerifier) {
+      return {
+        success: false,
+        code: 'auth0_pkce_verifier_missing',
+        error: 'Missing PKCE verifier for Auth0 code exchange.'
+      }
+    }
+
+    if (auth0Code && !auth0RedirectUri) {
+      return {
+        success: false,
+        code: 'auth0_redirect_uri_missing',
+        error: 'Missing redirect URI for Auth0 code exchange.'
+      }
+    }
+
+    const exchangePayload = auth0AccessToken
+      ? { access_token: auth0AccessToken }
+      : {
+          code: auth0Code,
+          code_verifier: auth0CodeVerifier,
+          redirect_uri: auth0RedirectUri || getAuth0RedirectUri()
+        }
+
+    try {
+      const response = await axios.post(
+        AUTH_ENDPOINTS.exchange,
+        exchangePayload,
+        { timeout: AUTH0_EXCHANGE_REQUEST_TIMEOUT_MS }
+      )
+
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Unable to exchange Auth0 token.',
+        requiresToken: true
+      })
+      if (!normalized.success) {
+        return {
+          success: false,
+          code: normalized.code,
+          error: normalized.message
+        }
+      }
+
+      setBackendSession(normalized.token, normalized.user, true)
+      return {
+        success: true,
+        user: normalized.user,
+        code: 'auth0_exchange_success'
+      }
+    } catch (error) {
+      const normalized = getBackendAuthError(error, 'Unable to exchange Auth0 credentials.')
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        clearBackendSession()
+      }
+
+      return {
+        success: false,
+        code: normalized.code || BACKEND_AUTH_UNKNOWN_ERROR_CODE,
+        error: normalized.message,
+        details: normalized.details,
+        status: error?.response?.status
+      }
+    }
+  }, [clearBackendSession, setBackendSession])
+
+  const syncBackendAfterLogin = useCallback(async ({
+    auth0AccessToken = '',
+    auth0Code = '',
+    auth0CodeVerifier = '',
+    auth0RedirectUri = ''
+  } = {}) => {
+    if (auth0Error) {
+      return {
+        success: false,
+        code: 'auth0_sdk_error',
+        error: auth0Error.message || 'Unable to restore the Auth0 session.'
+      }
+    }
+
+    if (!hasAuth0Session && !auth0AccessToken && !auth0Code) {
+      clearBackendSession()
+      return false
+    }
+
+    if (auth0AccessToken || auth0Code) {
+      return exchangeAuth0Token({
+        accessToken: auth0AccessToken,
+        authCode: auth0Code,
+        codeVerifier: auth0CodeVerifier,
+        redirectUri: auth0RedirectUri || getAuth0RedirectUri()
+      })
+    }
+
+    try {
+      const accessToken = await getAccessTokenSilently(getAuth0AccessTokenOptions())
+      return exchangeAuth0Token({ accessToken })
+    } catch (error) {
+      const normalized = normalizeAuthError(error, 'Unable to refresh the Auth0 session.')
+      clearBackendSession()
+      return {
+        success: false,
+        code: normalized.code,
+        error: normalized.message
+      }
+    }
+  }, [
+    auth0Error,
+    clearBackendSession,
+    exchangeAuth0Token,
+    getAccessTokenSilently,
+    hasAuth0Session
+  ])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const initialize = async () => {
+      if (isAuth0Loading) {
+        return
+      }
+
+      if (!hasAuth0Session) {
+        if (isMounted) {
+          clearBackendSession()
+          setLoading(false)
+        }
+        return
+      }
+
+      if (isMounted) {
+        setLoading(true)
+      }
+
+      const restored = await restoreStoredBackendSession({
+        setBackendSession,
+        clearBackendSession
+      })
+      if (restored) {
+        if (isMounted) {
+          setLoading(false)
+        }
+        return
+      }
+
+      const exchangeResult = await syncBackendAfterLogin()
+      if (!exchangeResult?.success) {
+        clearBackendSession()
+      }
+
+      if (isMounted) {
+        setLoading(false)
+      }
+    }
+
+    initialize()
+
+    return () => {
+      isMounted = false
+    }
+  }, [
+    clearBackendSession,
+    hasAuth0Session,
+    isAuth0Loading,
+    setBackendSession,
+    syncBackendAfterLogin
+  ])
+
+  const startAuth0Redirect = async (options = {}) => {
+    if (!isAuth0ClientConfigured()) {
+      return {
+        success: false,
+        error: AUTH0_AUTH_LOGIN_ERROR_MESSAGE
+      }
+    }
+
+    try {
+      await loginWithRedirect(options)
+      return { success: true }
+    } catch (error) {
+      const normalized = normalizeAuthError(error, 'Unable to start Auth0 sign-in.')
+      return { success: false, error: normalized.message, code: normalized.code }
+    }
+  }
+
+  const login = async (email) =>
+    startAuth0Redirect(
+      buildAuth0RedirectOptions({
+        loginHint: String(email || '').trim().toLowerCase()
+      }) || {}
+    )
+
+  const register = async (userData) =>
+    startAuth0Redirect(
+      buildAuth0RedirectOptions({
+        loginHint: String(userData?.email || '').trim().toLowerCase(),
+        screenHint: 'signup'
+      }) || {}
+    )
+
+  const logout = async () => {
+    clearBackendSession()
+    clearStoredAuthReturnTo()
+
+    try {
+      await auth0Logout({
+        logoutParams: {
+          returnTo: typeof window === 'undefined' ? undefined : window.location.origin
+        }
+      })
+      return { success: true, redirected: true }
+    } catch (error) {
+      const normalized = normalizeAuthError(error, 'Unable to sign out right now.')
+      return { success: false, error: normalized.message, code: normalized.code }
+    }
+  }
+
+  const updateProfile = async (profileData) => {
+    try {
+      const response = await axios.put(AUTH_ENDPOINTS.profile, {
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        role: profileData.role || '',
+        organization: profileData.organization || ''
+      })
+
+      const normalized = normalizeBackendAuthPayload(response, {
+        fallbackMessage: 'Failed to load updated profile.'
+      })
+      if (!normalized.success) {
+        return { success: false, error: normalized.message, code: normalized.code }
+      }
+
+      setBackendSession(session?.access_token, normalized.user, true)
+      return { success: true, user: normalized.user }
+    } catch (error) {
+      const normalized = getBackendAuthError(error, 'Unable to update profile right now.')
+      return { success: false, error: normalized.message, code: normalized.code }
+    }
+  }
+
+  const loginWithProvider = async (provider) =>
+    startAuth0Redirect(
+      buildAuth0RedirectOptions({
+        provider
+      }) || {}
+    )
+
+  const value = {
+    user,
+    token: session?.access_token || null,
+    loading: loading || isAuth0Loading,
+    login,
+    register,
+    logout,
+    updateProfile,
     loginWithProvider,
-    requestPasswordReset,
+    requestPasswordReset: async () => ({
+      success: false,
+      error: 'Password reset is handled in Auth0.'
+    }),
     syncBackendAfterLogin,
     isAuthenticated: !!user
   }
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export const AuthProvider = ({ children }) => {
+  const authMode = resolveAuthMode()
+
+  if (authMode === AUTH0_AUTH_MODE) {
+    if (!isAuth0ClientConfigured()) {
+      return (
+        <AuthContext.Provider value={buildUnavailableAuthValue(AUTH0_AUTH_LOGIN_ERROR_MESSAGE)}>
+          {children}
+        </AuthContext.Provider>
+      )
+    }
+
+    return (
+      <Auth0SdkProvider>
+        <Auth0SessionAuthProvider>{children}</Auth0SessionAuthProvider>
+      </Auth0SdkProvider>
+    )
+  }
+
+  if (authMode === BACKEND_AUTH_MODE) {
+    return <BackendSessionAuthProvider>{children}</BackendSessionAuthProvider>
+  }
+
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={buildUnavailableAuthValue()}>
       {children}
     </AuthContext.Provider>
   )

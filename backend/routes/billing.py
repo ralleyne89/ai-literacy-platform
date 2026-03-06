@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+from urllib.parse import urlparse
 
 import stripe
 from flask import Blueprint, jsonify, request, g
@@ -96,12 +97,54 @@ def _create_stripe_checkout_session(**kwargs):
     return StripeCheckoutSession.create(**kwargs)
 
 
+def _retrieve_stripe_checkout_session(session_id: str):
+    return StripeCheckoutSession.retrieve(session_id, expand=['subscription'])
+
+
+def _construct_stripe_webhook_event(payload, signature, secret):
+    return stripe.Webhook.construct_event(payload, signature, secret)
+
+
 def _create_stripe_billing_portal_session(**kwargs):
     return StripeBillingPortalSession.create(**kwargs)
 
 
 def _get_frontend_url() -> str:
     return os.getenv('FRONTEND_URL', 'http://localhost:5173')
+
+
+def _resolve_frontend_url(path: str) -> str:
+    base_url = _get_frontend_url().rstrip('/')
+    normalized_path = path if str(path).startswith('/') else f'/{path}'
+    return f'{base_url}{normalized_path}'
+
+
+def _is_allowed_frontend_redirect_url(candidate_url: str) -> bool:
+    requested = str(candidate_url or '').strip()
+    if not requested:
+        return False
+
+    try:
+        requested_parsed = urlparse(requested)
+        frontend_parsed = urlparse(_get_frontend_url())
+    except Exception:
+        return False
+
+    if requested_parsed.scheme not in ('http', 'https'):
+        return False
+
+    return (
+        requested_parsed.scheme == frontend_parsed.scheme and
+        requested_parsed.netloc == frontend_parsed.netloc
+    )
+
+
+def _sanitize_frontend_redirect_url(requested_url: Optional[str], fallback_path: str) -> str:
+    fallback_url = _resolve_frontend_url(fallback_path)
+    candidate = str(requested_url or '').strip()
+    if _is_allowed_frontend_redirect_url(candidate):
+        return candidate
+    return fallback_url
 
 
 def _plan_config(plan_id: str):
@@ -230,13 +273,13 @@ def _subscription_payload_from_user(user: User):
     }
 
 
-def _subscription_payload_from_stripe(user: User, stripe_subscription):
+def _subscription_payload_from_stripe(user: User, stripe_subscription, plan_id_hint: Optional[str] = None):
     item = (stripe_subscription.get('items', {}).get('data') or [{}])[0]
     price = item.get('price') or {}
     recurring = price.get('recurring') or {}
     amount_cents = price.get('unit_amount')
 
-    plan_id = _plan_id_from_amount(amount_cents)
+    plan_id = _normalize_plan_id(plan_id_hint or _plan_id_from_amount(amount_cents))
     interval = recurring.get('interval') or 'month'
     status = stripe_subscription.get('status')
 
@@ -255,6 +298,175 @@ def _subscription_payload_from_stripe(user: User, stripe_subscription):
         'customer_id': user.stripe_customer_id,
         'subscription_id': user.stripe_subscription_id,
     }
+
+
+def _resolve_authenticated_user():
+    user_id = g.get('current_user_id') or get_supabase_identity()
+    claims = g.get('supabase_claims') or get_supabase_claims(optional=True) or {}
+
+    if not user_id:
+        return None, claims, ('Unauthorized', 401)
+
+    try:
+        user = _ensure_local_user(user_id, claims)
+    except ValueError as exc:
+        return None, claims, (str(exc), 400)
+
+    return user, claims, None
+
+
+def _verified_billing_email(user: User, claims: dict) -> str:
+    email = (user.email or '').strip().lower()
+    if email:
+        return email
+
+    return (claims.get('email') or claims.get('user_email') or '').strip().lower()
+
+
+def _checkout_session_belongs_to_user(user: User, checkout_session) -> bool:
+    metadata = checkout_session.get('metadata') or {}
+    session_user_id = str(metadata.get('user_id') or '').strip()
+    if session_user_id and session_user_id == user.id:
+        return True
+
+    session_email_candidates = [
+        metadata.get('email'),
+        checkout_session.get('customer_email'),
+        (checkout_session.get('customer_details') or {}).get('email'),
+    ]
+    normalized_user_email = (user.email or '').strip().lower()
+    return any(
+        isinstance(candidate, str) and candidate.strip().lower() == normalized_user_email
+        for candidate in session_email_candidates
+    )
+
+
+def _sync_user_subscription_from_checkout_session(user: User, checkout_session):
+    metadata = checkout_session.get('metadata') or {}
+    checkout_mode = str(checkout_session.get('mode') or '').strip().lower()
+    if checkout_mode and checkout_mode != 'subscription':
+        raise ValueError('Checkout session is not a subscription session')
+
+    stripe_subscription = checkout_session.get('subscription')
+    if isinstance(stripe_subscription, str):
+        stripe_subscription = _retrieve_stripe_subscription(stripe_subscription)
+
+    if not isinstance(stripe_subscription, dict):
+        raise ValueError('Checkout session did not include a Stripe subscription')
+
+    session_customer_id = checkout_session.get('customer')
+    if session_customer_id:
+        user.stripe_customer_id = session_customer_id
+
+    payload = _subscription_payload_from_stripe(
+        user,
+        stripe_subscription,
+        plan_id_hint=metadata.get('plan_id')
+    )
+    return payload
+
+
+def _user_for_webhook_checkout_session(checkout_session):
+    metadata = checkout_session.get('metadata') or {}
+    user_id = str(metadata.get('user_id') or '').strip()
+    if user_id:
+        user = User.query.get(user_id)
+        if user:
+            return user
+
+    checkout_email = (
+        metadata.get('email') or
+        checkout_session.get('customer_email') or
+        (checkout_session.get('customer_details') or {}).get('email') or
+        ''
+    )
+    normalized_email = str(checkout_email).strip().lower()
+    if not normalized_email:
+        return None
+
+    return User.query.filter_by(email=normalized_email).first()
+
+
+def _user_for_stripe_subscription(stripe_subscription):
+    subscription_id = str(stripe_subscription.get('id') or '').strip()
+    customer_id = str(stripe_subscription.get('customer') or '').strip()
+
+    if subscription_id:
+        user = User.query.filter_by(stripe_subscription_id=subscription_id).first()
+        if user:
+            return user
+
+    if customer_id:
+        user = User.query.filter_by(stripe_customer_id=customer_id).first()
+        if user:
+            return user
+
+    return None
+
+
+def _handle_checkout_session_completed(checkout_session):
+    user = _user_for_webhook_checkout_session(checkout_session)
+    if user is None:
+        logger.warning(
+            'stripe_webhook_checkout_user_missing',
+            session_id=checkout_session.get('id'),
+            user_id=(checkout_session.get('metadata') or {}).get('user_id'),
+            email=(checkout_session.get('metadata') or {}).get('email'),
+        )
+        return
+
+    payload = _sync_user_subscription_from_checkout_session(user, checkout_session)
+    logger.info(
+        'stripe_webhook_checkout_completed',
+        user_id=user.id,
+        session_id=checkout_session.get('id'),
+        plan=payload.get('plan'),
+        status=payload.get('status'),
+    )
+
+
+def _handle_subscription_updated(stripe_subscription):
+    user = _user_for_stripe_subscription(stripe_subscription)
+    if user is None:
+        logger.warning(
+            'stripe_webhook_subscription_user_missing',
+            subscription_id=stripe_subscription.get('id'),
+            customer_id=stripe_subscription.get('customer'),
+        )
+        return
+
+    payload = _subscription_payload_from_stripe(user, stripe_subscription)
+    logger.info(
+        'stripe_webhook_subscription_updated',
+        user_id=user.id,
+        subscription_id=stripe_subscription.get('id'),
+        plan=payload.get('plan'),
+        status=payload.get('status'),
+    )
+
+
+def _handle_subscription_deleted(stripe_subscription):
+    user = _user_for_stripe_subscription(stripe_subscription)
+    if user is None:
+        logger.warning(
+            'stripe_webhook_subscription_delete_user_missing',
+            subscription_id=stripe_subscription.get('id'),
+            customer_id=stripe_subscription.get('customer'),
+        )
+        return
+
+    user.subscription_tier = 'free'
+    user.subscription_status = 'canceled'
+    user.stripe_customer_id = stripe_subscription.get('customer') or user.stripe_customer_id
+    user.stripe_subscription_id = stripe_subscription.get('id') or user.stripe_subscription_id
+    db.session.commit()
+
+    logger.info(
+        'stripe_webhook_subscription_deleted',
+        user_id=user.id,
+        subscription_id=user.stripe_subscription_id,
+        customer_id=user.stripe_customer_id,
+    )
 
 
 @billing_bp.route('/config', methods=['GET'])
@@ -314,7 +526,7 @@ def get_subscription():
 
 
 @billing_bp.route('/checkout-session', methods=['POST'])
-@supabase_jwt_required(optional=True)
+@supabase_jwt_required()
 def create_checkout_session():
     request_data = request.get_json() or {}
     plan_id = _normalize_plan_id(request_data.get('plan'))
@@ -346,26 +558,22 @@ def create_checkout_session():
             'details': 'STRIPE_SECRET_KEY environment variable is missing'
         }), 503
 
-    user_id = g.get('current_user_id') or get_supabase_identity(optional=True)
-    claims = g.get('supabase_claims') or get_supabase_claims(optional=True) or {}
-    user = User.query.get(user_id) if user_id else None
+    user, claims, error = _resolve_authenticated_user()
+    if error:
+        return jsonify({'error': error[0]}), error[1]
 
-    email = (request_data.get('email') or '').strip().lower()
+    email = _verified_billing_email(user, claims)
     if not email:
-        email = (user.email if user else None) or claims.get('email') or claims.get('user_email')
+        return jsonify({'error': 'Verified account email is required to start checkout'}), 400
 
-    if not email:
-        return jsonify({'error': 'Email is required to start checkout'}), 400
-
-    if user is None and user_id:
-        try:
-            user = _ensure_local_user(user_id, claims)
-        except ValueError as exc:
-            return jsonify({'error': str(exc)}), 400
-
-    frontend_url = _get_frontend_url().rstrip('/')
-    success_url = request_data.get('success_url') or f'{frontend_url}/billing?success=true'
-    cancel_url = request_data.get('cancel_url') or f'{frontend_url}/billing?canceled=true'
+    success_url = _sanitize_frontend_redirect_url(
+        request_data.get('success_url'),
+        '/billing?success=true'
+    )
+    cancel_url = _sanitize_frontend_redirect_url(
+        request_data.get('cancel_url'),
+        '/billing?canceled=true'
+    )
 
     try:
         if mock_mode:
@@ -396,13 +604,13 @@ def create_checkout_session():
             'success_url': f'{success_url}&session_id={{CHECKOUT_SESSION_ID}}',
             'cancel_url': cancel_url,
             'metadata': {
-                'user_id': user.id if user else '',
+                'user_id': user.id,
                 'plan_id': plan_id,
                 'email': email,
             }
         }
 
-        if user and user.stripe_customer_id:
+        if user.stripe_customer_id:
             checkout_kwargs['customer'] = user.stripe_customer_id
         else:
             checkout_kwargs['customer_email'] = email
@@ -426,29 +634,105 @@ def create_checkout_session():
     return jsonify({'url': session.url})
 
 
+@billing_bp.route('/checkout-session/complete', methods=['POST'])
+@supabase_jwt_required()
+def complete_checkout_session():
+    request_data = request.get_json(silent=True) or {}
+    session_id = str(request_data.get('session_id') or '').strip()
+    if not session_id:
+        return jsonify({'error': 'session_id is required'}), 400
+
+    user, _claims, error = _resolve_authenticated_user()
+    if error:
+        return jsonify({'error': error[0]}), error[1]
+
+    stripe_secret = os.getenv('STRIPE_SECRET_KEY')
+    if not stripe_secret:
+        return jsonify({'error': 'Stripe is not configured'}), 503
+
+    try:
+        stripe.api_key = stripe_secret
+        checkout_session = _retrieve_stripe_checkout_session(session_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception(
+            'stripe_checkout_session_retrieve_failed',
+            error=str(exc),
+            session_id=session_id,
+            user_id=user.id,
+        )
+        return jsonify({'error': 'Unable to retrieve checkout session', 'details': str(exc)}), 500
+
+    if not _checkout_session_belongs_to_user(user, checkout_session):
+        return jsonify({'error': 'Checkout session does not belong to the authenticated user'}), 403
+
+    try:
+        payload = _sync_user_subscription_from_checkout_session(user, checkout_session)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception(
+            'stripe_checkout_session_complete_failed',
+            error=str(exc),
+            session_id=session_id,
+            user_id=user.id,
+        )
+        return jsonify({'error': 'Unable to finalize checkout session', 'details': str(exc)}), 500
+
+    return jsonify(payload), 200
+
+
+@billing_bp.route('/webhooks/stripe', methods=['POST'])
+def handle_stripe_webhook():
+    webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+    stripe_secret = os.getenv('STRIPE_SECRET_KEY')
+    signature = request.headers.get('Stripe-Signature', '')
+
+    if not webhook_secret:
+        return jsonify({'error': 'Stripe webhook secret is not configured'}), 503
+
+    if not stripe_secret:
+        return jsonify({'error': 'Stripe is not configured'}), 503
+
+    payload = request.get_data()
+
+    try:
+        stripe_event = _construct_stripe_webhook_event(payload, signature, webhook_secret)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning('stripe_webhook_signature_failed', error=str(exc))
+        return jsonify({'error': f'Webhook Error: {exc}'}), 400
+
+    stripe.api_key = stripe_secret
+    event_type = stripe_event.get('type')
+    event_object = (stripe_event.get('data') or {}).get('object') or {}
+
+    try:
+        if event_type == 'checkout.session.completed':
+            _handle_checkout_session_completed(event_object)
+        elif event_type in ('customer.subscription.created', 'customer.subscription.updated'):
+            _handle_subscription_updated(event_object)
+        elif event_type == 'customer.subscription.deleted':
+            _handle_subscription_deleted(event_object)
+        else:
+            logger.info('stripe_webhook_unhandled_event', event_type=event_type)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception('stripe_webhook_processing_failed', event_type=event_type, error=str(exc))
+        return jsonify({'error': 'Webhook processing failed'}), 500
+
+    return jsonify({'received': True}), 200
+
+
 @billing_bp.route('/customer-portal', methods=['POST'])
 @supabase_jwt_required()
 def create_customer_portal():
-    user_id = g.get('current_user_id') or get_supabase_identity()
-    claims = g.get('supabase_claims') or get_supabase_claims(optional=True) or {}
-
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
-
-    try:
-        user = _ensure_local_user(user_id, claims)
-    except ValueError as exc:
-        return jsonify({'error': str(exc)}), 400
+    user, _claims, error = _resolve_authenticated_user()
+    if error:
+        return jsonify({'error': error[0]}), error[1]
 
     if not user.stripe_customer_id:
         return jsonify({'error': 'No active subscription customer found'}), 404
 
     request_data = request.get_json(silent=True) or {}
-    frontend_url = _get_frontend_url().rstrip('/')
-    return_url = request_data.get('return_url') or f'{frontend_url}/billing'
-
-    if not str(return_url).startswith(frontend_url):
-        return_url = f'{frontend_url}/billing'
+    return_url = _sanitize_frontend_redirect_url(request_data.get('return_url'), '/billing')
 
     if _mock_mode_enabled():
         return jsonify({'url': f'{return_url}?portal=mock'}), 200
@@ -468,7 +752,7 @@ def create_customer_portal():
         logger.exception(
             'stripe_customer_portal_failed',
             error=str(exc),
-            user_id=user_id,
+            user_id=user.id,
             customer_id=user.stripe_customer_id,
         )
         return jsonify({'error': 'Unable to open customer portal', 'details': str(exc)}), 500

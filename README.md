@@ -271,18 +271,11 @@ Automated end-to-end workflows expect these runtime conditions:
 - Frontend running at `http://127.0.0.1:5173`
 - Backend API running at `http://127.0.0.1:5001`
 - Test environment points to the API with `VITE_API_URL=http://127.0.0.1:5001`
+- Frontend is started with `VITE_AUTH_MODE=auth0`
+- `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are set for the target environment
+- The Auth0 application allows the matching callback URL and web origin (`/auth/callback` on local or production)
 - A stable dataset seeded for modules, certifications, and course content
-- Supabase auth configured for deterministic automated signup/login in test environments
-
-Required test credentials must come from CI/local env:
-
-- `E2E_TEST_EMAIL` (required)
-- `E2E_TEST_PASSWORD` (required)
-
-Optional admin fallback credentials (recommended in CI):
-
-- `E2E_ADMIN_EMAIL` (defaults to `reggiealleyne89@gmail.com` if unset in the test runner)
-- `E2E_ADMIN_PASSWORD` (must be supplied with `E2E_ADMIN_EMAIL`)
+- Backend token exchange is reachable at `/api/auth/exchange`
 
 Run the required seed steps from `backend/`:
 
@@ -294,30 +287,22 @@ FLASK_APP=app.py flask seed-certifications --force
 FLASK_APP=app.py flask seed-course-content --force
 ```
 
-For fully automated runs, keep Supabase email confirmation disabled (or ensure the test account used by automation is already confirmed), and avoid relying on social OAuth providers. The Playwright flow uses direct form-driven registration/login flows, so email confirmation/pending states or provider redirects can cause non-deterministic behavior.
+Auth0 release verification should validate the real browser flow instead of the legacy in-app password form flow:
 
-Recommended Playwright command usage:
+- `/login` accepts the email address and redirects to Auth0 Universal Login
+- `/register` accepts the email address and redirects to Auth0 signup
+- Auth0 returns to `/auth/callback`
+- The callback completes backend token exchange and lands on `/dashboard`
+- At least one protected route loads successfully after sign-in (for example `/training` or a course module)
 
-- CI (auth smoke):
+Legacy note:
 
-```bash
-E2E_TEST_EMAIL=test+ci@example.com E2E_TEST_PASSWORD=strong-password \
-E2E_ADMIN_EMAIL=admin@example.com E2E_ADMIN_PASSWORD=admin-password \
-npm run e2e:smoke
-```
+- `npm run e2e:smoke`, `npm run e2e:flow`, and `npm run e2e` should not be treated as Auth0 release gates until their specs are rewritten to follow the redirect and callback path above.
+- If you automate against a real Auth0 tenant, inject the test account details and any tenant-specific secrets through CI/local environment variables rather than hard-coding them into the suite.
 
-- Local/full verification:
+### Validation runbook (Auth0 release path)
 
-```bash
-E2E_TEST_EMAIL=test+local@example.com E2E_TEST_PASSWORD=strong-password \
-npm run e2e:flow
-```
-
-`npm run e2e` maps to `npm run e2e:flow` for the full journey and is kept for local/manual compatibility.
-
-### Validation runbook (latest execution)
-
-Executed: `2026-02-28` at `09:10 UTC`.
+Use this sequence before shipping an Auth0 build:
 
 ```bash
 # backend prep (from /backend)
@@ -328,20 +313,36 @@ PYTHONPATH=. FLASK_APP=app.py flask seed-training-modules --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-certifications --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-course-content --force
 
-# stack + Playwright execution
+# unit coverage for the Auth0 provider contract (from repo root)
+npm test -- src/contexts/AuthContext.test.jsx
+
+# static checks
+npm run lint
+
+# production-style frontend build with explicit Auth0 env
+VITE_API_URL=https://ai-literacy-platform.onrender.com \
+VITE_AUTH_MODE=auth0 \
+VITE_AUTH0_DOMAIN=https://litmusai.us.auth0.com \
+VITE_AUTH0_CLIENT_ID=your-auth0-client-id \
+VITE_AUTH0_AUDIENCE=https://litmusai.us.auth0.com/api/v2/ \
+VITE_AUTH0_REDIRECT_URI=https://litmusai.netlify.app/auth/callback \
+ENFORCE_PROD_ENV=1 \
+npm run build
+
+# stack for Auth0 browser verification
 npm run backend
 npm run dev -- --host 127.0.0.1 --port 5173
-npm run e2e:install
-npm run e2e:smoke
 ```
 
 Checklist:
 
 - [x] Backend reachable at `http://127.0.0.1:5001/api/health` (HTTP 200).
 - [x] Frontend reachable at `http://127.0.0.1:5173/` (HTTP 200).
-- [x] `npm run e2e:install` completed.
-- [ ] Backend DB seed/runbook prep completed end-to-end. `flask db upgrade` and seed chain failed at migration step due pre-existing DB state (`sqlite3.OperationalError: table certification_type already exists` in local workspace).
-- [ ] `npm run e2e` completed with tests. Current run reported `Error: No tests found`.
+- [ ] `/login` redirects to Auth0 Universal Login after email submission.
+- [ ] `/register` redirects to Auth0 signup after email submission.
+- [ ] `/auth/callback` completes without an auth error.
+- [ ] Dashboard loads with an authenticated backend session.
+- [ ] At least one protected route loads successfully after sign-in.
 
 ## 🔧 Configuration
 
@@ -372,6 +373,8 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 STRIPE_PRICE_PREMIUM=price_live_or_test_premium
 STRIPE_PRICE_ENTERPRISE=price_live_or_test_enterprise
 FRONTEND_URL=https://your-netlify-site.netlify.app
+# Optional explicit backend URL for legacy Netlify billing/webhook proxy functions
+BACKEND_API_URL=https://ai-literacy-platform.onrender.com
 E2E_TEST_EMAIL=autotest+playwright@example.com
 E2E_TEST_PASSWORD=super-secret-test-password
 # Optional: override default admin credentials used by E2E fallback path
@@ -388,6 +391,7 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 - `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are required when `VITE_AUTH_MODE=auth0`.
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required when `VITE_AUTH_MODE=supabase`.
 - `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET` is required for backend/Auth0 token flow; `SUPABASE_JWT_SECRET` is additionally required for Supabase-backed token verification.
+- Billing and Stripe webhook state should terminate at the backend API, not at a separate Netlify billing state store.
 
 Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
 

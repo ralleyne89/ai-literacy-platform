@@ -10,12 +10,13 @@ import os
 from werkzeug.security import check_password_hash as check_legacy_password_hash
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from auth_identity import AuthIdentityConflictError, MissingIdentityEmailError, sync_managed_user
 from routes import (
+    get_external_auth_identity_for_token,
     supabase_jwt_required,
     get_supabase_claims,
     get_supabase_claims_for_token,
     get_supabase_identity,
-    get_supabase_identity_for_token,
 )
 
 auth_bp = Blueprint('auth', __name__)
@@ -538,19 +539,39 @@ def login_options():
 def exchange():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
+        logger.warning(
+            'auth_exchange_invalid_payload',
+            request_id=str(request.headers.get('X-Request-ID', '')),
+            content_type=request.headers.get('Content-Type', ''),
+            raw_payload_type=type(payload).__name__,
+        )
         return jsonify({'error': 'Invalid request payload'}), 400
 
+    payload_code = _normalize_auth0_text(payload.get('code'))
+    payload_code_verifier = _normalize_auth0_text(payload.get('code_verifier'))
+    payload_access_token = _normalize_auth0_token(payload)
+    payload_redirect_uri = _normalize_frontend_redirect_uri(payload.get('redirect_uri'))
+
+    logger.info(
+        'auth_exchange_request_keys',
+        request_id=str(request.headers.get('X-Request-ID', '')),
+        has_code=bool(payload_code),
+        has_code_verifier=bool(payload_code_verifier),
+        has_access_token=bool(payload_access_token),
+        has_redirect_uri=bool(payload_redirect_uri),
+    )
+
     auth0_access_token = ''
-    auth0_code = _normalize_auth0_text(payload.get('code'))
+    auth0_code = payload_code
     if auth0_code:
-        auth0_code_verifier = _normalize_auth0_text(payload.get('code_verifier'))
+        auth0_code_verifier = payload_code_verifier
         if not auth0_code_verifier:
             return jsonify({
                 'error': 'Code verifier is required for authorization code exchange.',
                 'code': 'AUTH0_CODE_VERIFIER_REQUIRED',
             }), 400
 
-        auth0_redirect_uri = _normalize_frontend_redirect_uri(payload.get('redirect_uri'))
+        auth0_redirect_uri = payload_redirect_uri
         if not auth0_redirect_uri:
             return jsonify({
                 'error': 'Redirect URI is required for authorization code exchange.',
@@ -568,7 +589,7 @@ def exchange():
                 'code': 'AUTH0_CODE_EXCHANGE_FAILED',
             }), 400
     else:
-        auth0_access_token = _normalize_auth0_token(payload or {})
+        auth0_access_token = payload_access_token
 
     if not auth0_access_token:
         return jsonify({
@@ -589,8 +610,8 @@ def exchange():
             'code': 'AUTH0_TOKEN_UNAUTHORIZED',
         }), 401
 
-    user_id = get_supabase_identity_for_token(auth0_access_token)
-    if not user_id:
+    auth_identity = get_external_auth_identity_for_token(auth0_access_token)
+    if not auth_identity:
         return jsonify({
             'error': 'Invalid access token',
             'code': 'AUTH0_INVALID_ACCESS_TOKEN',
@@ -617,33 +638,26 @@ def exchange():
     organization = claims.get('organization') or user_metadata.get('organization')
 
     try:
-        user = User.query.get(user_id)
-        if user is None:
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user and existing_user.id != user_id:
-                return jsonify({
-                    'error': 'Email already exists for a legacy account',
-                    'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
-                }), 409
-
-            user = User(
-                id=user_id,
-                email=email,
-                password_hash='auth0_managed',
-                first_name=first_name,
-                last_name=last_name,
-                role=role or None,
-                organization=organization or None,
-            )
-            db.session.add(user)
-        else:
-            user.email = email
-            user.first_name = first_name
-            user.last_name = last_name
-            user.role = role or user.role
-            user.organization = organization or user.organization
-
-        db.session.commit()
+        user = sync_managed_user(
+            claims,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            organization=organization,
+        )
+    except AuthIdentityConflictError:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Email already exists for a legacy account',
+            'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
+        }), 409
+    except MissingIdentityEmailError:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Token missing email claim',
+            'code': 'AUTH0_EMAIL_CLAIM_REQUIRED',
+        }), 400
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Exchange failed', 'details': str(e)}), 500
@@ -733,7 +747,7 @@ def update_profile():
 def sync_user():
     """Ensure a corresponding user record exists in the local database for Supabase-authenticated users."""
     try:
-        supabase_user_id = g.get('current_user_id') or get_supabase_identity()
+        g.get('current_user_id') or get_supabase_identity()
         claims = g.get('supabase_claims') or get_supabase_claims()
         payload = request.get_json() or {}
 
@@ -755,36 +769,14 @@ def sync_user():
         if not last_name:
             last_name = 'Learner'
 
-        user = User.query.get(supabase_user_id)
-
-        if not user:
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user and existing_user.id != supabase_user_id:
-                return jsonify({
-                    'error': 'Email already exists for a legacy account',
-                    'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
-                    'message': 'A legacy account with this email already exists. Please sign in using email/password first, then link your social provider if needed.',
-                    'existing_user_id': existing_user.id
-                }), 409
-
-            user = User(
-                id=supabase_user_id,
-                email=email,
-                password_hash='supabase_managed',
-                first_name=first_name,
-                last_name=last_name,
-                role=role or None,
-                organization=organization or None
-            )
-            db.session.add(user)
-        else:
-            user.email = email
-            user.first_name = first_name
-            user.last_name = last_name
-            user.role = role or None
-            user.organization = organization or None
-
-        db.session.commit()
+        user = sync_managed_user(
+            claims,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            organization=organization,
+        )
 
         return jsonify({
             'message': 'User synchronized successfully',
@@ -798,6 +790,17 @@ def sync_user():
                 'subscription_tier': user.subscription_tier
             }
         }), 200
+    except AuthIdentityConflictError as exc:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Email already exists for a legacy account',
+            'code': 'EMAIL_ALREADY_EXISTS_LEGACY_ACCOUNT',
+            'message': 'A legacy account with this email already exists. Please sign in using email/password first, then link your social provider if needed.',
+            'existing_user_id': exc.existing_user.id,
+        }), 409
+    except MissingIdentityEmailError:
+        db.session.rollback()
+        return jsonify({'error': 'Email is required to sync user'}), 400
 
     except Exception as e:
         db.session.rollback()

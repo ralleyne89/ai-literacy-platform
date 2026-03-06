@@ -1,7 +1,7 @@
 import { devices, defineConfig } from '@playwright/test';
 
 const host = process.env.PLAYWRIGHT_HOST || '127.0.0.1';
-const frontendPort = Number(process.env.PLAYWRIGHT_FRONTEND_PORT || '5173');
+const frontendPort = Number(process.env.PLAYWRIGHT_FRONTEND_PORT || '5195');
 const backendPort = Number(process.env.PLAYWRIGHT_BACKEND_PORT || '5001');
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://${host}:${frontendPort}`;
 const recordMode = ['1', 'true', 'yes'].includes((process.env.PLAYWRIGHT_RECORD_MODE || '').toLowerCase());
@@ -46,7 +46,12 @@ export default defineConfig({
       timeout: 120000,
       env: {
         VITE_API_URL: `http://${host}:${backendPort}`,
-        VITE_AUTH_MODE: 'backend',
+        VITE_AUTH_MODE: 'auth0',
+        VITE_AUTH0_DOMAIN: 'litmusai.us.auth0.com',
+        VITE_AUTH0_CLIENT_ID: 'playwright-client-id',
+        VITE_AUTH0_AUDIENCE: 'https://litmusai.us.auth0.com/api/v2/',
+        VITE_AUTH0_REDIRECT_URI: `${baseURL}/auth/callback`,
+        PLAYWRIGHT_AUTH0_STUB: '1',
       },
     },
   ],

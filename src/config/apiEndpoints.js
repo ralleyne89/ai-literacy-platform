@@ -77,3 +77,11 @@ export const AUTH_ENDPOINTS = {
   exchange: buildApiPath('/api/auth/exchange'),
   profile: buildApiPath('/api/auth/profile')
 }
+
+export const BILLING_ENDPOINTS = {
+  config: buildApiPath('/api/billing/config'),
+  subscription: buildApiPath('/api/billing/subscription'),
+  checkoutSession: buildApiPath('/api/billing/checkout-session'),
+  checkoutComplete: buildApiPath('/api/billing/checkout-session/complete'),
+  customerPortal: buildApiPath('/api/billing/customer-portal')
+}

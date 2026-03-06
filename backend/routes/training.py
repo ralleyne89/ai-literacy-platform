@@ -68,9 +68,58 @@ def serialize_module(module, include_details: bool = False):
     return data
 
 
+def serialize_progress(progress, module_title=None):
+    if not progress:
+        return None
+
+    return {
+        'module_id': progress.module_id,
+        'module_title': module_title,
+        'status': progress.status,
+        'progress_percentage': progress.progress_percentage or 0,
+        'time_spent_minutes': progress.time_spent_minutes or 0,
+        'current_lesson_id': progress.current_lesson_id,
+        'started_at': progress.started_at.isoformat() if progress.started_at else None,
+        'last_accessed': progress.last_accessed.isoformat() if progress.last_accessed else None,
+        'completed_at': progress.completed_at.isoformat() if progress.completed_at else None,
+    }
+
+
+def build_progress_summary(progress_payload):
+    completed_modules = sum(1 for progress in progress_payload if progress.get('status') == 'completed')
+    total_learning_time = sum(progress.get('time_spent_minutes') or 0 for progress in progress_payload)
+    in_progress = [progress for progress in progress_payload if progress.get('status') == 'in_progress']
+    in_progress.sort(
+        key=lambda progress: progress.get('last_accessed') or '',
+        reverse=True,
+    )
+
+    return {
+        'completed_modules': completed_modules,
+        'total_learning_time': total_learning_time,
+        'resume_module': in_progress[0] if in_progress else None,
+    }
+
+
+def get_progress_lookup(user_id, module_ids):
+    if not user_id or not module_ids:
+        return {}
+
+    progress_records = (UserProgress.query
+                        .filter(
+                            UserProgress.user_id == user_id,
+                            UserProgress.module_id.in_(module_ids)
+                        )
+                        .all())
+
+    return {progress.module_id: progress for progress in progress_records}
+
+
 @training_bp.route('/modules', methods=['GET'])
+@supabase_jwt_required(optional=True)
 def get_training_modules():
     try:
+        user_id = g.get('current_user_id') or get_supabase_identity(optional=True)
         role_filter = request.args.get('role')
         access_tier = request.args.get('tier')
 
@@ -89,6 +138,21 @@ def get_training_modules():
             modules = [m for m in modules if m.get('access_tier') == access_tier]
 
         response_payload = {'modules': modules}
+        progress_payload = []
+
+        if user_id and modules:
+            progress_lookup = get_progress_lookup(user_id, [module['id'] for module in modules])
+            for module_payload in modules:
+                progress = serialize_progress(
+                    progress_lookup.get(module_payload['id']),
+                    module_title=module_payload.get('title'),
+                )
+                module_payload['user_progress'] = progress
+                if progress:
+                    progress_payload.append(progress)
+
+            response_payload['summary'] = build_progress_summary(progress_payload)
+            response_payload['resume_module'] = response_payload['summary']['resume_module']
 
         if not records:
             response_payload['message'] = 'No training modules configured yet. Use `flask seed-training-modules` to load defaults.'
@@ -110,14 +174,22 @@ def get_training_modules():
 
 
 @training_bp.route('/modules/<module_id>', methods=['GET'])
+@supabase_jwt_required(optional=True)
 def get_training_module_detail(module_id):
     try:
+      user_id = g.get('current_user_id') or get_supabase_identity(optional=True)
       module = TrainingModule.query.get(module_id)
       if not module or not module.is_active:
           return jsonify({'error': 'Module not found'}), 404
 
       serialized = serialize_module(module, include_details=True)
-      logger.info('training_module_detail', module_id=module_id)
+      progress = None
+      if user_id:
+          progress_record = UserProgress.query.filter_by(user_id=user_id, module_id=module_id).first()
+          progress = serialize_progress(progress_record, module_title=module.title)
+
+      serialized['progress'] = progress
+      logger.info('training_module_detail', module_id=module_id, user_id=user_id)
       return jsonify({'module': serialized}), 200
 
     except Exception as e:
@@ -128,6 +200,7 @@ def get_training_module_detail(module_id):
 @training_bp.route('/progress', methods=['GET'])
 @supabase_jwt_required()
 def get_user_progress():
+    user_id = None
     try:
         user_id = g.get('current_user_id') or get_supabase_identity()
 
@@ -139,18 +212,13 @@ def get_user_progress():
 
         progress_payload = []
         for progress, module in records:
-            progress_payload.append({
-                'module_id': progress.module_id,
-                'module_title': module.title,
-                'status': progress.status,
-                'progress_percentage': progress.progress_percentage,
-                'time_spent_minutes': progress.time_spent_minutes,
-                'last_accessed': progress.last_accessed.isoformat() if progress.last_accessed else None,
-                'completed_at': progress.completed_at.isoformat() if progress.completed_at else None
-            })
+            progress_payload.append(serialize_progress(progress, module_title=module.title))
 
         logger.info('training_progress_listed', user_id=user_id, count=len(progress_payload))
-        return jsonify({'progress': progress_payload}), 200
+        return jsonify({
+            'progress': progress_payload,
+            'summary': build_progress_summary(progress_payload),
+        }), 200
 
     except Exception as e:
         logger.exception('training_progress_failed', user_id=user_id, error=str(e))
@@ -160,6 +228,7 @@ def get_user_progress():
 @training_bp.route('/enroll/<module_id>', methods=['POST'])
 @supabase_jwt_required()
 def enroll_in_module(module_id):
+    user_id = None
     try:
         user_id = g.get('current_user_id') or get_supabase_identity()
 
@@ -192,7 +261,8 @@ def enroll_in_module(module_id):
         return jsonify({
             'message': 'Successfully enrolled in module',
             'module_id': module_id,
-            'status': progress.status
+            'status': progress.status,
+            'progress': serialize_progress(progress, module_title=module.title),
         }), 200
 
     except Exception as e:
@@ -204,6 +274,7 @@ def enroll_in_module(module_id):
 @training_bp.route('/progress/<module_id>', methods=['PUT'])
 @supabase_jwt_required()
 def update_progress(module_id):
+    user_id = None
     try:
         user_id = g.get('current_user_id') or get_supabase_identity()
         data = request.get_json() or {}
@@ -235,6 +306,8 @@ def update_progress(module_id):
         progress.time_spent_minutes = max(time_spent, progress.time_spent_minutes or 0)
         progress.status = 'completed' if mark_complete else 'in_progress'
         progress.last_accessed = datetime.utcnow()
+        if data.get('current_lesson_id'):
+            progress.current_lesson_id = data['current_lesson_id']
 
         if mark_complete and not progress.completed_at:
             progress.completed_at = datetime.utcnow()
@@ -255,7 +328,8 @@ def update_progress(module_id):
             'status': progress.status,
             'progress_percentage': progress.progress_percentage,
             'time_spent_minutes': progress.time_spent_minutes,
-            'completed_at': progress.completed_at.isoformat() if progress.completed_at else None
+            'completed_at': progress.completed_at.isoformat() if progress.completed_at else None,
+            'progress': serialize_progress(progress, module_title=module.title),
         }), 200
 
     except Exception as e:

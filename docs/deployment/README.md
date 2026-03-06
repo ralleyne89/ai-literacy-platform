@@ -71,6 +71,7 @@ In backend mode, configure:
 In Auth0 mode, configure:
 
 - `VITE_API_URL`
+- `BACKEND_API_URL` (optional Netlify function proxy override; defaults to `VITE_API_URL`)
 - `VITE_AUTH0_DOMAIN`
 - `VITE_AUTH0_CLIENT_ID`
 - `VITE_AUTH0_AUDIENCE`
@@ -93,13 +94,32 @@ In Auth0 mode, configure:
     - `http://localhost:5173`
   - Verify `VITE_AUTH0_REDIRECT_URI` in Netlify is set to the same production callback URL.
 
+## Auth0 release verification
+
+For Auth0 releases, use the real redirect and callback flow as the release gate.
+
+1. Deploy a build that keeps `VITE_AUTH_MODE=auth0` and the production `VITE_AUTH0_*` values aligned with `netlify.toml`.
+2. Open `/login`, submit an email, and confirm the browser leaves the app for Auth0 Universal Login instead of showing a local password form.
+3. Open `/register`, submit an email, and confirm the browser leaves the app for the Auth0 signup flow.
+4. Complete sign-in and verify Auth0 returns to `/auth/callback`, the backend exchange succeeds, and the app lands on `/dashboard`.
+5. Open at least one protected route after sign-in, such as `/training` or a module page, to confirm the session is usable beyond the dashboard.
+
+Legacy note:
+
+- Do not treat backend-form Playwright coverage as authoritative for Auth0 ship decisions.
+- `npm run e2e:smoke` and `npm run e2e:flow` need Auth0-aware specs before they can be used as production release gates.
+
 ## 🌐 Netlify + backend API routing
 
-For Netlify-hosted frontend deployments using backend mode, set `VITE_API_URL` to your public backend URL (for example `https://<your-backend-host>/`) so all `/api/*` calls are sent directly to Flask.
+For Netlify-hosted frontend deployments, set `VITE_API_URL` to your public backend URL (for example `https://<your-backend-host>/`) so auth and billing requests go straight to Flask.
 
 - Ensure the backend host permits your Netlify origin in CORS (`ALLOWED_ORIGINS` or `FRONTEND_URL`).
 - Avoid relying on Netlify proxying for backend auth paths unless you explicitly add `/api/*` redirects in `netlify.toml`.
 - Verify `VITE_API_URL` and restart the frontend build whenever the backend URL changes.
+- Billing and Stripe state are canonical in Flask:
+  - Browser requests should use the backend billing routes such as `/api/billing/config`, `/api/billing/checkout-session`, and `/api/billing/customer-portal`.
+  - Stripe webhooks should target the backend route `https://<your-backend-host>/api/billing/webhooks/stripe`.
+  - The legacy Netlify billing functions now proxy to the backend and should not be treated as a second source of truth.
 
 ## 🗄️ Database Providers and Migration Notes
 

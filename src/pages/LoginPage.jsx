@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Brain, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { setStoredAuthReturnTo } from '../config/authRoutes'
 
 const RETRYABLE_AUTH_ERROR_CODE = 'retryable_network_error'
 
@@ -54,6 +55,7 @@ const LoginPage = () => {
     setResetNotice('')
     setLastAction({ type: 'login' })
     setLoading(true)
+    setStoredAuthReturnTo(from)
 
     const result = await login(formData.email)
 
@@ -76,6 +78,7 @@ const LoginPage = () => {
     setErrorCode('')
     setResetNotice('')
     setLastAction({ type: 'provider', provider })
+    setStoredAuthReturnTo(from)
     const result = await loginWithProvider(provider)
     if (!result.success && result.error) {
       setError(result.error)
@@ -95,6 +98,7 @@ const LoginPage = () => {
 
     try {
       if (lastAction.type === 'login') {
+        setStoredAuthReturnTo(from)
         const result = await login(formData.email)
         if (result.success) {
           if (result.user) {
@@ -110,6 +114,7 @@ const LoginPage = () => {
       }
 
       if (lastAction.type === 'provider' && lastAction.provider) {
+        setStoredAuthReturnTo(from)
         const result = await loginWithProvider(lastAction.provider)
         if (!result.success) {
           setError(result.error || 'Unable to start social sign-in right now.')

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Brain, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { setStoredAuthReturnTo } from '../config/authRoutes'
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -34,6 +35,7 @@ const RegisterPage = () => {
     setMessage('')
 
     setLoading(true)
+    setStoredAuthReturnTo('/dashboard')
     const result = await register({
       email: formData.email
     })
@@ -53,6 +55,7 @@ const RegisterPage = () => {
   const handleProviderLogin = async (provider) => {
     setError('')
     setMessage('')
+    setStoredAuthReturnTo('/dashboard')
     const result = await loginWithProvider(provider)
     if (!result.success && result.error) {
       setError(result.error)

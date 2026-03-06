@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { BILLING_ENDPOINTS } from '../config/apiEndpoints'
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
 const formatCurrency = (amount, currency = 'usd') => {
@@ -116,12 +117,12 @@ const BillingPage = () => {
   const [checkoutPlan, setCheckoutPlan] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [checkoutEmail, setCheckoutEmail] = useState('')
   const [subscription, setSubscription] = useState(null)
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [mockMode, setMockMode] = useState(false)
   const [usingFallbackPlans, setUsingFallbackPlans] = useState(false)
   const [retryingPlans, setRetryingPlans] = useState(false)
+  const [finalizingCheckout, setFinalizingCheckout] = useState(false)
 
   const queryMessages = useMemo(() => ({
     success: 'Subscription activated successfully. Welcome aboard.',
@@ -134,7 +135,7 @@ const BillingPage = () => {
     }
 
     try {
-      const response = await axios.get('/api/billing/config')
+      const response = await axios.get(BILLING_ENDPOINTS.config)
       const payload = response?.data
 
       if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
@@ -166,7 +167,7 @@ const BillingPage = () => {
     }
 
     try {
-      const response = await axios.get('/api/billing/subscription')
+      const response = await axios.get(BILLING_ENDPOINTS.subscription)
       const payload = response?.data
 
       if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
@@ -182,17 +183,67 @@ const BillingPage = () => {
   }, [isAuthenticated])
 
   useEffect(() => {
-    setCheckoutEmail(user?.email || '')
-  }, [user?.email])
-
-  useEffect(() => {
     const params = new URLSearchParams(location.search)
-    if (params.get('success')) {
-      setNotice(queryMessages.success)
-    } else if (params.get('canceled')) {
+    const success = params.get('success')
+    const canceled = params.get('canceled')
+    const sessionId = params.get('session_id')
+
+    if (canceled) {
       setError(queryMessages.canceled)
+      return
     }
-  }, [location.search, queryMessages])
+
+    if (!success) {
+      return
+    }
+
+    if (!sessionId || !isAuthenticated) {
+      setNotice(queryMessages.success)
+      return
+    }
+
+    let cancelled = false
+
+    const finalizeCheckout = async () => {
+      setFinalizingCheckout(true)
+      setError('')
+
+      try {
+        const response = await axios.post(BILLING_ENDPOINTS.checkoutComplete, {
+          session_id: sessionId
+        })
+        const payload = response?.data
+
+        if (isHtmlPayload(payload) || !payload || typeof payload !== 'object') {
+          throw buildSyntheticHttpError(response, 'Invalid checkout completion payload')
+        }
+
+        if (!cancelled) {
+          setNotice(queryMessages.success)
+          await fetchSubscription()
+          if (typeof window !== 'undefined') {
+            const currentUrl = new URL(window.location.href)
+            currentUrl.searchParams.delete('session_id')
+            window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`)
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(getBillingActionError(err, 'We could not finalize your subscription after checkout.'))
+        }
+      } finally {
+        if (!cancelled) {
+          setFinalizingCheckout(false)
+        }
+      }
+    }
+
+    finalizeCheckout()
+
+    return () => {
+      cancelled = true
+    }
+  }, [fetchSubscription, isAuthenticated, location.search, queryMessages])
 
   useEffect(() => {
     fetchPlans({ showSpinner: true })
@@ -210,9 +261,8 @@ const BillingPage = () => {
   }
 
   const handleCheckout = async (planId) => {
-    const emailToUse = checkoutEmail.trim()
-    if (!emailToUse) {
-      setError('Please enter an email address before starting checkout.')
+    if (!isAuthenticated) {
+      setError('Sign in before starting checkout so we can use your verified account identity.')
       return
     }
 
@@ -220,7 +270,7 @@ const BillingPage = () => {
     setError('')
 
     try {
-      const response = await axios.post('/api/billing/checkout-session', { plan: planId, email: emailToUse })
+      const response = await axios.post(BILLING_ENDPOINTS.checkoutSession, { plan: planId })
       const payload = response?.data
 
       if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
@@ -239,7 +289,7 @@ const BillingPage = () => {
     setError('')
 
     try {
-      const response = await axios.post('/api/billing/customer-portal', {})
+      const response = await axios.post(BILLING_ENDPOINTS.customerPortal, {})
       const payload = response?.data
 
       if (isHtmlPayload(payload) || !payload || typeof payload !== 'object' || !payload.url) {
@@ -267,9 +317,13 @@ const BillingPage = () => {
       )
     }
 
-    const disabled = !plan.checkout_enabled || checkoutPlan === plan.id
+    const disabled = !plan.checkout_enabled || checkoutPlan === plan.id || !isAuthenticated
     const label = plan.checkout_enabled
-      ? (mockMode && !plan.is_free ? `Simulate ${plan.name}` : plan.cta)
+      ? (
+        isAuthenticated
+          ? (mockMode && !plan.is_free ? `Simulate ${plan.name}` : plan.cta)
+          : 'Sign in to upgrade'
+      )
       : 'Contact sales'
     const redirectingLabel = mockMode ? 'Opening sandbox...' : 'Redirecting...'
 
@@ -340,6 +394,13 @@ const BillingPage = () => {
           </div>
         )}
 
+        {finalizingCheckout && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-3">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Finalizing your subscription and syncing it to your account...</span>
+          </div>
+        )}
+
         {notice && (
           <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-3">
             <CheckCircle2 className="h-4 w-4" />
@@ -364,23 +425,39 @@ const BillingPage = () => {
           </div>
         )}
 
-        <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-gray-200 bg-white p-4">
-          <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-2">
-            Billing email
-          </label>
-          <input
-            id="checkout-email"
-            type="email"
-            autoComplete="email"
-            value={checkoutEmail}
-            onChange={(event) => setCheckoutEmail(event.target.value)}
-            placeholder="you@company.com"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-          />
-          <p className="mt-2 text-xs text-gray-500">
-            This email will be used for checkout receipts and subscription notices.
-          </p>
-        </div>
+        {isAuthenticated ? (
+          <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-gray-200 bg-white p-4">
+            <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-2">
+              Verified billing email
+            </label>
+            <input
+              id="checkout-email"
+              type="email"
+              autoComplete="email"
+              value={user?.email || ''}
+              readOnly
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-gray-700"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Checkout receipts and subscription notices use the verified email on your signed-in account.
+            </p>
+          </div>
+        ) : (
+          <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-medium">Sign in before upgrading.</p>
+            <p className="mt-1">
+              Paid checkout is tied to your verified account identity so the backend can securely sync your subscription.
+            </p>
+            <div className="mt-3 flex gap-3">
+              <Link to="/login" className="rounded-md bg-primary-600 px-3 py-2 text-white font-semibold hover:bg-primary-700">
+                Sign in
+              </Link>
+              <Link to="/register" className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100">
+                Create account
+              </Link>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">

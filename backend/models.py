@@ -10,6 +10,8 @@ class User(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    auth_provider = db.Column(db.String(32), nullable=True)
+    auth_subject = db.Column(db.String(255), nullable=True)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
     role = db.Column(db.String(50), nullable=True)  # Sales, HR, Marketing, Operations
@@ -23,6 +25,10 @@ class User(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('auth_provider', 'auth_subject', name='uq_user_auth_provider_subject'),
+    )
 
     # Relationships
     assessment_results = db.relationship('AssessmentResult', backref='user', lazy=True)

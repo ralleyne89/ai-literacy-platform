@@ -16,22 +16,6 @@ const TrainingModulePage = () => {
   const [progressUpdating, setProgressUpdating] = useState(false)
   const [progress, setProgress] = useState(null)
 
-  const fetchProgress = async () => {
-    if (!isAuthenticated) {
-      setProgress(null)
-      return
-    }
-
-    try {
-      const { data } = await axios.get('/api/training/progress')
-      const records = Array.isArray(data?.progress) ? data.progress : []
-      const match = records.find(record => record.module_id === moduleId) || null
-      setProgress(match)
-    } catch {
-      setProgress(null)
-    }
-  }
-
   useEffect(() => {
     const loadModule = async () => {
       try {
@@ -39,8 +23,9 @@ const TrainingModulePage = () => {
         setError('')
 
         const { data } = await axios.get(`/api/training/modules/${moduleId}`)
-        setModule(data?.module || null)
-        await fetchProgress()
+        const nextModule = data?.module || null
+        setModule(nextModule)
+        setProgress(nextModule?.progress || null)
       } catch {
         setError('Unable to load this module right now. Please try again later.')
       } finally {
@@ -59,8 +44,8 @@ const TrainingModulePage = () => {
 
     try {
       setEnrolling(true)
-      await axios.post(`/api/training/enroll/${moduleId}`)
-      await fetchProgress()
+      const { data } = await axios.post(`/api/training/enroll/${moduleId}`)
+      setProgress(data?.progress || null)
     } catch {
       setError('We could not enroll you in this module. Please try again.')
     } finally {
@@ -75,12 +60,12 @@ const TrainingModulePage = () => {
 
     try {
       setProgressUpdating(true)
-      await axios.put(`/api/training/progress/${moduleId}`, {
+      const { data } = await axios.put(`/api/training/progress/${moduleId}`, {
         status: 'completed',
         progress_percentage: 100,
         time_spent_minutes: module?.estimated_duration_minutes || 0
       })
-      await fetchProgress()
+      setProgress(data?.progress || null)
     } catch {
       setError('We could not update your progress. Please try again.')
     } finally {

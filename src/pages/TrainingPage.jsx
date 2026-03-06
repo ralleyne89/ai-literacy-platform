@@ -4,6 +4,16 @@ import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalL
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
+const getResumeModuleFromProgressMap = (progressMap) => {
+  return Object.values(progressMap)
+    .filter((progress) => progress?.status === 'in_progress')
+    .sort((a, b) => {
+      const aDate = a?.last_accessed ? new Date(a.last_accessed).getTime() : 0
+      const bDate = b?.last_accessed ? new Date(b.last_accessed).getTime() : 0
+      return bDate - aDate
+    })[0] || null
+}
+
 const TrainingPage = () => {
   const [modules, setModules] = useState([])
   const [selectedRole, setSelectedRole] = useState('All')
@@ -35,24 +45,18 @@ const TrainingPage = () => {
         setModules(modulesData)
 
         if (isAuthenticated) {
-          const progressResponse = await axios.get('/api/training/progress')
-          const progressData = Array.isArray(progressResponse?.data?.progress) ? progressResponse.data.progress : []
-
           const nextProgressMap = {}
-          progressData.forEach(record => {
-            nextProgressMap[record.module_id] = record
+          modulesData.forEach((module) => {
+            if (module?.user_progress?.module_id) {
+              nextProgressMap[module.user_progress.module_id] = module.user_progress
+            }
           })
           setProgressMap(nextProgressMap)
-
-          const nextResumeModule = progressData
-            .filter(item => item.status === 'in_progress')
-            .sort((a, b) => {
-              const aDate = a.last_accessed ? new Date(a.last_accessed).getTime() : 0
-              const bDate = b.last_accessed ? new Date(b.last_accessed).getTime() : 0
-              return bDate - aDate
-            })[0] || null
-
-          setResumeModule(nextResumeModule)
+          setResumeModule(
+            modulesResponse?.data?.resume_module ||
+            modulesResponse?.data?.summary?.resume_module ||
+            getResumeModuleFromProgressMap(nextProgressMap)
+          )
         } else {
           setProgressMap({})
           setResumeModule(null)

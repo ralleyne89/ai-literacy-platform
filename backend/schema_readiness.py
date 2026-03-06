@@ -12,6 +12,8 @@ logger = get_logger(__name__)
 SIGNUP_REQUIRED_USER_COLUMNS = (
     'email',
     'password_hash',
+    'auth_provider',
+    'auth_subject',
     'first_name',
     'last_name',
     'subscription_tier',

@@ -176,6 +176,7 @@ const DashboardPage = () => {
   const { user } = useAuth()
   const [assessmentHistory, setAssessmentHistory] = useState([])
   const [trainingProgress, setTrainingProgress] = useState([])
+  const [trainingSummary, setTrainingSummary] = useState(null)
   const [courseRecommendations, setCourseRecommendations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -209,8 +210,9 @@ const DashboardPage = () => {
           ? historyResult.value.data.history.map(normalizeAssessmentRecord).filter(Boolean)
           : []
         const latestHistoryAssessment = history[0]
-        const progress = Array.isArray(progressResult.value?.data?.progress)
-          ? progressResult.value.data.progress.map((record) => ({
+        const progressData = progressResult.value?.data
+        const progress = Array.isArray(progressData?.progress)
+          ? progressData.progress.map((record) => ({
               ...record,
               progress_percentage: parseNumericValue(record?.progress_percentage, 0),
               time_spent_minutes: parseNumericValue(record?.time_spent_minutes, 0)
@@ -231,8 +233,10 @@ const DashboardPage = () => {
 
         if (progressResult.status === 'fulfilled') {
           setTrainingProgress(progress)
+          setTrainingSummary(progressData?.summary || null)
         } else {
           setTrainingProgress([])
+          setTrainingSummary(null)
         }
 
         if (recommendations.length > 0) {
@@ -274,6 +278,10 @@ const DashboardPage = () => {
   }, [latestAssessment])
 
   const resumeModule = useMemo(() => {
+    if (trainingSummary?.resume_module) {
+      return trainingSummary.resume_module
+    }
+
     const inProgress = trainingProgress
       .filter(item => item.status === 'in_progress')
       .sort((a, b) => {
@@ -283,7 +291,7 @@ const DashboardPage = () => {
       })
 
     return inProgress[0] || null
-  }, [trainingProgress])
+  }, [trainingProgress, trainingSummary])
 
   if (loading) {
     return (
@@ -344,7 +352,9 @@ const DashboardPage = () => {
           </div>
           <div className="card text-center">
             <BookOpen className="w-8 h-8 text-secondary-600 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-gray-900">{completedModules}</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {trainingSummary?.completed_modules ?? completedModules}
+            </div>
             <div className="text-gray-600">Modules Completed</div>
           </div>
           <div className="card text-center">
@@ -355,7 +365,7 @@ const DashboardPage = () => {
           <div className="card text-center">
             <Clock className="w-8 h-8 text-green-600 mx-auto mb-2" />
             <div className="text-2xl font-bold text-gray-900">
-              {Math.round(totalLearningTime / 60)}h
+              {Math.round((trainingSummary?.total_learning_time ?? totalLearningTime) / 60)}h
             </div>
             <div className="text-gray-600">Learning Time</div>
           </div>
