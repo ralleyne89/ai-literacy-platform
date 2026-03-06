@@ -16,14 +16,29 @@ from auth_identity import (
 
 
 _AUTH0_JWKS_CLIENTS = {}
+_AUTH0_ENV_FALLBACKS = {
+    'AUTH0_DOMAIN': ('VITE_AUTH0_DOMAIN',),
+    'AUTH0_CLIENT_ID': ('VITE_AUTH0_CLIENT_ID',),
+    'AUTH0_AUDIENCE': ('VITE_AUTH0_AUDIENCE',),
+    'AUTH0_REDIRECT_URI': ('VITE_AUTH0_REDIRECT_URI',),
+}
 
 
 def _auth0_config_value(key):
-    value = current_app.config.get(key)
-    if value is None:
-        value = os.getenv(key)
+    for candidate_key in (key, *_AUTH0_ENV_FALLBACKS.get(key, ())):
+        value = current_app.config.get(candidate_key)
+        if value is not None:
+            normalized = str(value).strip()
+            if normalized:
+                return normalized
 
-    return (str(value).strip() if value is not None else '')
+        env_value = os.getenv(candidate_key)
+        if env_value is not None:
+            normalized = str(env_value).strip()
+            if normalized:
+                return normalized
+
+    return ''
 
 
 def _auth0_bool(value):

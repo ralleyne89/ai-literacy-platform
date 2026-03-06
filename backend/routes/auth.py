@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from auth_identity import AuthIdentityConflictError, MissingIdentityEmailError, sync_managed_user
 from routes import (
+    _auth0_config_value,
     get_external_auth_identity_for_token,
     supabase_jwt_required,
     get_supabase_claims,
@@ -184,13 +185,9 @@ def _normalize_frontend_redirect_uri(override_redirect_uri=''):
         if override:
             return override
 
-    configured_redirect_uri = _normalize_auth0_text(os.getenv('AUTH0_REDIRECT_URI'))
+    configured_redirect_uri = _normalize_auth0_text(_auth0_config_value('AUTH0_REDIRECT_URI'))
     if configured_redirect_uri:
         return configured_redirect_uri
-
-    vite_redirect_uri = _normalize_auth0_text(os.getenv('VITE_AUTH0_REDIRECT_URI'))
-    if vite_redirect_uri:
-        return vite_redirect_uri
 
     frontend_url = _normalize_auth0_text(os.getenv('FRONTEND_URL'))
     if frontend_url:
@@ -200,7 +197,7 @@ def _normalize_frontend_redirect_uri(override_redirect_uri=''):
 
 
 def _build_auth0_token_url():
-    raw_domain = _normalize_auth0_text(os.getenv('AUTH0_DOMAIN'))
+    raw_domain = _normalize_auth0_text(_auth0_config_value('AUTH0_DOMAIN'))
     if not raw_domain:
         return ''
 
@@ -242,7 +239,7 @@ def _exchange_authorization_code_for_access_token(auth_code, code_verifier, redi
     if not token_url:
         return '', 'Auth0 domain is not configured for token exchange.'
 
-    client_id = _normalize_auth0_text(os.getenv('AUTH0_CLIENT_ID'))
+    client_id = _normalize_auth0_text(_auth0_config_value('AUTH0_CLIENT_ID'))
     if not client_id:
         return '', 'Auth0 client_id is not configured for token exchange.'
 

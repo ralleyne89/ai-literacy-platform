@@ -46,9 +46,19 @@ def _normalize_setting(value):
     return str(value).strip()
 
 
+def _resolve_auth0_setting(primary_key, fallback_key):
+    primary_value = _normalize_setting(os.getenv(primary_key))
+    if primary_value:
+        return primary_value
+
+    return _normalize_setting(os.getenv(fallback_key))
+
+
 app.config['JWT_SECRET_KEY'] = _resolve_jwt_secret()
-app.config['AUTH0_DOMAIN'] = _normalize_setting(os.getenv('AUTH0_DOMAIN'))
-app.config['AUTH0_AUDIENCE'] = _normalize_setting(os.getenv('AUTH0_AUDIENCE'))
+app.config['AUTH0_DOMAIN'] = _resolve_auth0_setting('AUTH0_DOMAIN', 'VITE_AUTH0_DOMAIN')
+app.config['AUTH0_CLIENT_ID'] = _resolve_auth0_setting('AUTH0_CLIENT_ID', 'VITE_AUTH0_CLIENT_ID')
+app.config['AUTH0_AUDIENCE'] = _resolve_auth0_setting('AUTH0_AUDIENCE', 'VITE_AUTH0_AUDIENCE')
+app.config['AUTH0_REDIRECT_URI'] = _resolve_auth0_setting('AUTH0_REDIRECT_URI', 'VITE_AUTH0_REDIRECT_URI')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 # Initialize extensions

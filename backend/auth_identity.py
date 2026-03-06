@@ -8,6 +8,12 @@ from models import User, db
 
 AUTH0_PROVIDER = 'auth0'
 SUPABASE_PROVIDER = 'supabase'
+AUTH0_ENV_FALLBACKS = {
+    'AUTH0_DOMAIN': ('VITE_AUTH0_DOMAIN',),
+    'AUTH0_CLIENT_ID': ('VITE_AUTH0_CLIENT_ID',),
+    'AUTH0_AUDIENCE': ('VITE_AUTH0_AUDIENCE',),
+    'AUTH0_REDIRECT_URI': ('VITE_AUTH0_REDIRECT_URI',),
+}
 
 
 class AuthIdentityConflictError(ValueError):
@@ -21,16 +27,25 @@ class MissingIdentityEmailError(ValueError):
 
 
 def _config_value(key):
-    value = None
-    try:
-        value = current_app.config.get(key)
-    except RuntimeError:
+    for candidate_key in (key, *AUTH0_ENV_FALLBACKS.get(key, ())):
         value = None
+        try:
+            value = current_app.config.get(candidate_key)
+        except RuntimeError:
+            value = None
 
-    if value is None:
-        value = os.getenv(key)
+        if value is not None:
+            normalized = str(value).strip()
+            if normalized:
+                return normalized
 
-    return str(value).strip() if value is not None else ''
+        env_value = os.getenv(candidate_key)
+        if env_value is not None:
+            normalized = str(env_value).strip()
+            if normalized:
+                return normalized
+
+    return ''
 
 
 def _normalize_auth0_domain():
