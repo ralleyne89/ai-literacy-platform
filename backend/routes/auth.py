@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from flask_jwt_extended import create_access_token
 from models import db, User
 from logging_config import get_logger
@@ -10,9 +10,13 @@ import os
 from werkzeug.security import check_password_hash as check_legacy_password_hash
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from auth_identity import AuthIdentityConflictError, MissingIdentityEmailError, sync_managed_user
+from auth_identity import (
+    AuthIdentityConflictError,
+    MissingIdentityEmailError,
+    get_external_auth_identity_from_claims,
+    sync_managed_user,
+)
 from routes import (
-    get_external_auth_identity_for_token,
     supabase_jwt_required,
     get_supabase_claims,
     get_supabase_claims_for_token,
@@ -178,21 +182,34 @@ def _normalize_auth0_text(value):
     return ''
 
 
+def _auth0_config_value(key):
+    value = None
+    try:
+        value = current_app.config.get(key)
+    except RuntimeError:
+        value = None
+
+    if value is None:
+        value = os.getenv(key)
+
+    return _normalize_auth0_text(value)
+
+
 def _normalize_frontend_redirect_uri(override_redirect_uri=''):
     if isinstance(override_redirect_uri, str):
         override = override_redirect_uri.strip()
         if override:
             return override
 
-    configured_redirect_uri = _normalize_auth0_text(os.getenv('AUTH0_REDIRECT_URI'))
+    configured_redirect_uri = _auth0_config_value('AUTH0_REDIRECT_URI')
     if configured_redirect_uri:
         return configured_redirect_uri
 
-    vite_redirect_uri = _normalize_auth0_text(os.getenv('VITE_AUTH0_REDIRECT_URI'))
+    vite_redirect_uri = _auth0_config_value('VITE_AUTH0_REDIRECT_URI')
     if vite_redirect_uri:
         return vite_redirect_uri
 
-    frontend_url = _normalize_auth0_text(os.getenv('FRONTEND_URL'))
+    frontend_url = _auth0_config_value('FRONTEND_URL')
     if frontend_url:
         return f'{frontend_url.rstrip("/")}/auth/callback'
 
@@ -200,7 +217,7 @@ def _normalize_frontend_redirect_uri(override_redirect_uri=''):
 
 
 def _build_auth0_token_url():
-    raw_domain = _normalize_auth0_text(os.getenv('AUTH0_DOMAIN'))
+    raw_domain = _auth0_config_value('AUTH0_DOMAIN')
     if not raw_domain:
         return ''
 
@@ -209,6 +226,18 @@ def _build_auth0_token_url():
         normalized_domain = f'https://{normalized_domain}'
 
     return f'{normalized_domain}/oauth/token'
+
+
+def _build_auth0_userinfo_url():
+    raw_domain = _auth0_config_value('AUTH0_DOMAIN')
+    if not raw_domain:
+        return ''
+
+    normalized_domain = raw_domain.rstrip('/')
+    if not normalized_domain.startswith(('http://', 'https://')):
+        normalized_domain = f'https://{normalized_domain}'
+
+    return f'{normalized_domain}/userinfo'
 
 
 def _extract_json_error_message(raw_body):
@@ -237,12 +266,98 @@ def _extract_json_error_message(raw_body):
     return raw_body
 
 
+def _extract_json_payload(raw_body):
+    if not isinstance(raw_body, str):
+        return None
+
+    raw_body = raw_body.strip()
+    if not raw_body:
+        return None
+
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def _fetch_auth0_userinfo(access_token):
+    userinfo_url = _build_auth0_userinfo_url()
+    if not userinfo_url:
+        return None, 'Auth0 domain is not configured for userinfo lookup.'
+
+    normalized_token = _normalize_auth0_text(access_token)
+    if not normalized_token:
+        return None, 'Access token is required for userinfo lookup.'
+
+    request = Request(
+        userinfo_url,
+        method='GET',
+        headers={
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {normalized_token}',
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            response_body = response.read().decode('utf-8')
+    except HTTPError as error:
+        try:
+            raw_error = error.read().decode('utf-8', errors='replace')
+        except Exception:
+            raw_error = ''
+
+        error_message = _extract_json_error_message(raw_error) or str(error)
+        return None, f'Auth0 userinfo lookup failed: {error_message}'
+    except URLError as error:
+        return None, f'Unable to reach Auth0 userinfo endpoint: {error}'
+    except Exception as error:
+        return None, f'Auth0 userinfo lookup failed: {error}'
+
+    payload = _extract_json_payload(response_body)
+    if payload is None:
+        return None, 'Auth0 userinfo endpoint returned an invalid response.'
+
+    return payload, ''
+
+
+def _is_verified_auth0_claims(claims):
+    if not isinstance(claims, dict):
+        return False
+
+    if not claims.get('iss') or not claims.get('aud'):
+        return False
+
+    identity = get_external_auth_identity_from_claims(claims)
+    return bool(identity and identity.get('provider') == 'auth0' and identity.get('subject'))
+
+
+def _merge_auth0_claims(decoded_claims=None, userinfo_claims=None):
+    merged = {}
+
+    if isinstance(userinfo_claims, dict):
+        merged.update(userinfo_claims)
+
+    if isinstance(decoded_claims, dict):
+        for key, value in decoded_claims.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = {**merged[key], **value}
+                continue
+
+            if value not in (None, ''):
+                merged[key] = value
+
+    return merged
+
+
 def _exchange_authorization_code_for_access_token(auth_code, code_verifier, redirect_uri):
     token_url = _build_auth0_token_url()
     if not token_url:
         return '', 'Auth0 domain is not configured for token exchange.'
 
-    client_id = _normalize_auth0_text(os.getenv('AUTH0_CLIENT_ID'))
+    client_id = _auth0_config_value('AUTH0_CLIENT_ID')
     if not client_id:
         return '', 'Auth0 client_id is not configured for token exchange.'
 
@@ -597,21 +712,26 @@ def exchange():
             'code': 'AUTH0_ACCESS_TOKEN_REQUIRED',
         }), 400
 
+    decoded_claims = None
     try:
-        claims = get_supabase_claims_for_token(auth0_access_token, optional=False)
-        if not isinstance(claims, dict) or not claims.get('iss') or not claims.get('aud'):
-            return jsonify({
-                'error': 'Invalid access token',
-                'code': 'AUTH0_INVALID_ACCESS_TOKEN',
-            }), 401
+        candidate_claims = get_supabase_claims_for_token(auth0_access_token, optional=False)
+        if _is_verified_auth0_claims(candidate_claims):
+            decoded_claims = candidate_claims
     except Exception:
-        return jsonify({
-            'error': 'Unauthorized',
-            'code': 'AUTH0_TOKEN_UNAUTHORIZED',
-        }), 401
+        decoded_claims = None
 
-    auth_identity = get_external_auth_identity_for_token(auth0_access_token)
-    if not auth_identity:
+    userinfo_claims = None
+    if decoded_claims is None or not decoded_claims.get('email'):
+        userinfo_claims, _userinfo_error = _fetch_auth0_userinfo(auth0_access_token)
+        if decoded_claims is None and not isinstance(userinfo_claims, dict):
+            return jsonify({
+                'error': 'Unauthorized',
+                'code': 'AUTH0_TOKEN_UNAUTHORIZED',
+            }), 401
+
+    claims = _merge_auth0_claims(decoded_claims, userinfo_claims)
+    auth_identity = get_external_auth_identity_from_claims(claims)
+    if not auth_identity or auth_identity.get('provider') != 'auth0':
         return jsonify({
             'error': 'Invalid access token',
             'code': 'AUTH0_INVALID_ACCESS_TOKEN',
