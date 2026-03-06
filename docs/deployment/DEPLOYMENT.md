@@ -44,7 +44,9 @@ STRIPE_WEBHOOK_SECRET=<copy-from-your-local-backend/.env-file>
 FRONTEND_URL=https://litmusai.netlify.app
 ALLOWED_ORIGINS=https://litmusai.netlify.app
 AUTH0_DOMAIN=<your-auth0-domain>
+AUTH0_CLIENT_ID=<your-auth0-client-id>
 AUTH0_AUDIENCE=<your-auth0-audience>
+AUTH0_REDIRECT_URI=https://litmusai.netlify.app/auth/callback
 ```
 
 ### Step 4: Add PostgreSQL Database
@@ -114,7 +116,9 @@ STRIPE_WEBHOOK_SECRET=<copy-from-your-local-backend/.env-file>
 FRONTEND_URL=https://litmusai.netlify.app
 PORT=8080
 AUTH0_DOMAIN=<your-auth0-domain>
+AUTH0_CLIENT_ID=<your-auth0-client-id>
 AUTH0_AUDIENCE=<your-auth0-audience>
+AUTH0_REDIRECT_URI=https://litmusai.netlify.app/auth/callback
 ```
 
 ### Step 5: Deploy
@@ -180,7 +184,7 @@ For Railway:
 
 - Verify the Render service is pointed at the current repository revision and is running the Flask service defined by `backend/app.py`.
 - Confirm `buildCommand` in Render has succeeded (or `pip install -r backend/requirements.txt` in the same block).
-- Confirm `ALLOWED_ORIGINS`, `FRONTEND_URL`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, and `JWT_SECRET_KEY` are set in the Render Environment Variables.
+- Confirm `ALLOWED_ORIGINS`, `FRONTEND_URL`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE`, `AUTH0_REDIRECT_URI`, and `JWT_SECRET_KEY` are set in the Render Environment Variables.
 
 ### Stripe errors
 
@@ -203,7 +207,9 @@ Required environment notes by mode (production):
 
 - Backend mode requires `VITE_API_URL` plus backend secrets (`JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`) for issued tokens.
 - Supabase mode requires `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `SUPABASE_JWT_SECRET` for token validation.
-- Auth0 mode requires `VITE_AUTH0_*` values and backend token signing secret (`JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`).
+- Auth0 mode requires the frontend `VITE_AUTH0_*` values, the backend `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE`, and `AUTH0_REDIRECT_URI` values, and a backend token signing secret (`JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`).
+- Keep `VITE_AUTH0_CLIENT_ID`/`AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`/`AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`/`AUTH0_REDIRECT_URI` identical across frontend and backend config.
+- Keep `VITE_AUTH0_DOMAIN` and `AUTH0_DOMAIN` pointed at the same Auth0 tenant. The backend accepts either a bare hostname or the full `https://...` URL.
 
 Low-cost PostgreSQL hosting alternatives for `DATABASE_URL`:
 

@@ -7,6 +7,7 @@
     "dev": "vite",
     "start": "vite",
     "validate:prod-env": "node scripts/validate-prod-env.mjs",
+    "check:auth0-config": "node scripts/check-auth0-config-alignment.mjs",
     "build": "npm run validate:prod-env && vite build",
     "backend": "cd backend && FLASK_DEBUG=0 PORT=${PORT:-5001} ${PYTHON_CMD:-venv/bin/python} app.py",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",

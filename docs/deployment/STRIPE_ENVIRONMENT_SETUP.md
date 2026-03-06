@@ -48,6 +48,16 @@ FRONTEND_URL=https://your-site.netlify.app
 ALLOWED_ORIGINS=https://your-site.netlify.app
 ```
 
+### Auth0 alignment rules
+
+When `VITE_AUTH_MODE=auth0`, treat the frontend `VITE_AUTH0_*` values and backend `AUTH0_*` values as one deployment contract:
+
+- `VITE_AUTH0_CLIENT_ID` and `AUTH0_CLIENT_ID` must match exactly.
+- `VITE_AUTH0_AUDIENCE` and `AUTH0_AUDIENCE` must match exactly.
+- `VITE_AUTH0_REDIRECT_URI` and `AUTH0_REDIRECT_URI` must match exactly.
+- `VITE_AUTH0_DOMAIN` and `AUTH0_DOMAIN` must point at the same Auth0 tenant. The backend accepts either the bare hostname or the full `https://...` URL.
+- Even though Flask can fall back to `VITE_AUTH0_*`, set the bare `AUTH0_*` variables explicitly on the deployed backend/runtime so callback failures are easier to diagnose.
+
 ### 3. Frontend Environment Variables (.env)
 
 ```bash

@@ -18,8 +18,14 @@ I've opened the Netlify environment variables page in your browser.
 - [ ] `VITE_AUTH0_CLIENT_ID` = `...` (required in `auth0`)
 - [ ] `VITE_AUTH0_AUDIENCE` = `...` (required in `auth0`)
 - [ ] `VITE_AUTH0_REDIRECT_URI` = `https://your-site.com/auth/callback` (required in `auth0`)
+- [ ] `AUTH0_DOMAIN` = `your-domain.auth0.com` or `https://your-domain.auth0.com` (required on the backend in `auth0`)
+- [ ] `AUTH0_CLIENT_ID` = same value as `VITE_AUTH0_CLIENT_ID` (required on the backend in `auth0`)
+- [ ] `AUTH0_AUDIENCE` = same value as `VITE_AUTH0_AUDIENCE` (required on the backend in `auth0`)
+- [ ] `AUTH0_REDIRECT_URI` = same value as `VITE_AUTH0_REDIRECT_URI` (required on the backend in `auth0`)
 
-If your deployment is intentionally backend-only (`VITE_AUTH_MODE=backend`), you can skip the Supabase values. In `auth0` mode, skip Supabase values and provide the Auth0 values above.
+If your deployment is intentionally backend-only (`VITE_AUTH_MODE=backend`), you can skip the Supabase values. In `auth0` mode, skip Supabase values and provide both the frontend `VITE_AUTH0_*` values and the matching backend `AUTH0_*` values above.
+
+Before deploying after changing Auth0-related config, run `npm run check:auth0-config` to verify `netlify.toml` and `render.yaml` are aligned.
 
 **If they're there**: ✅ Great! Move to Step 2.
 
@@ -208,6 +214,10 @@ netlify deploy --prod
 ⏳ VITE_AUTH0_CLIENT_ID (Required in `auth0` mode)
 ⏳ VITE_AUTH0_AUDIENCE (Required in `auth0` mode)
 ⏳ VITE_AUTH0_REDIRECT_URI (Required in `auth0` mode)
+⏳ AUTH0_DOMAIN (Required on the backend in `auth0` mode)
+⏳ AUTH0_CLIENT_ID (Required on the backend in `auth0` mode)
+⏳ AUTH0_AUDIENCE (Required on the backend in `auth0` mode)
+⏳ AUTH0_REDIRECT_URI (Required on the backend in `auth0` mode)
 ✅ SUPABASE_SERVICE_ROLE_KEY (Only for optional DB integration step)
 ```
 

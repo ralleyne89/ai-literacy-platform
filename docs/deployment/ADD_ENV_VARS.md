@@ -36,10 +36,20 @@ https://app.netlify.com/sites/litmusai/configuration/env
   - **Variable**: `VITE_AUTH0_CLIENT_ID` = Auth0 app client ID
   - **Variable**: `VITE_AUTH0_AUDIENCE` = Auth0 audience
   - **Variable**: `VITE_AUTH0_REDIRECT_URI` = OAuth callback URL (`https://litmusai.netlify.app/auth/callback`)
-  - **Variable**: `AUTH0_DOMAIN` = Auth0 domain for backend token verification (no trailing slash)
+  - **Variable**: `AUTH0_DOMAIN` = same Auth0 tenant for backend token verification (`your-domain.auth0.com` or `https://your-domain.auth0.com`)
   - **Variable**: `AUTH0_CLIENT_ID` = Auth0 app client ID for backend code exchange
   - **Variable**: `AUTH0_AUDIENCE` = Auth0 audience for backend token verification
-  - **Variable**: `AUTH0_REDIRECT_URI` = backend fallback redirect URI (`https://litmusai.netlify.app/auth/callback`)
+  - **Variable**: `AUTH0_REDIRECT_URI` = backend callback/exchange redirect URI (`https://litmusai.netlify.app/auth/callback`)
+
+#### Auth0 variable alignment rules
+
+- Treat the frontend `VITE_AUTH0_*` values and backend `AUTH0_*` values as one contract for the same Auth0 application.
+- `VITE_AUTH0_CLIENT_ID` and `AUTH0_CLIENT_ID` must match exactly.
+- `VITE_AUTH0_AUDIENCE` and `AUTH0_AUDIENCE` must match exactly.
+- `VITE_AUTH0_REDIRECT_URI` and `AUTH0_REDIRECT_URI` must match exactly.
+- `VITE_AUTH0_DOMAIN` and `AUTH0_DOMAIN` must point at the same tenant. The backend accepts either the bare hostname or the full `https://...` URL.
+- Even though the Flask app can fall back to `VITE_AUTH0_*` values, set the bare `AUTH0_*` variables on the deployed backend/runtime explicitly so login callback failures are easier to reason about.
+- Canonical production values are in the repo in `netlify.toml` and `render.yaml`. Run `npm run check:auth0-config` to verify they stay in sync.
 
 #### Auth0 Dashboard URLs (must match exactly)
 

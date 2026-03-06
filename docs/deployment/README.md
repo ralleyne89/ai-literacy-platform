@@ -77,10 +77,31 @@ In Auth0 mode, configure:
 - `VITE_AUTH0_AUDIENCE`
 - `VITE_AUTH0_REDIRECT_URI`
 - `AUTH0_DOMAIN`
+- `AUTH0_CLIENT_ID`
 - `AUTH0_AUDIENCE`
+- `AUTH0_REDIRECT_URI`
 - `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`
 - `FRONTEND_URL`
 - `ALLOWED_ORIGINS`
+
+Alignment rules for Auth0 mode:
+
+- Keep `VITE_AUTH0_CLIENT_ID` and `AUTH0_CLIENT_ID` identical.
+- Keep `VITE_AUTH0_AUDIENCE` and `AUTH0_AUDIENCE` identical.
+- Keep `VITE_AUTH0_REDIRECT_URI` and `AUTH0_REDIRECT_URI` identical.
+- Keep `VITE_AUTH0_DOMAIN` and `AUTH0_DOMAIN` pointed at the same Auth0 tenant. The backend accepts either `your-tenant.us.auth0.com` or `https://your-tenant.us.auth0.com`.
+- The backend can fall back to `VITE_AUTH0_*`, but production deployments should still set the bare `AUTH0_*` variables explicitly on the backend runtime.
+
+### Auth0 config source of truth
+
+Production Auth0 settings are defined in the repo in `netlify.toml` (frontend build) and `render.yaml` (backend runtime). When changing one, update the other so they stay aligned, then run `npm run check:auth0-config`.
+
+### Production Auth0 verification
+
+If login or callback fails after deploy:
+
+1. Run `npm run check:auth0-config` locally to confirm in-repo alignment between `netlify.toml` and `render.yaml`.
+2. In Netlify (Site → Environment variables) and Render (Service → Environment), confirm values match the repo (or that deploys use the repo and have not been overridden in the dashboards).
 
 ## Auth0 provider settings for production
 
@@ -92,17 +113,18 @@ In Auth0 mode, configure:
   - Add web origins:
     - `https://litmusai.netlify.app`
     - `http://localhost:5173`
-  - Verify `VITE_AUTH0_REDIRECT_URI` in Netlify is set to the same production callback URL.
+  - Verify `VITE_AUTH0_REDIRECT_URI` in Netlify and `AUTH0_REDIRECT_URI` on the backend are set to the same production callback URL.
 
 ## Auth0 release verification
 
 For Auth0 releases, use the real redirect and callback flow as the release gate.
 
-1. Deploy a build that keeps `VITE_AUTH_MODE=auth0` and the production `VITE_AUTH0_*` values aligned with `netlify.toml`.
-2. Open `/login`, submit an email, and confirm the browser leaves the app for Auth0 Universal Login instead of showing a local password form.
-3. Open `/register`, submit an email, and confirm the browser leaves the app for the Auth0 signup flow.
-4. Complete sign-in and verify Auth0 returns to `/auth/callback`, the backend exchange succeeds, and the app lands on `/dashboard`.
-5. Open at least one protected route after sign-in, such as `/training` or a module page, to confirm the session is usable beyond the dashboard.
+1. Run `npm run check:auth0-config` before deploying if you changed Auth0-related config.
+2. Deploy a build that keeps `VITE_AUTH_MODE=auth0`, the production `VITE_AUTH0_*` values aligned with `netlify.toml`, and the backend `AUTH0_*` values aligned to the same Auth0 app settings.
+3. Open `/login`, submit an email, and confirm the browser leaves the app for Auth0 Universal Login instead of showing a local password form.
+4. Open `/register`, submit an email, and confirm the browser leaves the app for the Auth0 signup flow.
+5. Complete sign-in and verify Auth0 returns to `/auth/callback`, the backend exchange succeeds, and the app lands on `/dashboard`.
+6. Open at least one protected route after sign-in, such as `/training` or a module page, to confirm the session is usable beyond the dashboard.
 
 Legacy note:
 
