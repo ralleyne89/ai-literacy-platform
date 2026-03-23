@@ -1,7 +1,7 @@
 """Add domain_scores JSON column to assessment_result"""
 
 revision = '2293b1e30034'
-down_revision = None
+down_revision = '2293b1e30033'
 branch_labels = None
 depends_on = None
 

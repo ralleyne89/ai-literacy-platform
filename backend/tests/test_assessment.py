@@ -1,7 +1,5 @@
-import jwt
 from collections import Counter
 
-from app import app
 from models import db, User, AssessmentResult
 from routes.assessment import SAMPLE_QUESTIONS, DOMAINS
 
@@ -72,11 +70,10 @@ def test_assessment_questions_sample_exactly_three_per_domain(client):
     assert _domain_counts(questions) == Counter({domain: 3 for domain in DOMAINS})
 
 
-def test_assessment_submit_persists_domain_scores(client):
+def test_assessment_submit_persists_domain_scores(client, app, auth_headers):
     with app.app_context():
         user = create_user()
-        secret = app.config['SUPABASE_JWT_SECRET']
-        token = jwt.encode({'sub': user.id}, secret, algorithm='HS256')
+        headers = auth_headers(user)
 
     questions_response = client.get('/api/assessment/questions')
     assert questions_response.status_code == 200
@@ -92,7 +89,7 @@ def test_assessment_submit_persists_domain_scores(client):
             'selected_question_ids': selected_question_ids,
             'time_taken_minutes': 12
         },
-        headers={'Authorization': f'Bearer {token}'}
+        headers=headers
     )
 
     assert response.status_code == 200

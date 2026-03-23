@@ -248,7 +248,8 @@ const DashboardPage = () => {
         }
 
         const allFailed = [historyResult, progressResult, recommendationsResult].every(r => r.status === 'rejected')
-        if (allFailed) {
+        const isDemoUser = user?.id === 'demo-user'
+        if (allFailed && !isDemoUser) {
           setError('Unable to load dashboard data right now. Please refresh and try again.')
         }
       } finally {

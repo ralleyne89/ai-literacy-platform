@@ -1,10 +1,7 @@
-import jwt
 import uuid
 from datetime import datetime, timedelta
 
-from app import app
 from models import db, Lesson, LessonProgress, User, UserProgress, TrainingModule
-from seeders.course_content import seed_course_content
 
 
 def create_user(email='training-tester@example.com'):
@@ -20,19 +17,8 @@ def create_user(email='training-tester@example.com'):
     return user
 
 
-def create_auth_header(user_id):
-    secret = app.config['SUPABASE_JWT_SECRET']
-    token = jwt.encode({'sub': user_id}, secret, algorithm='HS256')
-    return {'Authorization': f'Bearer {token}'}
-
-
-def seed_course_data():
-    seed_course_content(force=True, silent=True)
-
-
-def test_training_progress_returns_summary_and_current_lesson_id(client):
+def test_training_progress_returns_summary_and_current_lesson_id(client, app, auth_headers):
     with app.app_context():
-        seed_course_data()
         user = create_user()
         module = TrainingModule.query.filter_by(id='module-ai-fundamentals-intro').first()
         lesson = Lesson.query.filter_by(module_id=module.id).order_by(Lesson.order_index).first()
@@ -63,7 +49,7 @@ def test_training_progress_returns_summary_and_current_lesson_id(client):
             ),
         ])
         db.session.commit()
-        headers = create_auth_header(user.id)
+        headers = auth_headers(user)
 
     response = client.get('/api/training/progress', headers=headers)
 
@@ -77,9 +63,8 @@ def test_training_progress_returns_summary_and_current_lesson_id(client):
     assert progress_by_module[module_id]['current_lesson_id'] == lesson_id
 
 
-def test_training_modules_returns_user_progress_inline(client):
+def test_training_modules_returns_user_progress_inline(client, app, auth_headers):
     with app.app_context():
-        seed_course_data()
         user = create_user(email='inline-progress@example.com')
         module = TrainingModule.query.filter_by(id='module-ai-fundamentals-intro').first()
         module_id = module.id
@@ -93,7 +78,7 @@ def test_training_modules_returns_user_progress_inline(client):
             last_accessed=datetime.utcnow(),
         ))
         db.session.commit()
-        headers = create_auth_header(user.id)
+        headers = auth_headers(user)
 
     response = client.get('/api/training/modules', headers=headers)
 
@@ -106,9 +91,8 @@ def test_training_modules_returns_user_progress_inline(client):
     assert modules_by_id[module_id]['user_progress']['progress_percentage'] == 55
 
 
-def test_training_module_detail_returns_authenticated_progress(client):
+def test_training_module_detail_returns_authenticated_progress(client, app, auth_headers):
     with app.app_context():
-        seed_course_data()
         user = create_user(email='module-detail@example.com')
         module = TrainingModule.query.filter_by(id='module-ai-fundamentals-intro').first()
         lesson = Lesson.query.filter_by(module_id=module.id).order_by(Lesson.order_index).first()
@@ -125,7 +109,7 @@ def test_training_module_detail_returns_authenticated_progress(client):
             last_accessed=datetime.utcnow(),
         ))
         db.session.commit()
-        headers = create_auth_header(user.id)
+        headers = auth_headers(user)
 
     response = client.get(f'/api/training/modules/{module_id}', headers=headers)
 
@@ -136,13 +120,12 @@ def test_training_module_detail_returns_authenticated_progress(client):
     assert payload['module']['progress']['current_lesson_id'] == lesson_id
 
 
-def test_completing_lesson_rolls_up_module_progress(client):
+def test_completing_lesson_rolls_up_module_progress(client, app, auth_headers):
     with app.app_context():
-        seed_course_data()
         user = create_user(email='lesson-rollup@example.com')
         module = TrainingModule.query.filter_by(id='module-ai-fundamentals-intro').first()
         lessons = Lesson.query.filter_by(module_id=module.id).order_by(Lesson.order_index).all()
-        headers = create_auth_header(user.id)
+        headers = auth_headers(user)
 
     response = client.post(
         f'/api/course/lessons/{lessons[0].id}/complete',
@@ -161,9 +144,8 @@ def test_completing_lesson_rolls_up_module_progress(client):
         assert module_progress.current_lesson_id == lessons[1].id
 
 
-def test_course_module_lessons_returns_module_progress_summary(client):
+def test_course_module_lessons_returns_module_progress_summary(client, app, auth_headers):
     with app.app_context():
-        seed_course_data()
         user = create_user(email='module-progress-summary@example.com')
         module = TrainingModule.query.filter_by(id='module-ai-fundamentals-intro').first()
         lessons = Lesson.query.filter_by(module_id=module.id).order_by(Lesson.order_index).all()
@@ -193,7 +175,7 @@ def test_course_module_lessons_returns_module_progress_summary(client):
             last_accessed=datetime.utcnow(),
         ))
         db.session.commit()
-        headers = create_auth_header(user.id)
+        headers = auth_headers(user)
 
     response = client.get(f'/api/course/modules/{module_id}/lessons', headers=headers)
 

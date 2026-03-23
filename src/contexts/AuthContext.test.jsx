@@ -1,41 +1,50 @@
 import { useEffect } from 'react'
 import { render, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
 import { AuthProvider, useAuth } from './AuthContext'
 
-const mockAuth0State = {
-  isLoading: false,
-  isAuthenticated: false,
-  user: null,
-  error: null,
-  loginWithRedirect: vi.fn(),
-  logout: vi.fn(),
-  getAccessTokenSilently: vi.fn()
-}
 
-vi.mock('@auth0/auth0-react', () => ({
-  Auth0Provider: ({ children }) => children,
-  useAuth0: () => mockAuth0State
+const mockAxios = vi.hoisted(() => ({
+  get: vi.fn(),
+  put: vi.fn(),
+  defaults: {
+    headers: {
+      common: {},
+    },
+  },
 }))
 
-vi.mock('axios', () => {
-  const defaults = {
-    headers: {
-      common: {}
-    }
-  }
+const mockClerkState = vi.hoisted(() => ({
+  isLoaded: true,
+  isSignedIn: true,
+  getToken: vi.fn(),
+  redirectToSignIn: vi.fn(),
+  redirectToSignUp: vi.fn(),
+  signOut: vi.fn(),
+}))
 
-  return {
-    default: {
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-      defaults
-    }
-  }
-})
+vi.mock('axios', () => ({
+  default: {
+    get: mockAxios.get,
+    put: mockAxios.put,
+    defaults: mockAxios.defaults,
+  },
+}))
+
+vi.mock('@clerk/clerk-react', () => ({
+  ClerkProvider: ({ children }) => children,
+  useAuth: () => ({
+    isLoaded: mockClerkState.isLoaded,
+    isSignedIn: mockClerkState.isSignedIn,
+    getToken: mockClerkState.getToken,
+  }),
+  useClerk: () => ({
+    redirectToSignIn: mockClerkState.redirectToSignIn,
+    redirectToSignUp: mockClerkState.redirectToSignUp,
+    signOut: mockClerkState.signOut,
+  }),
+}))
 
 let latestAuth
 
@@ -51,157 +60,95 @@ const AuthProbe = () => {
 
 const renderAuthProvider = () =>
   render(
-    <MemoryRouter
-      initialEntries={['/login']}
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-    >
-      <AuthProvider>
-        <AuthProbe />
-      </AuthProvider>
-    </MemoryRouter>
+    <AuthProvider>
+      <AuthProbe />
+    </AuthProvider>
   )
 
-describe('AuthProvider auth0 mode', () => {
+describe('AuthProvider Clerk session behavior', () => {
   const originalEnv = {
     VITE_AUTH_MODE: import.meta.env.VITE_AUTH_MODE,
-    VITE_AUTH0_DOMAIN: import.meta.env.VITE_AUTH0_DOMAIN,
-    VITE_AUTH0_CLIENT_ID: import.meta.env.VITE_AUTH0_CLIENT_ID,
-    VITE_AUTH0_AUDIENCE: import.meta.env.VITE_AUTH0_AUDIENCE,
-    VITE_AUTH0_REDIRECT_URI: import.meta.env.VITE_AUTH0_REDIRECT_URI
+    VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
   }
 
   beforeEach(() => {
     latestAuth = undefined
-    mockAuth0State.isLoading = false
-    mockAuth0State.isAuthenticated = false
-    mockAuth0State.user = null
-    mockAuth0State.error = null
-    mockAuth0State.loginWithRedirect.mockReset()
-    mockAuth0State.logout.mockReset()
-    mockAuth0State.getAccessTokenSilently.mockReset()
+    mockAxios.get.mockReset()
+    mockAxios.put.mockReset()
+    mockAxios.defaults.headers.common = {}
 
-    axios.get.mockReset()
-    axios.post.mockReset()
-    axios.put.mockReset()
-    axios.defaults.headers.common = {}
+    mockClerkState.isLoaded = true
+    mockClerkState.isSignedIn = true
+    mockClerkState.getToken.mockReset()
+    mockClerkState.redirectToSignIn.mockReset()
+    mockClerkState.redirectToSignUp.mockReset()
+    mockClerkState.signOut.mockReset()
 
-    window.localStorage.clear()
+    import.meta.env.VITE_AUTH_MODE = 'clerk'
+    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY = 'pk_test_clerk'
     window.sessionStorage.clear()
-
-    import.meta.env.VITE_AUTH_MODE = 'auth0'
-    import.meta.env.VITE_AUTH0_DOMAIN = 'https://litmusai.us.auth0.com'
-    import.meta.env.VITE_AUTH0_CLIENT_ID = 'test-client-id'
-    import.meta.env.VITE_AUTH0_AUDIENCE = 'https://litmusai.us.auth0.com/api/v2/'
-    import.meta.env.VITE_AUTH0_REDIRECT_URI = 'http://localhost:5173/auth/callback'
   })
 
   afterEach(() => {
     import.meta.env.VITE_AUTH_MODE = originalEnv.VITE_AUTH_MODE
-    import.meta.env.VITE_AUTH0_DOMAIN = originalEnv.VITE_AUTH0_DOMAIN
-    import.meta.env.VITE_AUTH0_CLIENT_ID = originalEnv.VITE_AUTH0_CLIENT_ID
-    import.meta.env.VITE_AUTH0_AUDIENCE = originalEnv.VITE_AUTH0_AUDIENCE
-    import.meta.env.VITE_AUTH0_REDIRECT_URI = originalEnv.VITE_AUTH0_REDIRECT_URI
+    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY = originalEnv.VITE_CLERK_PUBLISHABLE_KEY
   })
 
-  it('delegates login and logout to the Auth0 React SDK while preserving local session cleanup', async () => {
-    mockAuth0State.isAuthenticated = true
-    mockAuth0State.user = {
-      sub: 'auth0|user-123',
-      email: 'ada@example.com'
-    }
-    axios.get.mockResolvedValue({
+  it('hydrates the backend profile from a Clerk session token', async () => {
+    mockClerkState.getToken.mockResolvedValue('clerk-session-token')
+    mockAxios.get.mockResolvedValue({
       data: {
-        user: {
-          id: 'user-123',
-          email: 'ada@example.com'
-        }
-      }
-    })
-
-    window.localStorage.setItem(
-      'ailiteracy_backend_auth',
-      JSON.stringify({
-        token: 'header.payload.signature',
-        user: {
-          id: 'user-123',
-          email: 'ada@example.com'
-        }
-      })
-    )
-    axios.defaults.headers.common.Authorization = 'Bearer header.payload.signature'
-
-    renderAuthProvider()
-
-    await waitFor(() => expect(latestAuth).toBeDefined())
-
-    await latestAuth.login('ada@example.com')
-    expect(mockAuth0State.loginWithRedirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        authorizationParams: expect.objectContaining({
-          login_hint: 'ada@example.com'
-        })
-      })
-    )
-
-    await latestAuth.logout()
-    expect(mockAuth0State.logout).toHaveBeenCalled()
-    expect(window.localStorage.getItem('ailiteracy_backend_auth')).toBeNull()
-    expect(axios.defaults.headers.common.Authorization).toBeUndefined()
-  })
-
-  it('hydrates the stable backend session from an authenticated Auth0 browser session', async () => {
-    mockAuth0State.isAuthenticated = true
-    mockAuth0State.user = {
-      sub: 'auth0|user-123',
-      email: 'ada@example.com'
-    }
-    mockAuth0State.getAccessTokenSilently.mockResolvedValue('auth0-access-token')
-
-    axios.post.mockResolvedValue({
-      data: {
-        access_token: 'header.payload.signature',
         user: {
           id: 'user-123',
           email: 'ada@example.com',
           first_name: 'Ada',
           last_name: 'Lovelace',
-          role: 'learner',
-          organization: 'LitmusAI',
-          subscription_tier: 'free'
-        }
-      }
+          subscription_tier: 'free',
+        },
+      },
     })
 
     renderAuthProvider()
 
     await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
 
-    const result = await latestAuth.syncBackendAfterLogin()
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        success: true,
-        user: expect.objectContaining({
-          id: 'user-123',
-          email: 'ada@example.com'
-        })
-      })
-    )
-    expect(mockAuth0State.getAccessTokenSilently).toHaveBeenCalled()
-    expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/api/auth/exchange'),
-      expect.objectContaining({
-        access_token: 'auth0-access-token'
-      }),
-      expect.any(Object)
-    )
-    await waitFor(() => expect(latestAuth.isAuthenticated).toBe(true))
+    expect(latestAuth.isAuthenticated).toBe(true)
     expect(latestAuth.user).toEqual(
       expect.objectContaining({
         id: 'user-123',
-        email: 'ada@example.com'
+        email: 'ada@example.com',
       })
     )
-    expect(latestAuth.token).toBe('header.payload.signature')
+    expect(latestAuth.token).toBe('clerk-session-token')
+    expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer clerk-session-token')
+    expect(mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/auth/profile'))
+  })
+
+  it('logs out through Clerk and clears the auth header', async () => {
+    mockClerkState.getToken.mockResolvedValue('clerk-session-token')
+    mockClerkState.signOut.mockResolvedValue(undefined)
+    mockAxios.get.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-123',
+          email: 'ada@example.com',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+          subscription_tier: 'free',
+        },
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.logout()
+
+    expect(result).toEqual(expect.objectContaining({ success: true, redirected: true }))
+    expect(mockClerkState.signOut).toHaveBeenCalled()
+    expect(mockAxios.defaults.headers.common.Authorization).toBeUndefined()
   })
 })

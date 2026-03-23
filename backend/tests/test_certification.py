@@ -1,7 +1,5 @@
-import jwt
 from datetime import datetime
 
-from app import app
 from models import db, User, AssessmentResult, UserProgress, Certification, TrainingModule
 
 
@@ -55,17 +53,16 @@ def seed_completed_modules(user_id, count=3):
     db.session.commit()
 
 
-def test_apply_for_professional_certification_success(client):
+def test_apply_for_professional_certification_success(client, app, auth_headers):
     with app.app_context():
         user = create_enterprise_user()
         seed_assessment_result(user.id)
         seed_completed_modules(user.id, count=3)
-        secret = app.config['SUPABASE_JWT_SECRET']
-        token = jwt.encode({'sub': user.id}, secret, algorithm='HS256')
+        headers = auth_headers(user)
 
     response = client.post(
         '/api/certification/apply/litmusai-professional',
-        headers={'Authorization': f'Bearer {token}'},
+        headers=headers,
         json={}
     )
 
@@ -80,17 +77,16 @@ def test_apply_for_professional_certification_success(client):
         assert record.expires_at is not None
 
 
-def test_apply_for_certification_is_idempotent(client):
+def test_apply_for_certification_is_idempotent(client, app, auth_headers):
     with app.app_context():
         user = create_enterprise_user(email='idempotent@example.com')
         seed_assessment_result(user.id)
         seed_completed_modules(user.id, count=3)
-        secret = app.config['SUPABASE_JWT_SECRET']
-        token = jwt.encode({'sub': user.id}, secret, algorithm='HS256')
+        headers = auth_headers(user)
 
     first_response = client.post(
         '/api/certification/apply/litmusai-professional',
-        headers={'Authorization': f'Bearer {token}'},
+        headers=headers,
         json={}
     )
     assert first_response.status_code == 201
@@ -98,7 +94,7 @@ def test_apply_for_certification_is_idempotent(client):
 
     second_response = client.post(
         '/api/certification/apply/litmusai-professional',
-        headers={'Authorization': f'Bearer {token}'},
+        headers=headers,
         json={}
     )
     assert second_response.status_code == 200

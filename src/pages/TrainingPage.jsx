@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp, PlayCircle } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { DEMO_FALLBACK_MODULES_LIST } from '../data/demoFallback'
+
+const DEMO_FALLBACK_MODULES = DEMO_FALLBACK_MODULES_LIST
 
 const getResumeModuleFromProgressMap = (progressMap) => {
   return Object.values(progressMap)
@@ -22,7 +25,7 @@ const TrainingPage = () => {
   const [error, setError] = useState('')
   const [resumeModule, setResumeModule] = useState(null)
 
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const roles = ['All', 'Sales', 'HR', 'Marketing', 'Operations', 'General']
   const selectedRoleQuery = useMemo(() => {
@@ -62,7 +65,12 @@ const TrainingPage = () => {
           setResumeModule(null)
         }
       } catch {
-        setError('Failed to load training modules. Please try again later.')
+        if (user?.id === 'demo-user') {
+          setModules(DEMO_FALLBACK_MODULES)
+          setError('')
+        } else {
+          setError('Failed to load training modules. Please try again later.')
+        }
       } finally {
         setLoading(false)
       }

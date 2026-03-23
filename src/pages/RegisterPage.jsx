@@ -1,64 +1,32 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Brain, AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, Brain } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { setStoredAuthReturnTo } from '../config/authRoutes'
 
+
 const RegisterPage = () => {
-  const [formData, setFormData] = useState({
-    email: ''
-  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-
-  const { register, isAuthenticated, loginWithProvider } = useAuth()
+  const { register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard', { replace: true })
     }
   }, [isAuthenticated, navigate])
 
-  const handleChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setError('')
-    setMessage('')
-
     setLoading(true)
     setStoredAuthReturnTo('/dashboard')
-    const result = await register({
-      email: formData.email
-    })
 
-    if (result.success) {
-      if (result.user) {
-        navigate('/dashboard', { replace: true })
-      }
+    const result = await register()
+    if (!result.success) {
+      setError(result.error || 'Unable to start sign-up.')
       setLoading(false)
-      return
-    }
-
-    setError(result.error)
-    setLoading(false)
-  }
-
-  const handleProviderLogin = async (provider) => {
-    setError('')
-    setMessage('')
-    setStoredAuthReturnTo('/dashboard')
-    const result = await loginWithProvider(provider)
-    if (!result.success && result.error) {
-      setError(result.error)
     }
   }
 
@@ -70,12 +38,12 @@ const RegisterPage = () => {
             <Brain className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
-            Create your account with Auth0
+            Create your account
           </h2>
           <p className="mt-2 text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-              sign in with email and password
+              sign in
             </Link>
           </p>
         </div>
@@ -88,61 +56,16 @@ const RegisterPage = () => {
             </div>
           )}
 
-          {message && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <span className="text-green-700">{message}</span>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                autoComplete="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-                placeholder="you@example.com"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                You&apos;ll create your password on the secure Auth0 signup page.
-              </p>
-            </div>
-
+          <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+            <p className="text-sm text-gray-600">
+              Sign-up is handled by Clerk. Continue to the secure hosted registration page to create your account and come back ready to learn.
+            </p>
             <button
               type="submit"
               disabled={loading}
               className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Redirecting...' : 'Continue to Create Account'}
-            </button>
-          </div>
-
-          <p className="text-sm text-gray-600 text-center">
-            Prefer a social provider? Continue with Google or Facebook.
-          </p>
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('google')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleProviderLogin('facebook')}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Continue with Facebook
             </button>
           </div>
         </form>

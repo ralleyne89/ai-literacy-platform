@@ -45,7 +45,7 @@
 ---
 
 ### ✅ Test 4: Webhook Security
-**Endpoint**: `POST /api/webhooks/stripe`  
+**Endpoint**: `POST /api/billing/webhooks/stripe`  
 **Status**: ✅ **PASSED**
 
 **Results**:
@@ -94,7 +94,7 @@
 ✅ User is redirected back to site  
 
 ### Webhook Integration:
-✅ Webhook endpoint is live at `/api/webhooks/stripe`  
+✅ Webhook endpoint is live at `/api/billing/webhooks/stripe`  
 ✅ Webhook secret is configured  
 ✅ Signature validation is working  
 ✅ Ready to receive Stripe events  
@@ -146,8 +146,8 @@ After completing a test checkout:
    - `customer.subscription.created`
    - `invoice.payment_succeeded`
 
-### 2. Check Netlify Function Logs
-1. Go to: https://app.netlify.com/sites/litmusai/logs/functions
+### 2. Check Render Backend Logs
+1. Go to the Render service logs for the backend
 2. Filter by `stripe-webhook`
 3. You should see logs showing:
    - "Received webhook event: checkout.session.completed"
@@ -218,9 +218,8 @@ After completing a test checkout:
 
 ### Database Integration:
 - [x] Webhook updates user records
-- [x] Supabase integration code ready
-- [ ] Supabase credentials configured (optional)
-- [ ] Database schema updated (optional)
+- [x] Render backend integration ready
+- [ ] Production database schema updated
 
 ---
 
@@ -236,25 +235,19 @@ Steps:
 3. Enable subscription cancellation
 4. Save changes
 
-### 2. Add Supabase Integration
+### 2. Verify Backend Integration
 **Time**: 5 minutes
 
 Steps:
-1. Add `VITE_SUPABASE_URL` to Netlify
-2. Add `SUPABASE_SERVICE_ROLE_KEY` to Netlify
-3. Run database migration:
-   ```sql
-   ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'free';
-   ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
-   ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
-   ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT;
-   ```
-4. Redeploy site
+1. Confirm the Render backend has the Stripe and Clerk environment variables
+2. Confirm the webhook target is `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
+3. Confirm the database schema includes the Stripe subscription columns
+4. Redeploy the site if any production env vars changed
 
 ### 3. Test Complete Flow
 1. Complete a checkout
 2. Verify webhook events received
-3. Check database updated (if Supabase configured)
+3. Check database updated on Render
 4. Test customer portal (if activated)
 5. Test subscription cancellation
 
@@ -264,10 +257,9 @@ Steps:
 
 ### Real-time Monitoring:
 
-**Netlify Function Logs**:
-- URL: https://app.netlify.com/sites/litmusai/logs/functions
-- Shows all function invocations
-- Filter by function name
+**Render Backend Logs**:
+- Shows backend requests and webhook processing
+- Filter by function name or route
 - View errors and console logs
 
 **Stripe Dashboard**:
@@ -301,7 +293,7 @@ Steps:
 
 ### Optional Configuration:
 ⏳ Customer portal activation (2 min)  
-⏳ Supabase integration (5 min)  
+⏳ Backend database verification (5 min)  
 
 ---
 
@@ -319,13 +311,12 @@ All core features are working:
 1. Test the checkout flow with test cards
 2. Process real payments (when ready)
 3. Receive webhook events automatically
-4. Monitor everything through Stripe and Netlify dashboards
+4. Monitor everything through Stripe and Render dashboards
 
 **Next steps are optional** but recommended:
 - Activate customer portal for self-service management
-- Add Supabase integration for database updates
+- Confirm database updates on the Render backend
 
 ---
 
 **Everything is ready to go! 🚀**
-

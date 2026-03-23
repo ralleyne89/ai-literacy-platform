@@ -101,13 +101,13 @@ def validate_signup_schema_or_raise(db) -> None:
         )
 
     try:
-        user_columns = [column['name'] for column in inspector.get_columns('user')]
+        user_columns = inspector.get_columns('user')
     except SQLAlchemyError as exc:
         raise SchemaReadinessError(
             f"Unable to inspect 'user' table columns during startup: {exc}"
         ) from exc
 
-    missing_columns = _missing_required_columns(user_columns)
+    missing_columns = _missing_required_columns(column['name'] for column in user_columns)
     if missing_columns:
         missing_formatted = ', '.join(sorted(missing_columns))
         raise SchemaReadinessError(

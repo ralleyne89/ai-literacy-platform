@@ -23,7 +23,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: Explicit auth modes (`VITE_AUTH_MODE=backend|supabase|auth0`). `auto` is not supported in production.
+- **Authentication**: Clerk-only release configuration
 - **Deployment**: Replit-ready configuration
 
 ## 📋 Prerequisites
@@ -57,7 +57,7 @@ npm run backend
 
 The frontend will be available at `http://localhost:5173`
 
-> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and `VITE_AUTH_MODE` must be explicit.
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and `VITE_CLERK_PUBLISHABLE_KEY` must be set for the Netlify build.
 
 ### 3. Backend Setup
 
@@ -163,7 +163,7 @@ ai-literacy-platform/
 - [x] Flask backend with SQLAlchemy
 - [x] Database models and schema
 - [x] Assessment engine with 15 questions across 5 domains
-- [x] User authentication system (Supabase)
+- [x] User authentication system (Clerk release path)
 - [x] Responsive UI components
 - [x] Homepage with hero section and features
 - [x] Assessment page with interactive quiz
@@ -197,44 +197,22 @@ ai-literacy-platform/
 - [ ] API documentation
 - [ ] More courses and content
 
-## 🔐 Authentication Modes
+## 🔐 Authentication
 
-The app supports three explicit modes:
+LitmusAI now uses Clerk for the release auth path.
 
-- **Supabase mode (`VITE_AUTH_MODE=supabase`)**: Supabase login/signup and social OAuth (`Google` / `Facebook`) using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-- **Backend mode (`VITE_AUTH_MODE=backend`)**: email/password via `/api/auth/register` and `/api/auth/login`; JWT is stored client-side and attached to API requests.  
-  Keep Supabase vars unset unless you want optional OAuth/social features.
-- **Auth0 mode (`VITE_AUTH_MODE=auth0`)**: form auth is delegated to Auth0 Universal Login (`VITE_AUTH0_*` variables).
+Production config:
 
-Behavior notes:
+- Frontend build: `VITE_CLERK_PUBLISHABLE_KEY`
+- Backend/runtime: `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`
+- API base URL: `VITE_API_URL` pointing at the Render backend
 
-- `VITE_AUTH_MODE=auto` is no longer allowed in production. Set `backend`, `supabase`, or `auth0` explicitly.
-- In backend mode, password reset is unavailable by default and social login is delegated to Supabase only if those vars are present.
-- In Auth0 mode, password reset is handled by Auth0 and social login is managed in Auth0.
+Clerk dashboard setup:
 
-## 🔐 Social Sign-In Setup
-
-In **Supabase mode**, LitmusAI supports Google and Facebook OAuth through Supabase.
-
-1. In Supabase → Authentication → Providers, enable Google and Facebook.
-2. Supply each provider’s client ID and secret. Add both your local URL (`http://localhost:5173`) and deployed domain (e.g., Netlify) to the authorized redirect list.
-3. Supabase handles the OAuth callback at `/auth/callback` (single canonical callback path). No additional frontend routes are required.
-4. After issuing new keys, redeploy so the environment has updated Supabase values.
-
-In **Backend mode**, OAuth is disabled unless you intentionally keep Supabase variables configured for hybrid behavior.
-
-In **Auth0 mode**, configure provider connections in the Auth0 dashboard and enable them in the configured app/client.
-
-For this app, keep the OAuth callback route at `/auth/callback`. The frontend route is implemented in `src/config/authRoutes.js` and enforced by default in `AuthContext`.
-
-Auth0 dashboard checklist:
-
-1. Open **Applications → Applications → [Your App] → Connections** and enable **Google** for that app (`google-oauth2`).
-2. In **Allowed Callback URLs**, add your frontend callback endpoint(s), for example:
-   - `https://litmusai.netlify.app/auth/callback` (production)
-   - `http://localhost:5173/auth/callback` (local)
-3. In **Allowed Logout URLs** and **Allowed Web Origins**, include the matching app origins (`https://litmusai.netlify.app`, `http://localhost:5173`).
-4. Keep `VITE_AUTH0_REDIRECT_URI` aligned to the exact callback route above (or leave unset to use the app default).
+1. Create or select the Clerk application for this project.
+2. Add the production frontend origin and local dev origin to the allowed redirect/origin settings.
+3. Keep the `/auth/callback` route available for the SPA callback flow.
+4. Update Netlify and Render env vars together, then redeploy.
 
 ## 🧪 Testing the Application
 
@@ -271,11 +249,10 @@ Automated end-to-end workflows expect these runtime conditions:
 - Frontend running at `http://127.0.0.1:5173`
 - Backend API running at `http://127.0.0.1:5001`
 - Test environment points to the API with `VITE_API_URL=http://127.0.0.1:5001`
-- Frontend is started with `VITE_AUTH_MODE=auth0`
-- `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are set for the target environment
-- The Auth0 application allows the matching callback URL and web origin (`/auth/callback` on local or production)
+- Frontend is started with `VITE_CLERK_PUBLISHABLE_KEY`
+- The Clerk application allows the matching callback URL and web origin (`/auth/callback` on local or production)
 - A stable dataset seeded for modules, certifications, and course content
-- Backend token exchange is reachable at `/api/auth/exchange`
+- Backend auth verification accepts Clerk tokens for protected routes
 
 Run the required seed steps from `backend/`:
 
@@ -287,22 +264,21 @@ FLASK_APP=app.py flask seed-certifications --force
 FLASK_APP=app.py flask seed-course-content --force
 ```
 
-Auth0 release verification should validate the real browser flow instead of the legacy in-app password form flow:
+Clerk release verification should validate the real browser flow and preserved return-to behavior:
 
-- `/login` accepts the email address and redirects to Auth0 Universal Login
-- `/register` accepts the email address and redirects to Auth0 signup
-- Auth0 returns to `/auth/callback`
-- The callback completes backend token exchange and lands on `/dashboard`
+- `/login` and `/register` open the Clerk sign-in or sign-up flow
+- Clerk returns to `/auth/callback`
+- The callback hydrates the backend session and lands on `/dashboard`
 - At least one protected route loads successfully after sign-in (for example `/training` or a course module)
 
 Legacy note:
 
-- `npm run e2e:smoke`, `npm run e2e:flow`, and `npm run e2e` should not be treated as Auth0 release gates until their specs are rewritten to follow the redirect and callback path above.
-- If you automate against a real Auth0 tenant, inject the test account details and any tenant-specific secrets through CI/local environment variables rather than hard-coding them into the suite.
+- `npm run e2e:smoke`, `npm run e2e:flow`, and `npm run e2e` should only be treated as release gates after they exercise the Clerk browser flow.
+- If you automate against a real Clerk tenant, inject the test account details and any tenant-specific secrets through CI/local environment variables rather than hard-coding them into the suite.
 
-### Validation runbook (Auth0 release path)
+### Validation runbook (Clerk release path)
 
-Use this sequence before shipping an Auth0 build:
+Use this sequence before shipping a Clerk build:
 
 ```bash
 # backend prep (from /backend)
@@ -313,23 +289,19 @@ PYTHONPATH=. FLASK_APP=app.py flask seed-training-modules --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-certifications --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-course-content --force
 
-# unit coverage for the Auth0 provider contract (from repo root)
+# unit coverage for the Clerk provider contract (from repo root)
 npm test -- src/contexts/AuthContext.test.jsx
 
 # static checks
 npm run lint
 
-# production-style frontend build with explicit Auth0 env
+# production-style frontend build with explicit Clerk env
 VITE_API_URL=https://ai-literacy-platform.onrender.com \
-VITE_AUTH_MODE=auth0 \
-VITE_AUTH0_DOMAIN=https://litmusai.us.auth0.com \
-VITE_AUTH0_CLIENT_ID=your-auth0-client-id \
-VITE_AUTH0_AUDIENCE=https://litmusai.us.auth0.com/api/v2/ \
-VITE_AUTH0_REDIRECT_URI=https://litmusai.netlify.app/auth/callback \
+VITE_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key \
 ENFORCE_PROD_ENV=1 \
 npm run build
 
-# stack for Auth0 browser verification
+# stack for Clerk browser verification
 npm run backend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
@@ -338,8 +310,8 @@ Checklist:
 
 - [x] Backend reachable at `http://127.0.0.1:5001/api/health` (HTTP 200).
 - [x] Frontend reachable at `http://127.0.0.1:5173/` (HTTP 200).
-- [ ] `/login` redirects to Auth0 Universal Login after email submission.
-- [ ] `/register` redirects to Auth0 signup after email submission.
+- [ ] `/login` opens the Clerk sign-in flow after email submission.
+- [ ] `/register` opens the Clerk sign-up flow after email submission.
 - [ ] `/auth/callback` completes without an auth error.
 - [ ] Dashboard loads with an authenticated backend session.
 - [ ] At least one protected route loads successfully after sign-in.
@@ -357,14 +329,10 @@ DATABASE_URL=sqlite:///ai_literacy.db
 FLASK_ENV=development
 FLASK_DEBUG=True
 VITE_API_URL=http://localhost:5001
-VITE_AUTH_MODE=auth0
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-VITE_AUTH0_DOMAIN=https://your-domain.auth0.com
-VITE_AUTH0_CLIENT_ID=your-auth0-client-id
-VITE_AUTH0_AUDIENCE=your-auth0-audience
-VITE_AUTH0_REDIRECT_URI=https://your-site.com/auth/callback
+VITE_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
+CLERK_SECRET_KEY=your-clerk-secret-key
+CLERK_JWT_ISSUER=https://your-clerk-issuer
+CLERK_JWKS_URL=https://your-clerk-issuer/.well-known/jwks.json
 LOG_LEVEL=INFO
 # Optional: Stripe (populate once your Stripe account is ready)
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
@@ -387,27 +355,9 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 `npm run build` runs `scripts/validate-prod-env.mjs` before Vite build. In production contexts (`NETLIFY=true` + `CONTEXT=production`, `NODE_ENV=production`, or `ENFORCE_PROD_ENV=1`), the build will fail when:
 
 - `VITE_API_URL` is missing, invalid, or points to localhost
-- `VITE_AUTH_MODE` must be one of `backend`, `supabase`, or `auth0` (no implicit `auto` fallback in production).
-- `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI` are required when `VITE_AUTH_MODE=auth0`.
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are required when `VITE_AUTH_MODE=supabase`.
-- `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET` is required for backend/Auth0 token flow; `SUPABASE_JWT_SECRET` is additionally required for Supabase-backed token verification.
+- `VITE_CLERK_PUBLISHABLE_KEY` is missing
+- Legacy Auth0/Supabase release variables are still present in the build environment
 - Billing and Stripe webhook state should terminate at the backend API, not at a separate Netlify billing state store.
-
-Create a Supabase project (or use an existing one) and copy the Project URL and public `anon` API key into the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` values. The frontend uses these values to communicate with Supabase for authentication. You'll also need the project's JWT secret (Settings → API → `JWT Secret`) and place it in `SUPABASE_JWT_SECRET` so the Flask API can validate Supabase-issued access tokens.
-
-### Auth mode
-
-Use `VITE_AUTH_MODE` to control login behavior:
-
-`backend`: always use backend credentials and skip Supabase-first behavior.
-
-`supabase`: force Supabase for login, signup, and social providers (`Google` / `Facebook`).
-
-`auth0`: force Auth0 Universal Login; all email/password and social login flows are handled by Auth0.
-
-`auto`: not supported in production and treated as an invalid mode.
-
-In backend mode, social login is typically unavailable unless you keep Supabase settings for hybrid behavior, and password-reset links remain unavailable unless you add custom backend flows. In Auth0 mode, reset is handled in Auth0.
 
 ## 🚀 Deployment workflow (PR -> main -> Netlify)
 

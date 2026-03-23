@@ -69,6 +69,8 @@ backend/instance/
 .coverage
 coverage/
 htmlcov/
+playwright-report/
+test-results/
 
 # Misc
 Thumbs.db

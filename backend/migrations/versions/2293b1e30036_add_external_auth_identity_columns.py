@@ -10,16 +10,17 @@ import sqlalchemy as sa
 
 
 def upgrade():
-    op.add_column('user', sa.Column('auth_provider', sa.String(length=32), nullable=True))
-    op.add_column('user', sa.Column('auth_subject', sa.String(length=255), nullable=True))
-    op.create_unique_constraint(
-        'uq_user_auth_provider_subject',
-        'user',
-        ['auth_provider', 'auth_subject'],
-    )
+    with op.batch_alter_table('user', recreate='always') as batch_op:
+        batch_op.add_column(sa.Column('auth_provider', sa.String(length=32), nullable=True))
+        batch_op.add_column(sa.Column('auth_subject', sa.String(length=255), nullable=True))
+        batch_op.create_unique_constraint(
+            'uq_user_auth_provider_subject',
+            ['auth_provider', 'auth_subject'],
+        )
 
 
 def downgrade():
-    op.drop_constraint('uq_user_auth_provider_subject', 'user', type_='unique')
-    op.drop_column('user', 'auth_subject')
-    op.drop_column('user', 'auth_provider')
+    with op.batch_alter_table('user', recreate='always') as batch_op:
+        batch_op.drop_constraint('uq_user_auth_provider_subject', type_='unique')
+        batch_op.drop_column('auth_subject')
+        batch_op.drop_column('auth_provider')

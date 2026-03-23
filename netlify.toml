@@ -14,19 +14,12 @@
 
 [context.production.environment]
   VITE_API_URL = "https://ai-literacy-platform.onrender.com"
-  VITE_AUTH_MODE = "auth0"
-  # Frontend Auth0 build-time values for the Netlify app.
-  # Keep the backend runtime AUTH0_* values aligned to the same tenant,
-  # client ID, audience, and redirect URI in Render/backend env settings.
-  # Flask can fall back to VITE_AUTH0_* locally, but deployed auth should not
-  # treat those frontend variables as the backend source of truth.
-  VITE_AUTH0_DOMAIN = "https://litmusai.us.auth0.com"
-  VITE_AUTH0_CLIENT_ID = "rJVPV5C28rl38LggrVvlKppZ19I8EIlj"
-  VITE_AUTH0_AUDIENCE = "https://litmusai.us.auth0.com/api/v2/"
-  VITE_AUTH0_REDIRECT_URI = "https://litmusai.netlify.app/auth/callback"
+  # Clerk publishable key for the frontend build.
+  VITE_CLERK_PUBLISHABLE_KEY = "pk_test_or_prod_replace_me"
 
 # Billing routes and Stripe webhook callbacks are canonical on the backend API at `VITE_API_URL`.
 # Legacy Netlify billing functions proxy to the backend and are not a second source of truth.
+# Netlify continues to auto-deploy from `main` once the branch is merged.
 # SPA fallback - must be last
 [[redirects]]
   from = "/*"

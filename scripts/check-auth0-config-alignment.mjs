@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Verifies that Auth0-related config is aligned between netlify.toml (frontend)
- * and render.yaml (backend). Exits 0 if aligned, 1 if misaligned or missing.
+ * Validates that the Clerk release config is aligned between netlify.toml
+ * (frontend build) and render.yaml (backend runtime).
+ *
+ * The file name is kept for compatibility with the existing package.json script
+ * entry, but the check now enforces Clerk-only release config.
  */
 
 import fs from 'node:fs'
@@ -11,23 +14,24 @@ const ROOT = process.cwd()
 const NETLIFY_TOML = path.join(ROOT, 'netlify.toml')
 const RENDER_YAML = path.join(ROOT, 'render.yaml')
 
-const VITE_KEYS = [
-  'VITE_AUTH0_DOMAIN',
-  'VITE_AUTH0_CLIENT_ID',
-  'VITE_AUTH0_AUDIENCE',
-  'VITE_AUTH0_REDIRECT_URI',
-]
-const AUTH0_KEYS = ['AUTH0_DOMAIN', 'AUTH0_CLIENT_ID', 'AUTH0_AUDIENCE', 'AUTH0_REDIRECT_URI']
-
-function readNetlifyAuth0() {
-  if (!fs.existsSync(NETLIFY_TOML)) {
-    return { error: `Missing file: ${NETLIFY_TOML}` }
+const readFile = (filePath) => {
+  if (!fs.existsSync(filePath)) {
+    return { error: `Missing file: ${filePath}` }
   }
-  const raw = fs.readFileSync(NETLIFY_TOML, 'utf8')
+  return { raw: fs.readFileSync(filePath, 'utf8') }
+}
+
+const readNetlifyClerkConfig = () => {
+  const file = readFile(NETLIFY_TOML)
+  if (file.error) {
+    return file
+  }
+
+  const raw = file.raw
   const lines = raw.split(/\r?\n/)
   let inSection = false
   const out = {}
-  const keyRegex = /^\s*(VITE_AUTH0_(?:DOMAIN|CLIENT_ID|AUDIENCE|REDIRECT_URI))\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))\s*$/
+  const keyRegex = /^\s*(VITE_CLERK_PUBLISHABLE_KEY)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))\s*$/
   for (const line of lines) {
     if (line.startsWith('[')) {
       if (inSection) break
@@ -38,23 +42,28 @@ function readNetlifyAuth0() {
     const m = line.match(keyRegex)
     if (m) out[m[1]] = (m[2] ?? m[3] ?? m[4] ?? '').trim()
   }
-  for (const k of VITE_KEYS) {
-    if (out[k] === undefined) return { error: `Missing in netlify.toml: ${k}` }
+
+  if (!out.VITE_CLERK_PUBLISHABLE_KEY) {
+    return { error: 'Missing in netlify.toml: VITE_CLERK_PUBLISHABLE_KEY' }
   }
+
   return out
 }
 
-function readRenderAuth0() {
-  if (!fs.existsSync(RENDER_YAML)) {
-    return { error: `Missing file: ${RENDER_YAML}` }
+const readRenderClerkConfig = () => {
+  const file = readFile(RENDER_YAML)
+  if (file.error) {
+    return file
   }
-  const raw = fs.readFileSync(RENDER_YAML, 'utf8')
+
+  const raw = file.raw
   const lines = raw.split(/\r?\n/)
+  const out = {}
   let inWebService = false
   let inEnvVars = false
   let depthEnvVars = 0
-  const out = {}
   let currentKey = null
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const trimmed = line.trimStart()
@@ -71,12 +80,21 @@ function readRenderAuth0() {
     }
     if (inEnvVars && indent <= depthEnvVars && trimmed) break
     if (!inEnvVars) continue
-    const keyMatch = line.match(/^\s+-\s+key:\s+(AUTH0_(?:DOMAIN|CLIENT_ID|AUDIENCE|REDIRECT_URI))\s*$/)
+    const keyMatch = line.match(/^\s+-\s+key:\s+(CLERK_(?:SECRET_KEY|JWT_ISSUER|JWKS_URL|PUBLISHABLE_KEY))\s*$/)
     if (keyMatch) {
       currentKey = keyMatch[1]
       continue
     }
     if (currentKey) {
+      const syncMatch = line.match(/^\s+sync:\s*(true|false)\s*$/)
+      if (syncMatch) {
+        if (syncMatch[1] === 'false') {
+          out[currentKey] = '__SYNCED_EXTERNALLY__'
+        }
+        currentKey = null
+        continue
+      }
+
       const valueMatch = line.match(/^\s+value:\s*(?:"([^"]*)"|'([^']*)'|(.+?))\s*$/)
       if (valueMatch) {
         const v = (valueMatch[1] ?? valueMatch[2] ?? valueMatch[3] ?? '').trim()
@@ -85,72 +103,78 @@ function readRenderAuth0() {
       }
     }
   }
-  for (const k of AUTH0_KEYS) {
-    if (out[k] === undefined) return { error: `Missing in render.yaml: ${k}` }
+
+  for (const key of ['CLERK_SECRET_KEY', 'CLERK_JWT_ISSUER', 'CLERK_JWKS_URL']) {
+    if (!out[key]) {
+      return { error: `Missing in render.yaml: ${key}` }
+    }
   }
+
   return out
 }
 
-function normalizeDomain(v) {
-  if (!v || typeof v !== 'string') return ''
-  let s = v.trim().toLowerCase().replace(/\/+$/, '')
+const normalizeUrl = (value) => {
+  if (!value || typeof value !== 'string') return ''
+  const trimmed = value.trim().toLowerCase().replace(/\/+$/, '')
   try {
-    const u = new URL(s.startsWith('http') ? s : `https://${s}`)
-    return u.hostname
+    return new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`).toString().replace(/\/+$/, '')
   } catch {
-    return s.replace(/^https?:\/\//, '')
+    return trimmed.replace(/^https?:\/\//, '')
   }
 }
 
 function main() {
-  const netlify = readNetlifyAuth0()
+  const netlify = readNetlifyClerkConfig()
   if (netlify.error) {
-    console.error('[check-auth0-config]', netlify.error)
-    process.exit(1)
-  }
-  const render = readRenderAuth0()
-  if (render.error) {
-    console.error('[check-auth0-config]', render.error)
+    console.error('[check-clerk-config]', netlify.error)
     process.exit(1)
   }
 
-  const pairs = [
-    ['VITE_AUTH0_CLIENT_ID', 'AUTH0_CLIENT_ID'],
-    ['VITE_AUTH0_AUDIENCE', 'AUTH0_AUDIENCE'],
-    ['VITE_AUTH0_REDIRECT_URI', 'AUTH0_REDIRECT_URI'],
-  ]
-  const mismatches = []
-  for (const [viteKey, auth0Key] of pairs) {
-    const a = netlify[viteKey]
-    const b = render[auth0Key]
-    if (a !== b) {
-      mismatches.push({ viteKey, auth0Key, frontend: a, backend: b })
-    }
+  const render = readRenderClerkConfig()
+  if (render.error) {
+    console.error('[check-clerk-config]', render.error)
+    process.exit(1)
   }
-  const netlifyDomain = normalizeDomain(netlify.VITE_AUTH0_DOMAIN)
-  const renderDomain = normalizeDomain(render.AUTH0_DOMAIN)
-  if (netlifyDomain !== renderDomain) {
+
+  const mismatches = []
+
+  const frontendKey = netlify.VITE_CLERK_PUBLISHABLE_KEY
+  const mirroredKey = render.CLERK_PUBLISHABLE_KEY
+  if (mirroredKey && frontendKey !== mirroredKey) {
     mismatches.push({
-      viteKey: 'VITE_AUTH0_DOMAIN',
-      auth0Key: 'AUTH0_DOMAIN',
-      frontend: netlify.VITE_AUTH0_DOMAIN,
-      backend: render.AUTH0_DOMAIN,
-      note: '(normalized domain must match)',
+      key: 'CLERK_PUBLISHABLE_KEY',
+      frontend: frontendKey,
+      backend: mirroredKey,
+    })
+  }
+
+  if (!normalizeUrl(render.CLERK_JWT_ISSUER)) {
+    mismatches.push({
+      key: 'CLERK_JWT_ISSUER',
+      frontend: '(expected issuer URL)',
+      backend: render.CLERK_JWT_ISSUER,
+    })
+  }
+
+  if (!normalizeUrl(render.CLERK_JWKS_URL)) {
+    mismatches.push({
+      key: 'CLERK_JWKS_URL',
+      frontend: '(expected JWKS URL)',
+      backend: render.CLERK_JWKS_URL,
     })
   }
 
   if (mismatches.length) {
-    console.error('[check-auth0-config] Auth0 config is not aligned between netlify.toml and render.yaml.')
-    for (const m of mismatches) {
-      console.error(`  ${m.viteKey} (netlify) !== ${m.auth0Key} (render)`)
-      console.error(`    frontend: ${m.frontend}`)
-      console.error(`    backend:  ${m.backend}`)
-      if (m.note) console.error(`    ${m.note}`)
+    console.error('[check-clerk-config] Clerk config is not aligned between netlify.toml and render.yaml.')
+    for (const mismatch of mismatches) {
+      console.error(`  ${mismatch.key}`)
+      console.error(`    frontend: ${mismatch.frontend}`)
+      console.error(`    backend:  ${mismatch.backend}`)
     }
     process.exit(1)
   }
 
-  console.log('Auth0 config aligned between netlify.toml and render.yaml.')
+  console.log('Clerk release config validated between netlify.toml and render.yaml.')
   process.exit(0)
 }
 

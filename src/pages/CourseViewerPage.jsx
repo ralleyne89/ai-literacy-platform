@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, CheckCircle, Circle, Clock, BookOpen, Award } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../contexts/AuthContext'
+import { DEMO_FALLBACK_MODULE_IDS, getDemoModuleAndLessons } from '../data/demoFallback'
 import VideoLesson from '../components/course/VideoLesson'
 import TextLesson from '../components/course/TextLesson'
 import QuizLesson from '../components/course/QuizLesson'
@@ -10,6 +12,7 @@ import InteractiveLesson from '../components/course/InteractiveLesson'
 const CourseViewerPage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [module, setModule] = useState(null)
   const [moduleProgress, setModuleProgress] = useState(null)
   const [lessons, setLessons] = useState([])
@@ -45,6 +48,16 @@ const CourseViewerPage = () => {
         loadLesson(nextLessons[startIndex].id, startIndex)
       }
     } catch (error) {
+      if (user?.id === 'demo-user' && DEMO_FALLBACK_MODULE_IDS.includes(moduleId)) {
+        const fallback = getDemoModuleAndLessons(moduleId)
+        if (fallback) {
+          setModule(fallback.module)
+          setModuleProgress(fallback.moduleProgress)
+          setLessons(fallback.lessons)
+          setCurrentLesson(fallback.currentLessonFull)
+          setCurrentLessonIndex(0)
+        }
+      }
       console.error('Failed to fetch lessons:', error)
     } finally {
       setLoading(false)

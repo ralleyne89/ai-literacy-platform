@@ -5,6 +5,17 @@ const frontendPort = Number(process.env.PLAYWRIGHT_FRONTEND_PORT || '5195');
 const backendPort = Number(process.env.PLAYWRIGHT_BACKEND_PORT || '5001');
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || `http://${host}:${frontendPort}`;
 const recordMode = ['1', 'true', 'yes'].includes((process.env.PLAYWRIGHT_RECORD_MODE || '').toLowerCase());
+const e2eDatabasePath = process.env.PLAYWRIGHT_DATABASE_PATH || '/tmp/ai-literacy-playwright.db';
+const e2eDatabaseUrl = process.env.PLAYWRIGHT_DATABASE_URL || `sqlite:////${e2eDatabasePath.replace(/^\/+/, '')}`;
+const backendCommand = [
+  'cd backend',
+  `rm -f ${e2eDatabasePath}`,
+  `DATABASE_URL=${e2eDatabaseUrl} venv/bin/python -m flask --app app.py db upgrade`,
+  `DATABASE_URL=${e2eDatabaseUrl} venv/bin/python -m flask --app app.py seed-training-modules --silent`,
+  `DATABASE_URL=${e2eDatabaseUrl} venv/bin/python -m flask --app app.py seed-certifications --silent`,
+  `DATABASE_URL=${e2eDatabaseUrl} venv/bin/python -m flask --app app.py seed-course-content --silent`,
+  `PORT=${backendPort} FLASK_DEBUG=0 DATABASE_URL=${e2eDatabaseUrl} venv/bin/python app.py`,
+].join(' && ');
 
 export default defineConfig({
   testDir: './e2e',
@@ -31,27 +42,27 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run backend',
+      command: backendCommand,
       port: backendPort,
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120000,
       env: {
         PORT: String(backendPort),
+        DATABASE_URL: e2eDatabaseUrl,
+        FRONTEND_URL: `http://${host}:${frontendPort}`,
+        ALLOWED_ORIGINS: `http://${host}:${frontendPort}`,
       },
     },
     {
       command: `npm run dev -- --host ${host} --port ${frontendPort}`,
       port: frontendPort,
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120000,
       env: {
         VITE_API_URL: `http://${host}:${backendPort}`,
-        VITE_AUTH_MODE: 'auth0',
-        VITE_AUTH0_DOMAIN: 'litmusai.us.auth0.com',
-        VITE_AUTH0_CLIENT_ID: 'playwright-client-id',
-        VITE_AUTH0_AUDIENCE: 'https://litmusai.us.auth0.com/api/v2/',
-        VITE_AUTH0_REDIRECT_URI: `${baseURL}/auth/callback`,
-        PLAYWRIGHT_AUTH0_STUB: '1',
+        VITE_AUTH_MODE: 'clerk',
+        VITE_CLERK_PUBLISHABLE_KEY: 'pk_test_playwright_clerk_stub',
+        PLAYWRIGHT_CLERK_STUB: '1',
       },
     },
   ],

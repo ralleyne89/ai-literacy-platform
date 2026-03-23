@@ -47,8 +47,8 @@ if (!isProductionBuild) {
 const errors = []
 const warnings = []
 const requiredHost = 'ai-literacy-platform.onrender.com'
-const supportedAuthModes = new Set(['backend', 'supabase', 'auth0'])
 const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
+const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_SUPABASE_', 'SUPABASE_']
 
 const isValidHttpUrl = (value) => {
   const normalized = String(value || '').trim()
@@ -79,21 +79,6 @@ const addWarning = (message) => {
   warnings.push(message)
 }
 
-const authMode = (() => {
-  const rawMode = (getEnv('VITE_AUTH_MODE') || '').toLowerCase().trim()
-  if (!rawMode) {
-    addError(
-      'VITE_AUTH_MODE is required in production. Set it explicitly to one of: auth0 (recommended), backend, or supabase.'
-    )
-    return ''
-  }
-  if (!supportedAuthModes.has(rawMode)) {
-    addError(`Unsupported VITE_AUTH_MODE="${rawMode}". Use auth0, backend, or supabase.`)
-    return rawMode
-  }
-  return rawMode
-})()
-
 const apiUrl = getEnv('VITE_API_URL')
 if (!apiUrl) {
   addError('VITE_API_URL is required and must be an absolute URL in production.')
@@ -109,81 +94,28 @@ if (!apiUrl) {
       !parsedApi.hostname.toLowerCase().endsWith(`.${requiredHost}`)
     ) {
       addWarning(
-        `VITE_API_URL currently points to "${parsedApi.hostname}". Verify this is the intended backend host and keep Auth callbacks and CORS aligned.`
+        `VITE_API_URL currently points to "${parsedApi.hostname}". Verify this is the intended backend host and keep the Render backend and Netlify frontend aligned.`
       )
     }
   }
 }
 
-if (authMode === 'backend' || authMode === 'auth0') {
-  const hasTokenSecret = Boolean(getEnv('SUPABASE_JWT_SECRET')) || Boolean(getEnv('JWT_SECRET_KEY'))
-  if (!hasTokenSecret) {
-    addError('One of SUPABASE_JWT_SECRET or JWT_SECRET_KEY is required for backend token signing/verification.')
-  }
+const clerkPublishableKey = getEnv('VITE_CLERK_PUBLISHABLE_KEY')
+if (!clerkPublishableKey) {
+  addError('VITE_CLERK_PUBLISHABLE_KEY is required in production.')
 }
 
-if (authMode === 'supabase') {
-  const supabaseUrl = getEnv('VITE_SUPABASE_URL')
-  if (!supabaseUrl) {
-    addError('VITE_SUPABASE_URL is required when VITE_AUTH_MODE=supabase.')
-  } else {
-    const parsedSupabase = parseUrl(supabaseUrl)
-    if (!parsedSupabase || parsedSupabase.protocol !== 'https:') {
-      addError('VITE_SUPABASE_URL must be a valid https URL.')
-    } else if (!parsedSupabase.hostname.endsWith('.supabase.co')) {
-      addError('VITE_SUPABASE_URL should point to a *.supabase.co host.')
-    }
-  }
-
-  if (!getEnv('VITE_SUPABASE_ANON_KEY')) {
-    addError('VITE_SUPABASE_ANON_KEY is required when VITE_AUTH_MODE=supabase.')
-  }
-
-  if (!getEnv('SUPABASE_JWT_SECRET')) {
-    addError('SUPABASE_JWT_SECRET is required when VITE_AUTH_MODE=supabase.')
-  }
+const authMode = getEnv('VITE_AUTH_MODE')
+if (authMode && authMode.toLowerCase() !== 'clerk') {
+  addError('VITE_AUTH_MODE is no longer supported for release builds. Remove legacy auth mode configuration and use Clerk only.')
 }
 
-if (authMode === 'auth0') {
-  const auth0Domain = getEnv('VITE_AUTH0_DOMAIN')
-  const auth0ClientId = getEnv('VITE_AUTH0_CLIENT_ID')
-  const auth0Audience = getEnv('VITE_AUTH0_AUDIENCE')
-  const auth0RedirectUri = getEnv('VITE_AUTH0_REDIRECT_URI')
-
-  if (!auth0Domain) {
-    addError('VITE_AUTH0_DOMAIN is required when VITE_AUTH_MODE=auth0.')
-  } else if (auth0Domain.includes('://') && !isValidHttpUrl(auth0Domain)) {
-    addError('VITE_AUTH0_DOMAIN must be a valid HTTP(S) URL when including a protocol (for example https://your-domain.auth0.com).')
-  }
-
-  if (!auth0ClientId) {
-    addError('VITE_AUTH0_CLIENT_ID is required when VITE_AUTH_MODE=auth0.')
-  }
-
-  if (!auth0Audience) {
-    addError('VITE_AUTH0_AUDIENCE is required when VITE_AUTH_MODE=auth0.')
-  }
-
-  if (!auth0RedirectUri) {
-    addError('VITE_AUTH0_REDIRECT_URI is required when VITE_AUTH_MODE=auth0.')
-  } else if (!isValidHttpUrl(auth0RedirectUri)) {
-    addError('VITE_AUTH0_REDIRECT_URI must be a valid absolute HTTP(S) URL.')
-  } else {
-    const redirectPath = parseUrl(auth0RedirectUri)?.pathname
-    if (redirectPath !== '/auth/callback') {
-      addError(`VITE_AUTH0_REDIRECT_URI must use /auth/callback. Current path: ${redirectPath || '(missing)'}.`)
-    }
-  }
-
-  const backendRedirect = getEnv('AUTH0_REDIRECT_URI')
-  if (backendRedirect) {
-    const parsedRedirect = parseUrl(backendRedirect)
-    const backendPath = parsedRedirect?.pathname
-    if (!isValidHttpUrl(backendRedirect)) {
-      addError('AUTH0_REDIRECT_URI must be a valid absolute HTTP(S) URL when set.')
-    } else if (backendPath && backendPath !== '/auth/callback') {
-      addError(`AUTH0_REDIRECT_URI must use /auth/callback when set. Current path: ${backendPath}.`)
-    }
+for (const prefix of legacyAuthPrefixes) {
+  const matches = Object.keys({ ...process.env, ...fileEnv }).filter((key) => key.startsWith(prefix))
+  if (matches.length > 0) {
+    addWarning(
+      `Legacy auth variables are still present: ${matches.join(', ')}. They are not used by the Clerk release path and should be removed from production environments.`
+    )
   }
 }
 
@@ -194,10 +126,9 @@ if (errors.length > 0) {
   }
 
   console.error('\nHow to fix:')
-  console.error('- Ensure all required variables are set for your selected VITE_AUTH_MODE.')
-  console.error('- Keep VITE_API_URL aligned with the single backend host (https://ai-literacy-platform.onrender.com by default).')
-  console.error('- Set VITE_AUTH_MODE explicitly; fallback/auto heuristics are disabled in production.')
-  console.error('- For auth0 mode, confirm VITE_AUTH0_REDIRECT_URI equals https://<site>/auth/callback.')
+  console.error('- Ensure VITE_API_URL points at the Render backend host.')
+  console.error('- Set VITE_CLERK_PUBLISHABLE_KEY for the Netlify build.')
+  console.error('- Remove legacy Auth0/Supabase auth-mode variables from production configuration.')
   console.error('- Re-run the build after fixing values.')
   process.exit(1)
 }

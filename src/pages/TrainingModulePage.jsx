@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink, Loader2 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { DEMO_FALLBACK_MODULE_DETAILS, DEMO_FALLBACK_MODULE_IDS } from '../data/demoFallback'
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -27,18 +28,29 @@ const TrainingModulePage = () => {
         setModule(nextModule)
         setProgress(nextModule?.progress || null)
       } catch {
-        setError('Unable to load this module right now. Please try again later.')
+        if (user?.id === 'demo-user' && DEMO_FALLBACK_MODULE_IDS.includes(moduleId)) {
+          const fallback = DEMO_FALLBACK_MODULE_DETAILS[moduleId]
+          if (fallback) {
+            setModule(fallback)
+            setProgress(null)
+            setError('')
+          } else {
+            setError('Unable to load this module right now. Please try again later.')
+          }
+        } else {
+          setError('Unable to load this module right now. Please try again later.')
+        }
       } finally {
         setLoading(false)
       }
     }
 
     loadModule()
-  }, [moduleId, isAuthenticated])
+  }, [moduleId, isAuthenticated, user?.id])
 
   const handleEnroll = async () => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/training/modules/${moduleId}` } })
+      navigate('/login', { state: { from: { pathname: `/training/modules/${moduleId}` } } })
       return
     }
 
@@ -209,7 +221,7 @@ const TrainingModulePage = () => {
                   </Link>
                 ) : !isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
                   <button
-                    onClick={() => navigate('/login', { state: { from: `/training/modules/${moduleId}` } })}
+                    onClick={() => navigate('/login', { state: { from: { pathname: `/training/modules/${moduleId}` } } })}
                     className="btn-primary"
                   data-testid="training-module-login-button"
                   >

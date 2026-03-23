@@ -1,12 +1,10 @@
-import jwt
 import pytest
 
-from app import app
 from models import db, User
 
 
 @pytest.fixture()
-def authenticated_user(client):
+def authenticated_user(client, app, create_clerk_token):
     with app.app_context():
         user = User(
             email='billing@example.com',
@@ -20,7 +18,7 @@ def authenticated_user(client):
         user_id = user.id
         user_email = user.email
 
-    token = jwt.encode({'sub': user_id}, app.config['SUPABASE_JWT_SECRET'], algorithm='HS256')
+    token = create_clerk_token(sub=user_id, email=user_email)
     return {
         'id': user_id,
         'email': user_email,
@@ -134,7 +132,7 @@ def test_checkout_session_uses_authenticated_email(client, authenticated_user, m
     assert payload['url'] == 'https://stripe.example/checkout-authenticated'
 
 
-def test_checkout_session_complete_updates_subscription(client, authenticated_user, monkeypatch):
+def test_checkout_session_complete_updates_subscription(client, authenticated_user, monkeypatch, app):
     token = authenticated_user['token']
     user_id = authenticated_user['id']
     email = authenticated_user['email']
@@ -207,7 +205,7 @@ def test_checkout_session_complete_updates_subscription(client, authenticated_us
         assert user.stripe_subscription_id == 'sub_test_123'
 
 
-def test_stripe_webhook_checkout_completion_updates_subscription(client, authenticated_user, monkeypatch):
+def test_stripe_webhook_checkout_completion_updates_subscription(client, authenticated_user, monkeypatch, app):
     user_id = authenticated_user['id']
     email = authenticated_user['email']
 
@@ -296,7 +294,7 @@ def test_subscription_endpoint_defaults_to_free(client, authenticated_user):
     assert payload['has_subscription'] is False
 
 
-def test_subscription_endpoint_uses_stripe_fallback(client, authenticated_user, monkeypatch):
+def test_subscription_endpoint_uses_stripe_fallback(client, authenticated_user, monkeypatch, app):
     user_id = authenticated_user['id']
     token = authenticated_user['token']
 
@@ -364,7 +362,7 @@ def test_customer_portal_requires_customer_id(client, authenticated_user):
     assert 'No active subscription customer found' in response.get_json().get('error', '')
 
 
-def test_customer_portal_success(client, authenticated_user, monkeypatch):
+def test_customer_portal_success(client, authenticated_user, monkeypatch, app):
     user_id = authenticated_user['id']
     token = authenticated_user['token']
 

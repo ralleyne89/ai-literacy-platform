@@ -1,8 +1,6 @@
 import { AUTH_CALLBACK_PATH } from './apiEndpoints'
 
 export { AUTH_CALLBACK_PATH }
-
-export const AUTH0_CALLBACK_PATH = AUTH_CALLBACK_PATH
 export const AUTH_RETURN_TO_SESSION_KEY = 'ailiteracy_auth_return_to'
 
 export const getStoredAuthReturnTo = () => {

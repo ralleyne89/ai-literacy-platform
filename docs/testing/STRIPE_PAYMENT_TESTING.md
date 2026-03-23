@@ -4,11 +4,11 @@
 
 Before testing, ensure all fixes have been applied:
 
-- [ ] Database migration has been run in Supabase
+- [ ] Database migration has been run on the backend database
 - [ ] Backend User model has new Stripe columns
 - [ ] Webhook handler uses `subscription_tier` (not `subscription_plan`)
 - [ ] Certification TIER_RANK includes "premium"
-- [ ] SUPABASE_SERVICE_ROLE_KEY is set in Netlify
+- [ ] Clerk backend env vars are set on Render
 - [ ] All Stripe environment variables are configured
 - [ ] Application has been redeployed
 
@@ -53,7 +53,7 @@ Any future expiry date and any 3-digit CVC will work.
 - ✅ Payment processed successfully
 - ✅ Redirected back to billing page with success message
 - ✅ No errors in browser console
-- ✅ No errors in Netlify function logs
+- ✅ No errors in Render backend logs
 
 **Database Verification:**
 ```sql
@@ -105,7 +105,7 @@ Expected values:
 - ✅ No errors in response body
 - ✅ Database updated correctly
 
-**Netlify Function Logs:**
+**Render Backend Logs:**
 ```
 Received webhook event: checkout.session.completed
 Customer: test@example.com, Subscription: sub_..., Plan: premium
@@ -247,15 +247,15 @@ WHERE email = 'your-test-email@example.com';
 
 **Check:**
 1. Verify webhook endpoint is configured in Stripe
-2. Check `SUPABASE_SERVICE_ROLE_KEY` is set in Netlify
+2. Confirm the endpoint is `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
 3. Run database migration script
-4. Check Netlify function logs for errors
+4. Check Render backend logs for errors
 5. Verify webhook signature secret matches
 
 **Debug Steps:**
 ```bash
-# Check Netlify function logs
-netlify functions:log stripe-webhook
+# Check Render backend logs
+# Use the Render dashboard or service logs
 
 # Check Stripe webhook deliveries
 # Go to: Stripe Dashboard → Developers → Webhooks → [Your endpoint] → Recent deliveries
@@ -266,8 +266,8 @@ netlify functions:log stripe-webhook
 **Check:**
 1. Verify user exists in database with matching email
 2. Check database has all required columns
-3. Verify SUPABASE_SERVICE_ROLE_KEY has write permissions
-4. Check Netlify function logs for detailed error
+3. Verify the Render backend has permission to write to the database
+4. Check Render backend logs for detailed error
 
 ### Test Fails: Premium content still locked after upgrade
 
@@ -281,7 +281,7 @@ netlify functions:log stripe-webhook
 
 All tests should pass with:
 - ✅ No errors in browser console
-- ✅ No errors in Netlify function logs
+- ✅ No errors in Render backend logs
 - ✅ Database correctly updated after each action
 - ✅ Webhooks successfully processed (200 responses)
 - ✅ Premium content accessible after upgrade
@@ -330,10 +330,9 @@ Before going live:
 If tests fail, collect this information:
 
 1. **Error messages** from browser console
-2. **Netlify function logs** for webhook processing
+2. **Render backend logs** for webhook processing
 3. **Stripe webhook delivery logs**
 4. **Database state** (subscription_tier, stripe_customer_id, etc.)
 5. **Steps to reproduce** the issue
 
 Include all this information when reporting bugs or requesting support.
-
