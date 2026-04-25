@@ -1,4 +1,4 @@
-from models import User
+from models import User, db
 
 
 def test_sync_creates_internal_user_for_clerk_subject(client, app, create_clerk_token):
@@ -65,3 +65,43 @@ def test_profile_links_existing_email_to_clerk_identity(client, app, create_cler
         user = User.query.get(existing_user_id)
         assert user.auth_provider == 'clerk'
         assert user.auth_subject == 'user_existing_456'
+
+
+def test_profile_sync_preserves_locally_managed_fields(client, app, create_clerk_token):
+    with app.app_context():
+        user = User(
+            email='preserve@example.com',
+            password_hash='clerk_managed',
+            first_name='Local',
+            last_name='Profile',
+            role='Sales',
+            organization='Acme',
+            auth_provider='clerk',
+            auth_subject='user_preserve_789',
+        )
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    token = create_clerk_token(
+        sub='user_preserve_789',
+        email='preserve@example.com',
+        extra_claims={
+            'given_name': 'Remote',
+            'family_name': 'Profile',
+        },
+    )
+
+    response = client.get(
+        '/api/auth/profile',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        user = User.query.get(user_id)
+        assert user.first_name == 'Remote'
+        assert user.last_name == 'Profile'
+        assert user.role == 'Sales'
+        assert user.organization == 'Acme'

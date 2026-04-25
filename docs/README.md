@@ -29,6 +29,11 @@ Database setup, migration scripts, and readiness checklists.
 2. Check [deployment/DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md) for setup
 3. Review [course-content/COURSE_CATALOG.md](course-content/COURSE_CATALOG.md) for available courses
 
+**Local development defaults:**
+- Frontend: `http://localhost:5173` via `npm run dev`
+- Backend API: `http://localhost:5001` via `npm run backend`
+- Auth release path: Clerk only (`VITE_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`)
+
 **Deploying?** See:
 - [deployment/DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md)
 - [deployment/PUSH_AND_DEPLOY_GUIDE.md](deployment/PUSH_AND_DEPLOY_GUIDE.md)
@@ -43,3 +48,10 @@ Database setup, migration scripts, and readiness checklists.
 **Testing?** See:
 - [testing/TESTING_GUIDE.md](testing/TESTING_GUIDE.md)
 - [testing/COMPLETE_TESTING_CHECKLIST.md](testing/COMPLETE_TESTING_CHECKLIST.md)
+
+Current top-level checks:
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`

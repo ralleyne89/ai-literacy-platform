@@ -17,6 +17,12 @@ Production release config is Clerk-only:
 - Render backend env: `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`
 - Backend API base: `VITE_API_URL`
 
+Local defaults:
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5001`
+- Start commands: `npm run dev` and `npm run backend`
+
 The canonical Stripe webhook target is the Render backend route:
 
 - `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
@@ -33,6 +39,12 @@ Netlify billing functions remain legacy proxies and are not the source of truth.
 
 ## Validation
 
-Use the release validation script from the repo root after updating production config.
+Use the release validation script from the repo root after updating production config:
+
+```bash
+npm run validate:prod-env
+npm run check:clerk-config
+npm run build
+```
 
 If you change release config in `netlify.toml` or `render.yaml`, also run the Clerk config checker script. The script filename is legacy; the check now validates Clerk release config.

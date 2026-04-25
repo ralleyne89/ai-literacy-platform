@@ -24,7 +24,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
 - **Authentication**: Clerk-only release configuration
-- **Deployment**: Replit-ready configuration
+- **Deployment**: Netlify frontend + Render backend configuration
 
 ## 📋 Prerequisites
 
@@ -78,14 +78,15 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Set up environment variables
-cp ../.env.example .env
+cp .env.example .env
 # Edit .env file with your configuration
 
-# Initialize database
-python app.py
+# Start the backend API
+cd ..
+npm run backend
 ```
 
-The backend API will be available at `http://localhost:5000`
+The backend API will be available at `http://localhost:5001`
 
 ### 4. Database Migrations & Seeds
 
@@ -149,7 +150,7 @@ ai-literacy-platform/
 │   └── archive/                 # Historical docs
 ├── package.json                 # Frontend dependencies
 ├── requirements.txt             # Backend dependencies
-├── vite.config.js              # Vite configuration
+├── vite.config.ts              # Vite configuration
 ├── tailwind.config.js          # Tailwind CSS configuration
 └── README.md                   # This file
 ```
@@ -232,14 +233,14 @@ npm run preview
 ### Backend Testing
 
 ```bash
-# Install backend + test dependencies
-pip install -r requirements-dev.txt
+# Install backend + test dependencies from repo root
+backend/venv/bin/python -m pip install -r requirements-dev.txt
 
-# Start the Flask development server
+# Start the Flask development server from repo root
 npm run backend
 
 # Run backend unit tests
-python -m pytest -q
+npm run test:backend
 ```
 
 ### End-to-End (Playwright) Preconditions
@@ -288,12 +289,17 @@ PYTHONPATH=. FLASK_APP=app.py flask db upgrade
 PYTHONPATH=. FLASK_APP=app.py flask seed-training-modules --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-certifications --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-course-content --force
+cd ..
 
 # unit coverage for the Clerk provider contract (from repo root)
 npm test -- src/contexts/AuthContext.test.jsx
 
 # static checks
 npm run lint
+npm run typecheck
+
+# backend unit coverage
+npm run test:backend
 
 # production-style frontend build with explicit Clerk env
 VITE_API_URL=https://ai-literacy-platform.onrender.com \
@@ -341,6 +347,7 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 STRIPE_PRICE_PREMIUM=price_live_or_test_premium
 STRIPE_PRICE_ENTERPRISE=price_live_or_test_enterprise
 FRONTEND_URL=https://your-netlify-site.netlify.app
+ALLOWED_ORIGINS=https://your-netlify-site.netlify.app
 # Optional explicit backend URL for legacy Netlify billing/webhook proxy functions
 BACKEND_API_URL=https://ai-literacy-platform.onrender.com
 E2E_TEST_EMAIL=autotest+playwright@example.com
@@ -356,7 +363,7 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 
 - `VITE_API_URL` is missing, invalid, or points to localhost
 - `VITE_CLERK_PUBLISHABLE_KEY` is missing
-- Legacy Auth0/Supabase release variables are still present in the build environment
+- Legacy non-Clerk auth release variables are still present in the build environment
 - Billing and Stripe webhook state should terminate at the backend API, not at a separate Netlify billing state store.
 
 ## 🚀 Deployment workflow (PR -> main -> Netlify)
@@ -377,7 +384,6 @@ Common production databases (free or low-cost):
 - Neon
 - Render PostgreSQL
 - Railway PostgreSQL
-- Supabase Postgres
 - Aiven PostgreSQL
 - ElephantSQL (availability may vary)
 
@@ -453,4 +459,4 @@ For support, email support@ailiteracyplatform.com or create an issue in this rep
 
 - Inspired by GenAIPI's proven methodology
 - Design influenced by CYPHER Learning's modern aesthetic
-- Built for the Replit platform ecosystem
+- Built for the Netlify and Render deployment path

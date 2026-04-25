@@ -49,6 +49,7 @@ const warnings = []
 const requiredHost = 'ai-literacy-platform.onrender.com'
 const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_SUPABASE_', 'SUPABASE_']
+const placeholderValues = new Set(['pk_test_or_prod_replace_me'])
 
 const isValidHttpUrl = (value) => {
   const normalized = String(value || '').trim()
@@ -103,6 +104,8 @@ if (!apiUrl) {
 const clerkPublishableKey = getEnv('VITE_CLERK_PUBLISHABLE_KEY')
 if (!clerkPublishableKey) {
   addError('VITE_CLERK_PUBLISHABLE_KEY is required in production.')
+} else if (placeholderValues.has(clerkPublishableKey)) {
+  addError('VITE_CLERK_PUBLISHABLE_KEY is still set to a placeholder value.')
 }
 
 const authMode = getEnv('VITE_AUTH_MODE')

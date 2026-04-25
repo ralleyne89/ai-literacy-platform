@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.js']
     },
     server: {
-      port: 3001,
+      port: 5173,
       proxy: {
         '/api': {
           target: apiTarget,

@@ -165,30 +165,44 @@ def _managed_user_profile_from_claims(claims):
     if not isinstance(public_metadata, dict):
         public_metadata = {}
 
-    profile = {
-        'email': _normalize_email(
-            claims.get('email') or claims.get('email_address') or claims.get('primary_email_address')
-        ),
-        'first_name': _normalize_text(claims.get('given_name') or claims.get('first_name')),
-        'last_name': _normalize_text(claims.get('family_name') or claims.get('last_name')),
-        'role': _normalize_text(public_metadata.get('role') or unsafe_metadata.get('role')) or None,
-        'organization': _normalize_text(
-            public_metadata.get('organization') or unsafe_metadata.get('organization')
-        ) or None,
-    }
+    profile = {}
+    email = _normalize_email(
+        claims.get('email') or claims.get('email_address') or claims.get('primary_email_address')
+    )
+    first_name = _normalize_text(claims.get('given_name') or claims.get('first_name'))
+    last_name = _normalize_text(claims.get('family_name') or claims.get('last_name'))
+    role = _normalize_text(public_metadata.get('role') or unsafe_metadata.get('role'))
+    organization = _normalize_text(public_metadata.get('organization') or unsafe_metadata.get('organization'))
 
-    if not profile['email'] or not profile['first_name'] or not profile['last_name']:
+    if email:
+        profile['email'] = email
+    if first_name:
+        profile['first_name'] = first_name
+    if last_name:
+        profile['last_name'] = last_name
+    if role:
+        profile['role'] = role
+    if organization:
+        profile['organization'] = organization
+
+    if not profile.get('email') or not profile.get('first_name') or not profile.get('last_name'):
         remote_profile = _fetch_clerk_user_profile(claims.get('sub'))
         if remote_profile:
-            profile['email'] = profile['email'] or remote_profile.get('email', '')
-            profile['first_name'] = profile['first_name'] or remote_profile.get('first_name', '')
-            profile['last_name'] = profile['last_name'] or remote_profile.get('last_name', '')
-            profile['role'] = profile['role'] or remote_profile.get('role')
-            profile['organization'] = profile['organization'] or remote_profile.get('organization')
+            for key in ('email', 'first_name', 'last_name', 'role', 'organization'):
+                if not profile.get(key) and remote_profile.get(key):
+                    profile[key] = remote_profile[key]
 
-    profile['first_name'] = profile['first_name'] or 'AI'
-    profile['last_name'] = profile['last_name'] or 'Learner'
     return profile
+
+
+def _profile_for_new_user(profile):
+    return {
+        'email': profile.get('email', ''),
+        'first_name': profile.get('first_name') or 'AI',
+        'last_name': profile.get('last_name') or 'Learner',
+        'role': profile.get('role'),
+        'organization': profile.get('organization'),
+    }
 
 
 def _link_user_to_identity(user, identity):
@@ -203,9 +217,9 @@ def _update_user_from_profile(user, profile):
         user.first_name = profile['first_name']
     if profile.get('last_name'):
         user.last_name = profile['last_name']
-    if 'role' in profile:
+    if profile.get('role') is not None:
         user.role = profile.get('role')
-    if 'organization' in profile:
+    if profile.get('organization') is not None:
         user.organization = profile.get('organization')
 
 
@@ -241,10 +255,11 @@ def resolve_user_from_claims(claims, create_if_missing=False):
     if not create_if_missing:
         return None
 
-    if not profile['email']:
+    create_profile = _profile_for_new_user(profile)
+    if not create_profile['email']:
         raise MissingIdentityEmailError('Email is required to create user profile')
 
-    existing_user = User.query.filter_by(email=profile['email']).first()
+    existing_user = User.query.filter_by(email=create_profile['email']).first()
     if existing_user is not None:
         if existing_user.auth_provider and not _user_matches_identity(existing_user, identity):
             raise AuthIdentityConflictError(existing_user)
@@ -257,12 +272,12 @@ def resolve_user_from_claims(claims, create_if_missing=False):
         return existing_user
 
     user = User(
-        email=profile['email'],
+        email=create_profile['email'],
         password_hash=CLERK_MANAGED_PASSWORD_MARKER,
-        first_name=profile['first_name'],
-        last_name=profile['last_name'],
-        role=profile.get('role'),
-        organization=profile.get('organization'),
+        first_name=create_profile['first_name'],
+        last_name=create_profile['last_name'],
+        role=create_profile.get('role'),
+        organization=create_profile.get('organization'),
         auth_provider=identity['provider'],
         auth_subject=identity['subject'],
     )

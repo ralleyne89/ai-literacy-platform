@@ -17,6 +17,7 @@ DEMO_USER_ID = 'demo-user'
 CLERK_PROVIDER = 'clerk'
 DEMO_PROVIDER = 'demo'
 _CLERK_JWKS_CLIENTS = {}
+TRUTHY_VALUES = {'1', 'true', 'yes', 'on'}
 
 
 def _config_value(key):
@@ -91,6 +92,21 @@ def _normalize_identity_value(value):
     if not isinstance(value, str):
         return ''
     return value.strip()
+
+
+def _truthy_config(key):
+    return _config_value(key).lower() in TRUTHY_VALUES
+
+
+def _demo_auth_enabled():
+    if current_app.config.get('TESTING'):
+        return True
+
+    environment = (_config_value('FLASK_ENV') or _config_value('ENV')).lower()
+    if environment in ('production', 'prod'):
+        return False
+
+    return _truthy_config('ENABLE_DEMO_AUTH') or environment == 'demo'
 
 
 def _get_or_create_demo_user():
@@ -188,7 +204,7 @@ def _decode_token_identity(optional=False, token=None, allowed_providers=None):
     if token is None:
         return None
 
-    if token == 'demo':
+    if token == 'demo' and _demo_auth_enabled():
         demo_user = _get_or_create_demo_user()
         return {
             'provider': DEMO_PROVIDER,

@@ -53,7 +53,7 @@ This directory contains all testing guides, verification checklists, and quality
 - [ ] All API endpoints return correct responses
 - [ ] Database migrations run successfully
 - [ ] Course content seeds properly
-- [ ] Authentication works
+- [ ] Clerk token verification works for protected routes
 - [ ] Error handling works
 
 **Frontend:**
@@ -74,6 +74,7 @@ This directory contains all testing guides, verification checklists, and quality
 
 **Production URLs:**
 - [ ] Homepage loads
+- [ ] Clerk sign-in and sign-up complete through `/auth/callback`
 - [ ] Assessment works
 - [ ] Dashboard shows recommendations
 - [ ] Course viewer accessible
@@ -156,8 +157,18 @@ See [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) for current issues and reso
 
 ## 🔧 Testing Tools
 
+### Current Commands
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:e2e`
+
+Local browser verification expects the frontend on `http://localhost:5173` and the backend API on `http://localhost:5001`.
+
 ### Backend
-- pytest (unit tests)
+- pytest through `npm run test:backend`
 - curl (API testing)
 - Python scripts (database verification)
 
@@ -167,8 +178,8 @@ See [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) for current issues and reso
 - Network tab (API calls)
 
 ### Integration
-- Manual testing
-- End-to-end scenarios
+- Manual Clerk browser testing
+- End-to-end scenarios through Playwright
 - User acceptance testing
 
 ## 📝 Reporting Issues
@@ -179,4 +190,3 @@ When reporting issues, include:
 3. Actual behavior
 4. Screenshots/logs
 5. Environment (dev/prod)
-

@@ -12,9 +12,9 @@ services:
       - key: CLERK_SECRET_KEY
         sync: false
       - key: CLERK_JWT_ISSUER
-        value: https://clerk.ai-literacy-platform.example
+        sync: false
       - key: CLERK_JWKS_URL
-        value: https://clerk.ai-literacy-platform.example/.well-known/jwks.json
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY

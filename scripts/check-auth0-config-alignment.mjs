@@ -13,6 +13,17 @@ import path from 'node:path'
 const ROOT = process.cwd()
 const NETLIFY_TOML = path.join(ROOT, 'netlify.toml')
 const RENDER_YAML = path.join(ROOT, 'render.yaml')
+const SYNCED_EXTERNALLY = '__SYNCED_EXTERNALLY__'
+const PLACEHOLDER_VALUES = new Set([
+  'pk_test_or_prod_replace_me',
+  'https://clerk.ai-literacy-platform.example',
+  'https://clerk.ai-literacy-platform.example/.well-known/jwks.json',
+])
+
+const isPlaceholderValue = (value) => {
+  const normalized = String(value || '').trim()
+  return PLACEHOLDER_VALUES.has(normalized) || normalized.includes('ai-literacy-platform.example')
+}
 
 const readFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -43,11 +54,18 @@ const readNetlifyClerkConfig = () => {
     if (m) out[m[1]] = (m[2] ?? m[3] ?? m[4] ?? '').trim()
   }
 
-  if (!out.VITE_CLERK_PUBLISHABLE_KEY) {
-    return { error: 'Missing in netlify.toml: VITE_CLERK_PUBLISHABLE_KEY' }
+  const envPublishableKey = String(process.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
+  const publishableKey = out.VITE_CLERK_PUBLISHABLE_KEY || envPublishableKey
+
+  if (!publishableKey) {
+    return { VITE_CLERK_PUBLISHABLE_KEY: SYNCED_EXTERNALLY }
   }
 
-  return out
+  if (isPlaceholderValue(publishableKey)) {
+    return { error: 'VITE_CLERK_PUBLISHABLE_KEY is still set to a placeholder value.' }
+  }
+
+  return { VITE_CLERK_PUBLISHABLE_KEY: publishableKey }
 }
 
 const readRenderClerkConfig = () => {
@@ -98,6 +116,9 @@ const readRenderClerkConfig = () => {
       const valueMatch = line.match(/^\s+value:\s*(?:"([^"]*)"|'([^']*)'|(.+?))\s*$/)
       if (valueMatch) {
         const v = (valueMatch[1] ?? valueMatch[2] ?? valueMatch[3] ?? '').trim()
+        if (isPlaceholderValue(v)) {
+          return { error: `${currentKey} is still set to a placeholder value.` }
+        }
         out[currentKey] = v
         currentKey = null
       }
@@ -115,6 +136,7 @@ const readRenderClerkConfig = () => {
 
 const normalizeUrl = (value) => {
   if (!value || typeof value !== 'string') return ''
+  if (value === SYNCED_EXTERNALLY) return SYNCED_EXTERNALLY
   const trimmed = value.trim().toLowerCase().replace(/\/+$/, '')
   try {
     return new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`).toString().replace(/\/+$/, '')
@@ -140,7 +162,12 @@ function main() {
 
   const frontendKey = netlify.VITE_CLERK_PUBLISHABLE_KEY
   const mirroredKey = render.CLERK_PUBLISHABLE_KEY
-  if (mirroredKey && frontendKey !== mirroredKey) {
+  if (
+    mirroredKey &&
+    frontendKey !== SYNCED_EXTERNALLY &&
+    mirroredKey !== SYNCED_EXTERNALLY &&
+    frontendKey !== mirroredKey
+  ) {
     mismatches.push({
       key: 'CLERK_PUBLISHABLE_KEY',
       frontend: frontendKey,
@@ -148,7 +175,7 @@ function main() {
     })
   }
 
-  if (!normalizeUrl(render.CLERK_JWT_ISSUER)) {
+  if (render.CLERK_JWT_ISSUER !== SYNCED_EXTERNALLY && !normalizeUrl(render.CLERK_JWT_ISSUER)) {
     mismatches.push({
       key: 'CLERK_JWT_ISSUER',
       frontend: '(expected issuer URL)',
@@ -156,7 +183,7 @@ function main() {
     })
   }
 
-  if (!normalizeUrl(render.CLERK_JWKS_URL)) {
+  if (render.CLERK_JWKS_URL !== SYNCED_EXTERNALLY && !normalizeUrl(render.CLERK_JWKS_URL)) {
     mismatches.push({
       key: 'CLERK_JWKS_URL',
       frontend: '(expected JWKS URL)',

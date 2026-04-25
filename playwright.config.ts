@@ -51,6 +51,7 @@ export default defineConfig({
         DATABASE_URL: e2eDatabaseUrl,
         FRONTEND_URL: `http://${host}:${frontendPort}`,
         ALLOWED_ORIGINS: `http://${host}:${frontendPort}`,
+        ENABLE_DEMO_AUTH: '1',
       },
     },
     {
