@@ -62,7 +62,7 @@ const Navbar = () => {
     }`
 
   return (
-    <nav className="relative z-50 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-xl">
+    <nav className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl">
         <div className="flex items-center justify-between gap-4">
           <Link
