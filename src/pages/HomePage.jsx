@@ -1,497 +1,680 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Brain,
-  Target,
-  Zap,
-  Award,
-  TrendingUp,
-  CheckCircle,
   ArrowRight,
-  ShieldCheck,
-  GraduationCap,
-  ClipboardList,
-  Building2,
+  Award,
+  BadgeCheck,
+  BarChart3,
   BookOpen,
+  Brain,
+  Building2,
+  CheckCircle,
+  Clock,
+  GraduationCap,
+  HelpCircle,
+  Layers3,
+  PlayCircle,
+  ShieldCheck,
   Sparkles,
-  HelpCircle
+  Target,
+  TrendingUp,
+  Zap,
 } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { HeroGeometric } from '@/components/ui/shape-landing-hero'
 import ClientFeedback from '@/components/ui/testimonial'
-import { motion } from 'framer-motion'
 
-const AnimatedSection = ({ children, className = '', delay = 0, ...props }) => (
-  <motion.section
-    className={className}
-    initial={{ opacity: 0, y: 48 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, amount: 0.2 }}
-    transition={{ duration: 0.6, ease: 'easeOut', delay }}
-    {...props}
-  >
-    {children}
-  </motion.section>
+const reveal = {
+  hidden: { opacity: 0, y: 36 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.65, ease: 'easeOut' },
+  },
+}
+
+const AnimatedSection = ({ children, className = '', delay = 0, ...props }) => {
+  const reduceMotion = useReducedMotion()
+
+  return (
+    <motion.section
+      className={className}
+      initial={reduceMotion ? false : 'hidden'}
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.18 }}
+      variants={{
+        hidden: { opacity: 0, y: 40 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.62, ease: 'easeOut', delay: reduceMotion ? 0 : delay },
+        },
+      }}
+      {...props}
+    >
+      {children}
+    </motion.section>
+  )
+}
+
+const MetricPill = ({ icon: Icon, label, value }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-brand-sm">
+    <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+      <Icon className="h-4 w-4" />
+    </div>
+    <div className="text-2xl font-bold text-slate-950">{value}</div>
+    <div className="mt-1 text-sm text-slate-500">{label}</div>
+  </div>
 )
+
+const ProductPreview = () => (
+  <div className="glass-panel relative mx-auto max-w-xl overflow-hidden p-4 text-white lg:mx-0">
+    <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-white/5 to-secondary-500/10" />
+    <div className="relative rounded-[1.5rem] border border-white/10 bg-brand-navy/72 p-5 shadow-brand-lg">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-white">AI readiness dashboard</div>
+          <div className="text-xs text-white/50">Personal plan after assessment</div>
+        </div>
+        <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+          Live path
+        </span>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Readiness score</div>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="text-6xl font-bold tracking-tight text-white">74</span>
+            <span className="pb-2 text-sm font-semibold text-emerald-200">+18 pts</span>
+          </div>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full rounded-full bg-gradient-primary"
+              initial={{ width: '0%' }}
+              whileInView={{ width: '74%' }}
+              viewport={{ once: true }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {[
+            { label: 'Recommended module', value: 'Prompt Engineering Mastery', icon: BookOpen },
+            { label: 'Next skill gap', value: 'Evaluate AI output quality', icon: Target },
+            { label: 'Credential track', value: 'Workplace AI Proficiency', icon: Award },
+          ].map((item) => {
+            const Icon = item.icon
+            return (
+              <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-secondary-200">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div>
+                  <div className="text-xs text-white/45">{item.label}</div>
+                  <div className="text-sm font-semibold text-white">{item.value}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+const LiteracyPlanSection = () => {
+  const reduceMotion = useReducedMotion()
+  const planItems = [
+    {
+      icon: Brain,
+      title: 'Skill profile',
+      copy: 'See where you are confident, where you are guessing, and which AI concepts matter most for your role.',
+      meta: '15 questions',
+    },
+    {
+      icon: Layers3,
+      title: 'Learning path',
+      copy: 'Get a prioritized training plan that turns assessment gaps into practical workplace exercises.',
+      meta: 'Role-aware',
+    },
+    {
+      icon: BadgeCheck,
+      title: 'Proof of progress',
+      copy: 'Move from practice into certification so your AI literacy becomes visible and credible.',
+      meta: 'Credential-ready',
+    },
+  ]
+
+  return (
+    <AnimatedSection id="ai-readiness" className="bg-white py-20">
+      <div className="section-shell">
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div>
+            <div className="eyebrow">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI literacy plan
+            </div>
+            <h2 className="mt-5 text-4xl font-bold tracking-tight text-slate-950 md:text-5xl">
+              Your AI literacy plan, mapped in minutes
+            </h2>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
+              LitmusAI turns a quick benchmark into a guided route: what to learn, what to practice, and how to prove it with certification.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <MetricPill icon={Clock} label="Assessment time" value="3-5m" />
+              <MetricPill icon={TrendingUp} label="Skill lift tracked" value="+52" />
+              <MetricPill icon={ShieldCheck} label="Proof path" value="Cert" />
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute left-7 top-8 hidden h-[calc(100%-4rem)] w-px bg-slate-200 md:block" />
+            <motion.div
+              className="absolute left-7 top-8 hidden w-px origin-top bg-gradient-to-b from-primary-500 to-secondary-500 md:block"
+              initial={{ scaleY: 0 }}
+              whileInView={{ scaleY: 1 }}
+              viewport={{ once: true, amount: 0.5 }}
+              transition={{ duration: reduceMotion ? 0 : 1.2, ease: 'easeOut' }}
+              style={{ height: 'calc(100% - 4rem)' }}
+            />
+            <div className="space-y-4">
+              {planItems.map((item, index) => {
+                const Icon = item.icon
+                return (
+                  <motion.article
+                    key={item.title}
+                    variants={reveal}
+                    initial={reduceMotion ? false : 'hidden'}
+                    whileInView="visible"
+                    viewport={{ once: true, amount: 0.35 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="relative rounded-brand border border-slate-200 bg-gradient-soft-panel p-5 shadow-brand-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-brand-md md:pl-20"
+                  >
+                    <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-white text-primary-600 shadow-brand-sm md:absolute md:left-1 md:top-6">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-950">{item.title}</h3>
+                        <p className="mt-2 text-slate-600">{item.copy}</p>
+                      </div>
+                      <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-primary-700 shadow-brand-sm">
+                        {item.meta}
+                      </span>
+                    </div>
+                  </motion.article>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </AnimatedSection>
+  )
+}
+
+const JourneySection = () => {
+  const reduceMotion = useReducedMotion()
+  const steps = [
+    {
+      icon: Target,
+      title: 'Benchmark your skills',
+      copy: 'Start with a fast, practical assessment across AI concepts, responsible use, prompting, and workplace application.',
+      action: 'Start free assessment',
+      href: '/assessment',
+    },
+    {
+      icon: PlayCircle,
+      title: 'Practice workplace workflows',
+      copy: 'Build prompts, review habits, and AI-assisted workflows that connect directly to Sales, HR, Marketing, Operations, and leadership work.',
+      action: 'Explore live courses',
+      href: '/training',
+    },
+    {
+      icon: Award,
+      title: 'Earn proof of proficiency',
+      copy: 'Validate real-world AI literacy with certification designed to signal capability, not just course completion.',
+      action: 'View certification',
+      href: '/certification',
+    },
+  ]
+
+  return (
+    <AnimatedSection className="relative overflow-hidden bg-brand-navy py-24 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(107,78,255,0.22),transparent_32%),radial-gradient(circle_at_80%_25%,rgba(0,210,255,0.16),transparent_30%)]" />
+      <div className="section-shell relative">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+            <Zap className="h-3.5 w-3.5 text-secondary-300" />
+            How it works
+          </div>
+          <h2 className="mt-5 text-4xl font-bold tracking-tight text-white md:text-5xl">
+            From unsure to AI-literate with a path you can follow
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-white/65">
+            Assessment, training, and certification work together as one guided system instead of disconnected content.
+          </p>
+        </div>
+
+        <div className="relative mt-14 grid gap-5 lg:grid-cols-3">
+          <motion.div
+            className="absolute left-[16%] right-[16%] top-12 hidden h-px origin-left bg-gradient-to-r from-primary-400 via-secondary-400 to-emerald-300 lg:block"
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: reduceMotion ? 0 : 1.1, ease: 'easeOut' }}
+          />
+          {steps.map((step, index) => {
+            const Icon = step.icon
+            return (
+              <motion.article
+                key={step.title}
+                initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.35 }}
+                transition={{ duration: 0.55, delay: reduceMotion ? 0 : index * 0.12 }}
+                className="relative overflow-hidden rounded-brand-lg border border-white/10 bg-white/[0.06] p-6 shadow-brand-lg backdrop-blur transition-all duration-200 hover:-translate-y-1 hover:bg-white/[0.08]"
+              >
+                <div className="relative z-10">
+                  <div className="mb-8 flex items-center justify-between">
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-primary-600 shadow-brand-sm">
+                      <Icon className="h-6 w-6" />
+                    </span>
+                    <span className="text-sm font-bold text-white/35">0{index + 1}</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">{step.title}</h3>
+                  <p className="mt-4 min-h-[6rem] text-base leading-7 text-white/68">{step.copy}</p>
+                  <Link to={step.href} className="mt-6 inline-flex items-center gap-2 font-semibold text-secondary-200 hover:text-white">
+                    {step.action}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </motion.article>
+            )
+          })}
+        </div>
+      </div>
+    </AnimatedSection>
+  )
+}
+
+const Footer = () => {
+  const year = new Date().getFullYear()
+  const footerGroups = [
+    {
+      title: 'Platform',
+      links: [
+        { label: 'Assessment', to: '/assessment' },
+        { label: 'Training', to: '/training' },
+        { label: 'Certification', to: '/certification' },
+        { label: 'Dashboard', to: '/dashboard' },
+      ],
+    },
+    {
+      title: 'Teams',
+      links: [
+        { label: 'Enterprise', to: '/enterprise' },
+        { label: 'Pricing', to: '/billing' },
+      ],
+    },
+    {
+      title: 'Learn',
+      links: [
+        { label: 'FAQ', href: '#faq' },
+        { label: 'Featured course', href: '#featured-course' },
+        { label: 'AI readiness', href: '#ai-readiness' },
+      ],
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Terms', to: '/terms' },
+        { label: 'Privacy', to: '/privacy' },
+      ],
+    },
+  ]
+
+  return (
+    <footer className="bg-brand-ink text-white">
+      <div className="section-shell py-16">
+        <div className="rounded-brand-lg border border-white/10 bg-white/[0.04] p-6 shadow-brand-lg md:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                Start here
+              </div>
+              <h2 className="mt-4 max-w-2xl text-3xl font-bold tracking-tight text-white md:text-4xl">
+                Find your AI literacy baseline and turn it into practical skill.
+              </h2>
+            </div>
+            <Link to="/assessment" className="btn-primary inline-flex w-fit items-center gap-2">
+              Start free assessment
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-12 grid gap-10 lg:grid-cols-[1.2fr_2fr]">
+          <div>
+            <Link to="/" className="inline-flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-primary shadow-brand-sm">
+                <Brain className="h-5 w-5 text-white" />
+              </span>
+              <span className="font-heading text-xl font-bold">LitmusAI</span>
+            </Link>
+            <p className="mt-5 max-w-sm leading-7 text-white/60">
+              AI literacy training, assessment, and certification for people and teams who need practical capability they can use at work.
+            </p>
+          </div>
+
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {footerGroups.map((group) => (
+              <div key={group.title}>
+                <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-white/45">{group.title}</h3>
+                <ul className="mt-4 space-y-3">
+                  {group.links.map((link) => (
+                    <li key={link.label}>
+                      {link.to ? (
+                        <Link to={link.to} className="text-sm font-medium text-white/70 transition-colors hover:text-white">
+                          {link.label}
+                        </Link>
+                      ) : (
+                        <a href={link.href} className="text-sm font-medium text-white/70 transition-colors hover:text-white">
+                          {link.label}
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-white/45 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {year} LitmusAI. All rights reserved.</p>
+          <p>Assess. Practice. Certify. Apply.</p>
+        </div>
+      </div>
+    </footer>
+  )
+}
 
 const HomePage = () => {
   const features = [
     {
       icon: Target,
-      title: 'Assess AI Readiness',
-      description: 'Comprehensive 15-question assessment across AI Fundamentals, Practical Usage, Ethics & Critical Thinking, AI Impact & Applications, and Strategic Understanding.',
-      color: 'text-primary-600'
+      title: 'Assess AI readiness',
+      description: 'Benchmark core concepts, responsible use, prompting, and practical workplace judgment.',
+      color: 'text-primary-600',
     },
     {
-      icon: Zap,
-      title: 'Activate Through Training',
-      description: 'Role-specific training modules for Sales, HR, Marketing, and Operations with hands-on tool building.',
-      color: 'text-secondary-600'
+      icon: GraduationCap,
+      title: 'Build with guided practice',
+      description: 'Role-specific modules turn AI concepts into real workflows, prompts, and review habits.',
+      color: 'text-secondary-600',
     },
     {
       icon: Award,
-      title: 'Certify AI Proficiency',
-      description: 'Industry-recognized credentials that validate practical AI skills for career advancement.',
-      color: 'text-accent-orange'
-    }
-  ]
-
-  const benefits = [
-    'Transform skills within weeks, not months',
-    'Practical, workplace-ready AI applications',
-    'Role-specific learning paths',
-    'Industry-recognized certifications',
-    'Live interactive training sessions',
-    'Immediate skill assessment and feedback'
+      title: 'Certify proficiency',
+      description: 'Validate practical skill with credentials designed to signal workplace-ready AI literacy.',
+      color: 'text-accent-orange',
+    },
   ]
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative">
-        <HeroGeometric
-          badge="LitmusAI"
-          title1={(
-            <>
-              Assess → Activate →
-            </>
-          )}
-          title2="Certify AI Talent"
-        />
-      </section>
+    <div className="min-h-screen bg-brand-mist">
+      <HeroGeometric
+        badge="Free AI Readiness Benchmark"
+        title1="Build AI literacy"
+        title2="you can prove at work"
+        subtitle="Take a quick assessment, get a personalized learning path, and build practical AI skills through guided training and certification."
+        primaryAction={(
+          <Link to="/assessment" className="btn-primary inline-flex items-center justify-center gap-2">
+            Start free assessment
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        )}
+        secondaryAction={(
+          <Link to="/training" className="btn-ghost inline-flex items-center justify-center gap-2">
+            Explore training
+            <BookOpen className="h-4 w-4" />
+          </Link>
+        )}
+        preview={<ProductPreview />}
+      />
 
-      <AnimatedSection className="py-14 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600">
-            <span className="inline-block h-2 w-2 rounded-full bg-primary-500"></span>
-            Complete AI Proficiency Development
-          </div>
-          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-primary shadow-sm">
-            <Brain className="h-7 w-7 text-white" />
-          </div>
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900">Transform teams with measurable AI mastery</h2>
-          <p className="mt-4 text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-            Pair the hero experience above with the rest of our Assess → Activate → Certify journey to benchmark skills, deploy live training, and verify outcomes with trusted credentials.
-          </p>
-        </div>
-      </AnimatedSection>
+      <LiteracyPlanSection />
+      <JourneySection />
 
-      {/* Steps band */}
-      <AnimatedSection className="bg-gray-900 py-14 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold text-white">Start with assessment, activate with training, certify proficiency</h2>
-            <p className="mt-3 text-gray-300">Hands-on learning, real outcomes, industry-recognized credentials.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="rounded-2xl bg-gray-800/60 p-6 border border-white/10">
-              <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">1</div>
-              <div className="flex items-center gap-2 text-lg font-semibold"><CheckCircle className="h-5 w-5 text-emerald-400"/> Assess AI Readiness</div>
-              <p className="mt-2 text-gray-300 text-sm">Discover current skills across key dimensions and get a personalized plan.</p>
-              <div className="mt-4">
-                <Link to="/assessment" className="inline-flex items-center text-emerald-400 font-medium">
-                  Start free assessment <ArrowRight className="ml-1 h-4 w-4"/>
-                </Link>
-              </div>
+      <AnimatedSection className="bg-white py-20" delay={0.05}>
+        <div className="section-shell">
+          <div className="mx-auto mb-14 max-w-3xl text-center">
+            <div className="eyebrow">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Complete system
             </div>
-            <div className="rounded-2xl bg-gray-800/60 p-6 border border-white/10">
-              <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">2</div>
-              <div className="flex items-center gap-2 text-lg font-semibold"><GraduationCap className="h-5 w-5 text-emerald-400"/> Activate Through Training</div>
-              <p className="mt-2 text-gray-300 text-sm">Hands-on, role-specific courses for Sales, HR, Marketing, and Operations.</p>
-              <div className="mt-4">
-                <Link to="/training" className="inline-flex items-center text-emerald-400 font-medium">
-                  Explore live courses <ArrowRight className="ml-1 h-4 w-4"/>
-                </Link>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-gray-800/60 p-6 border border-white/10">
-              <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10">3</div>
-              <div className="flex items-center gap-2 text-lg font-semibold"><ShieldCheck className="h-5 w-5 text-emerald-400"/> Certify AI Proficiency</div>
-              <p className="mt-2 text-gray-300 text-sm">Prove real-world capability with standardized exams and digital certificates.</p>
-              <div className="mt-4">
-                <Link to="/certification" className="inline-flex items-center text-emerald-400 font-medium">
-                  View certification <ArrowRight className="ml-1 h-4 w-4"/>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* Features Section */}
-      <AnimatedSection className="py-20 bg-white" delay={0.05}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              The Complete LitmusAI Journey
+            <h2 className="mt-5 text-4xl font-bold text-slate-950 md:text-5xl">
+              The complete LitmusAI journey
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our proven Assess → Activate → Certify methodology transforms individuals and organizations
-              from AI-curious to AI-proficient.
+            <p className="mt-5 text-lg leading-8 text-slate-600">
+              A connected path from curiosity to confidence, with measurable growth at every step.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="card text-center">
-                <div className={`w-16 h-16 mx-auto mb-6 rounded-full bg-gray-50 flex items-center justify-center ${feature.color}`}>
-                  <feature.icon className="w-8 h-8" />
+          <div className="grid gap-6 md:grid-cols-3">
+            {features.map((feature) => {
+              const Icon = feature.icon
+              return (
+                <article key={feature.title} className="card">
+                  <div className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 ${feature.color}`}>
+                    <Icon className="h-7 w-7" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-950">{feature.title}</h3>
+                  <p className="mt-3 leading-7 text-slate-600">{feature.description}</p>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <AnimatedSection className="bg-brand-mist py-20" delay={0.1}>
+        <div className="section-shell">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+            <div>
+              <div className="eyebrow">
+                <Building2 className="h-3.5 w-3.5" />
+                Teams and organizations
+              </div>
+              <h2 className="mt-5 text-4xl font-bold text-slate-950 md:text-5xl">Every company should be AI ready</h2>
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                LitmusAI helps teams benchmark readiness, activate role-specific skills, and prove progress with trusted credentials.
+              </p>
+
+              <div className="mt-8 space-y-4">
+                {[
+                  'Role-specific learning paths for Sales, HR, Marketing, Operations, and leadership.',
+                  'Hands-on courses where teams build real prompts, processes, and AI-assisted workflows.',
+                  'Practical certification that validates responsible, workplace-ready AI usage.',
+                ].map((item) => (
+                  <div key={item} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand-sm">
+                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+                    <p className="text-slate-700">{item}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/assessment" className="btn-primary text-center">Start free AI assessment</Link>
+                <Link to="/enterprise" className="btn-outline text-center">Explore team options</Link>
+              </div>
+            </div>
+
+            <div className="soft-panel overflow-hidden p-5">
+              <div className="rounded-2xl bg-brand-navy p-5 text-white">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Team readiness map</div>
+                    <div className="text-xs text-white/50">Sample cohort overview</div>
+                  </div>
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-secondary-200">Updated today</span>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Prompt quality', value: '82%', color: 'bg-secondary-400' },
+                    { label: 'Responsible use', value: '76%', color: 'bg-emerald-400' },
+                    { label: 'Workflow application', value: '64%', color: 'bg-primary-400' },
+                  ].map((row) => (
+                    <div key={row.label}>
+                      <div className="mb-2 flex justify-between text-sm">
+                        <span className="text-white/70">{row.label}</span>
+                        <span className="font-semibold">{row.value}</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                        <div className={`h-full rounded-full ${row.color}`} style={{ width: row.value }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <MetricPill icon={TrendingUp} label="Productivity lift" value="45%" />
+                <MetricPill icon={ShieldCheck} label="Completion intent" value="91%" />
+                <MetricPill icon={Brain} label="Confidence gain" value="+52" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <AnimatedSection className="bg-brand-navy py-20 text-white" delay={0.1}>
+        <div className="section-shell">
+          <div className="mb-10 text-center">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-300" />
+              What sets us apart
+            </div>
+            <h2 className="mt-5 text-4xl font-bold text-white md:text-5xl">Built for practical AI adoption</h2>
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/65">
+              The platform is designed around measurable behavior change, not passive content consumption.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              { t: 'Embedded AI leadership with real execution, not just advice', s: 'Strategic AI enablement at a fraction of a full-time CAIO.' },
+              { t: 'Tailored by department for real-world workflows', s: 'Custom pathways for the exact work your teams do every day.' },
+              { t: 'Live, hands-on training where teams build real tools', s: 'Learners leave with reusable prompts, habits, and automations.' },
+              { t: 'Fast implementation for visible momentum', s: 'Most teams can establish a baseline and start improving within weeks.' },
+              { t: 'Practical certification tied to business use', s: 'Credentials validate applied skill, not memorized theory.' },
+              { t: 'Focused exclusively on AI enablement', s: 'Assessment, training, and certification are designed as one system.' },
+            ].map((item) => (
+              <div key={item.t} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-5">
+                <span className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+                  <CheckCircle className="h-4 w-4" />
+                </span>
+                <div>
+                  <div className="font-semibold text-white">{item.t}</div>
+                  <div className="mt-1 text-sm leading-6 text-white/58">{item.s}</div>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </AnimatedSection>
 
-      {/* Assessment split section */}
-      <AnimatedSection className="py-20 bg-gray-50" delay={0.1}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-10 items-start">
-            {/* Left copy */}
+      <AnimatedSection id="featured-course" className="bg-white py-20">
+        <div className="section-shell">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white border border-gray-200 px-3 py-1 text-xs text-gray-600">
-                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
-                Transformation within weeks, not months
-              </div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Every company should be AI ready</h2>
-              <p className="text-gray-700 mb-6">Assess → Activate → Certify: discover where you stand, build hands-on skills through live training, and earn industry-recognized credentials.</p>
-
-              <div className="space-y-4 text-sm">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">1</div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Assess</div>
-                    <div className="text-gray-600">Discover your team's AI readiness with a quick assessment.</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">2</div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Activate</div>
-                    <div className="text-gray-600">Build real tools in-session through role-specific, live courses.</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">3</div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Certify</div>
-                    <div className="text-gray-600">Prove proficiency with standardized exams and verified certificates.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                <Link to="/assessment" className="btn-primary">Start free AI assessment</Link>
-                <Link to="/training" className="btn-outline">Explore live courses</Link>
-              </div>
-
-              <p className="mt-3 text-xs text-gray-500">Individual → Team → Organization: many clients start with individual team members, then scale.</p>
-            </div>
-
-            {/* Right: metrics + assessment preview */}
-            <div className="space-y-4">
-              {/* Metrics card */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-5">
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Promotion impact</div>
-                    <div className="h-2 w-full rounded bg-gray-100 overflow-hidden"><div className="h-full w-[70%] bg-emerald-500"></div></div>
-                    <div className="mt-1 text-xs text-gray-600">of graduates reported promotions/new opportunities within 6 months</div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1"><span>Productivity increase</span><span className="font-semibold text-gray-700">45%</span></div>
-                    <div className="h-2 w-full rounded bg-gray-100 overflow-hidden"><div className="h-full w-[45%] bg-emerald-500"></div></div>
-                    <div className="mt-1 text-xs text-gray-600">average improvement in daily work tasks</div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1"><span>Salary premium</span><span className="font-semibold text-gray-700">25%</span></div>
-                    <div className="h-2 w-full rounded bg-gray-100 overflow-hidden"><div className="h-full w-[25%] bg-emerald-500"></div></div>
-                    <div className="mt-1 text-xs text-gray-600">higher compensation for AI-skilled professionals</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Assessment preview */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full bg-gray-300"></span>
-                    AI Proficiency Assessment
-                  </div>
-                  <div>2:45 remaining</div>
-                </div>
-                <div className="text-sm text-gray-900 font-medium mb-3">Which of the following best describes a transformer-based language model?</div>
-                <div className="space-y-2">
-                  {[
-                    'A model that converts text to numerical vectors',
-                    'A neural network that uses attention mechanisms to process text sequences',
-                    'A rule-based system for language translation',
-                    'An algorithm that transforms audio into text',
-                  ].map((opt, i) => (
-                    <button key={i} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-left text-sm hover:bg-gray-50">{opt}</button>
-                  ))}
-                </div>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="h-2 flex-1 rounded bg-gray-100 overflow-hidden"><div className="h-full w-1/2 bg-primary-500"></div></div>
-                  <button className="btn-outline text-sm">Next question</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* What sets us apart (dark) */}
-      <AnimatedSection className="py-20 bg-gray-900 text-white" delay={0.1}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white">What sets us apart</h2>
-            <p className="mt-3 text-white">Embedded leadership, real execution, and outcomes within weeks.</p>
-          </div>
-
-          <div className="rounded-2xl bg-gray-800/60 border border-white/10 p-6 md:p-8">
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                {t: 'Embedded AI leadership (fCAIO) with real execution, not just advice', s: 'Get strategic AI leadership at a fraction of the cost of hiring a full-time CAIO.'},
-                {t: 'Tailored by department for real-world workflows', s: 'Custom training for HR, Sales, Marketing, Operations, and executive teams.'},
-                {t: 'Live, hands-on training where teams build real tools in-session', s: 'Unlike theoretical courses, teams create actual business solutions during training.'},
-                {t: 'Fast implementation—most companies see transformation within weeks', s: 'Rapid results vs. months-long traditional programs.'},
-                {t: 'Practical, fast certifications tied to business use, not theory', s: 'Skills-based credentials that prove real workplace capability.'},
-                {t: 'Focused exclusively on AI enablement across every layer of the org', s: 'We specialize only in AI transformation.'},
-              ].map((item, idx) => (
-                <div key={idx} className="flex gap-3">
-                  <span className="mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                  </span>
-                  <div>
-                    <div className="font-semibold">{item.t}</div>
-                    <div className="text-sm text-white">{item.s}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 text-center">
-              <Link to="/enterprise" className="btn-outline">Advanced Enterprise Solutions</Link>
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-
-
-
-
-      {/* What you get section */}
-      <AnimatedSection className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Assessment */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
-                <Target className="h-5 w-5 text-emerald-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Assessment</h3>
-              <p className="text-gray-600 mb-4 text-sm">Comprehensive skill mapping, personalized insights and recommendations.</p>
-              <div className="space-y-2 text-sm text-gray-700">
-                <div>• Free 3-5 minute assessment</div>
-                <div>• Benchmark comparison</div>
-                <div>• Personalized learning paths</div>
-              </div>
-              <div className="mt-4">
-                <Link to="/assessment" className="text-emerald-600 font-medium text-sm inline-flex items-center">
-                  Free 3-5 minute assessment <ArrowRight className="w-4 h-4 ml-1" />
-                </Link>
+              <h2 className="text-4xl font-bold text-slate-950 md:text-5xl">Certification that measures what matters</h2>
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Exams reflect real-world AI proficiency across thinking, knowledge, communication, and responsible use.
+              </p>
+              <div className="mt-8 space-y-4">
+                {[
+                  { icon: Sparkles, title: 'AI Thinking & Cognitive Aptitude', copy: 'Reasoning, decomposition, pattern recognition, and using AI as a thinking partner.' },
+                  { icon: BookOpen, title: 'AI Knowledge & Understanding', copy: 'Core concepts, capabilities, limitations, safety, and responsible use.' },
+                  { icon: Target, title: 'Prompt Engineering & Communication', copy: 'Outcome-driven prompting, iteration, evaluation, and clear AI collaboration.' },
+                ].map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <div key={item.title} className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-brand-sm">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-950">{item.title}</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-600">{item.copy}</div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Training */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
-                <GraduationCap className="h-5 w-5 text-blue-600" />
+            <div className="soft-panel p-6">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary-700">
+                Featured live course
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Training</h3>
-              <p className="text-gray-600 mb-4 text-sm">Live interactive learning. Build real tools, delivered by department for immediate workplace application.</p>
-              <div className="space-y-2 text-sm text-gray-700">
-                <div>• Live training where teams build real tools</div>
-                <div>• Role-specific courses</div>
-                <div>• Hands-on practice</div>
-              </div>
-              <div className="mt-4">
-                <Link to="/training" className="text-blue-600 font-medium text-sm inline-flex items-center">
-                  Explore live courses <ArrowRight className="w-4 h-4 ml-1" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Certification */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-                <Award className="h-5 w-5 text-purple-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Certification</h3>
-              <p className="text-gray-600 mb-4 text-sm">Skills-based credentials that advance careers and prove real workplace capabilities.</p>
-              <div className="space-y-2 text-sm text-gray-700">
-                <div>• Career advancement</div>
-                <div>• Skills-based credentials that advance careers</div>
-                <div>• Prove real workplace capabilities</div>
-              </div>
-              <div className="mt-4">
-                <Link to="/certification" className="text-purple-600 font-medium text-sm inline-flex items-center">
-                  Get certified <ArrowRight className="w-4 h-4 ml-1" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* Certification Dimensions */}
-      <AnimatedSection className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-start">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Certification that measures what matters</h2>
-              <p className="text-lg text-gray-600 mb-6">Our exams reflect real-world AI proficiency across three core dimensions, ensuring a trusted signal for hiring and advancement.</p>
-              <div className="space-y-4">
-                <div className="flex items-start gap-4 p-4 rounded-xl border border-gray-200 bg-white">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
-                    <Sparkles className="h-5 w-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 mb-1">AI Thinking & Cognitive Aptitude</div>
-                    <div className="text-gray-600 text-sm">Reasoning, problem decomposition, pattern recognition, and using AI as a thinking partner.</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4 p-4 rounded-xl border border-gray-200 bg-white">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
-                    <BookOpen className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 mb-1">AI Knowledge & Understanding</div>
-                    <div className="text-gray-600 text-sm">Core concepts, capabilities and limitations, safety, and responsible use of AI systems.</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4 p-4 rounded-xl border border-gray-200 bg-white">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-                    <ClipboardList className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 mb-1">Prompt Engineering & Communication</div>
-                    <div className="text-gray-600 text-sm">Outcome-driven prompting, iteration, evaluation, and communicating with AI effectively.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Featured live course</h3>
-              <div className="text-2xl font-bold text-gray-900 mb-2">How to Build a Business in a Weekend with AI</div>
-              <p className="text-gray-600 mb-4">An intensive, instructor-led workshop where you learn to rapidly plan, prototype, and launch a business using AI tools—complete with real-time feedback.</p>
-              <ul className="text-gray-700 space-y-2 mb-6 list-disc pl-5">
-                <li>Hands-on, guided sessions with expert instructors</li>
-                <li>Practical frameworks and toolkits you can reuse</li>
-                <li>Certificate of completion</li>
+              <h3 className="text-3xl font-bold text-slate-950">How to Build a Business in a Weekend with AI</h3>
+              <p className="mt-4 leading-7 text-slate-600">
+                An intensive, instructor-led workshop where learners rapidly plan, prototype, and launch a business using AI tools.
+              </p>
+              <ul className="mt-6 space-y-3 text-slate-700">
+                {['Hands-on guided sessions', 'Reusable practical frameworks', 'Certificate of completion'].map((item) => (
+                  <li key={item} className="flex gap-3">
+                    <CheckCircle className="mt-0.5 h-5 w-5 text-emerald-500" />
+                    {item}
+                  </li>
+                ))}
               </ul>
-              <Link to="/training" className="btn-outline inline-flex items-center">
-                Explore course <ArrowRight className="w-4 h-4 ml-2" />
+              <Link to="/training" className="btn-outline mt-7 inline-flex items-center gap-2">
+                Explore course
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
         </div>
       </AnimatedSection>
 
-      {/* FAQs Preview */}
-      <AnimatedSection className="py-20 bg-white" delay={0.1}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently asked questions</h2>
-            <p className="text-lg text-gray-600">Quick answers about assessments, courses, and certifications.</p>
+      <AnimatedSection id="faq" className="bg-brand-mist py-20" delay={0.1}>
+        <div className="section-shell max-w-6xl">
+          <div className="mb-12 text-center">
+            <h2 className="text-4xl font-bold text-slate-950 md:text-5xl">Frequently asked questions</h2>
+            <p className="mt-4 text-lg text-slate-600">Quick answers about assessments, courses, and certifications.</p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="card">
-              <div className="flex items-start">
-                <HelpCircle className="w-5 h-5 text-primary-600 mt-1 mr-3" />
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">What is the AI Mastery Predictor Test?</div>
-                  <div className="text-gray-600 text-sm">A free 15-question assessment that evaluates your AI proficiency across AI Fundamentals, Practical Usage, Ethics & Critical Thinking, AI Impact & Applications, and Strategic Understanding.</div>
+          <div className="grid gap-5 md:grid-cols-2">
+            {[
+              ['What is the AI Mastery Predictor Test?', 'A free 15-question assessment that evaluates AI fundamentals, practical usage, responsible thinking, AI impact, and strategic understanding.'],
+              ['Do I need technical experience?', 'No. LitmusAI is designed for professionals across industries and roles. No coding background is required.'],
+              ['What does certification cover?', 'A standardized exam validating real-world AI application skills with a verified digital certificate.'],
+              ['Are there team options?', 'Yes. Teams can use org-wide assessments, analytics, custom programs, and bulk certification management.'],
+            ].map(([question, answer]) => (
+              <div key={question} className="card">
+                <div className="flex items-start gap-3">
+                  <HelpCircle className="mt-1 h-5 w-5 text-primary-600" />
+                  <div>
+                    <h3 className="font-bold text-slate-950">{question}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{answer}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="card">
-              <div className="flex items-start">
-                <HelpCircle className="w-5 h-5 text-primary-600 mt-1 mr-3" />
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Do I need technical experience?</div>
-                  <div className="text-gray-600 text-sm">No. The platform is designed for professionals across industries and roles—no coding required.</div>
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-start">
-                <HelpCircle className="w-5 h-5 text-primary-600 mt-1 mr-3" />
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">What does the certification cover?</div>
-                  <div className="text-gray-600 text-sm">A 40-question standardized exam validating real-world AI application skills with a verified digital certificate.</div>
-                </div>
-              </div>
-            </div>
-            <div className="card">
-              <div className="flex items-start">
-                <HelpCircle className="w-5 h-5 text-primary-600 mt-1 mr-3" />
-                <div>
-                  <div className="font-semibold text-gray-900 mb-1">Are there team/enterprise options?</div>
-                  <div className="text-gray-600 text-sm">Yes. We offer org-wide assessments, analytics, custom programs, and bulk certification management.</div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </AnimatedSection>
 
-      {/* Testimonials Section */}
       <section className="bg-white">
         <ClientFeedback />
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-primary text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Ready to transform your AI skills?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Start with our free AI readiness assessment and discover your personalized learning path.
-          </p>
-          <Link
-            to="/assessment"
-            className="bg-white text-primary-600 font-semibold py-4 px-8 rounded-full shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 inline-flex items-center space-x-2"
-          >
-            <span>Begin your AI journey</span>
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
-      </section>
+      <Footer />
     </div>
   )
 }

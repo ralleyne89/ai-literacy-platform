@@ -1,6 +1,4 @@
-"use client"
-
-import { motion, useMotionValue, useTransform, animate, type Variants } from 'framer-motion'
+import { motion, useMotionValue, useReducedMotion, useTransform, animate } from 'framer-motion'
 import { Circle } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -11,7 +9,7 @@ function ElegantShape({
   width = 400,
   height = 100,
   rotate = 0,
-  gradient = 'from-white/[0.08]'
+  gradient = 'from-white/[0.08]',
 }: {
   className?: string
   delay?: number
@@ -20,39 +18,28 @@ function ElegantShape({
   rotate?: number
   gradient?: string
 }) {
+  const reduceMotion = useReducedMotion()
+
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        y: -150,
-        rotate: rotate - 15
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        rotate
-      }}
+      initial={reduceMotion ? false : { opacity: 0, y: -120, rotate: rotate - 15 }}
+      animate={reduceMotion ? { opacity: 1, rotate } : { opacity: 1, y: 0, rotate }}
       transition={{
-        duration: 2.4,
+        duration: 2.2,
         delay,
         ease: [0.23, 0.86, 0.39, 0.96],
-        opacity: { duration: 1.2 }
+        opacity: { duration: 1.1 },
       }}
       className={cn('absolute', className)}
     >
       <motion.div
-        animate={{
-          y: [0, 15, 0]
-        }}
+        animate={reduceMotion ? undefined : { y: [0, 14, 0] }}
         transition={{
           duration: 12,
           repeat: Number.POSITIVE_INFINITY,
-          ease: 'easeInOut'
+          ease: 'easeInOut',
         }}
-        style={{
-          width,
-          height
-        }}
+        style={{ width, height }}
         className="relative"
       >
         <div
@@ -60,7 +47,7 @@ function ElegantShape({
             'absolute inset-0 rounded-full',
             'bg-gradient-to-r to-transparent',
             gradient,
-            'backdrop-blur-[2px] border-2 border-white/[0.15]',
+            'border-2 border-white/[0.15] backdrop-blur-[2px]',
             'shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]',
             'after:absolute after:inset-0 after:rounded-full',
             'after:bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]'
@@ -72,130 +59,151 @@ function ElegantShape({
 }
 
 function HeroGeometric({
-  badge = 'Design Collective',
-  title1 = 'Elevate Your Digital Vision',
-  title2 = 'Crafting Exceptional Websites'
+  badge = 'Free AI Readiness Benchmark',
+  title1 = 'Build AI literacy',
+  title2 = 'you can prove at work',
+  subtitle = 'Take a quick assessment, get a personalized learning path, and build practical AI skills through guided training and certification.',
+  primaryAction,
+  secondaryAction,
+  preview,
 }: {
   badge?: string
   title1?: ReactNode
   title2?: ReactNode
+  subtitle?: ReactNode
+  primaryAction?: ReactNode
+  secondaryAction?: ReactNode
+  preview?: ReactNode
 }) {
   const [isMounted, setIsMounted] = useState(false)
+  const reduceMotion = useReducedMotion()
   const ambient = useMotionValue(0)
-  const glowOpacity = useTransform(ambient, [0, 1], [0.05, 0.25])
+  const glowOpacity = useTransform(ambient, [0, 1], [0.08, 0.28])
 
   useEffect(() => {
     setIsMounted(true)
+    if (reduceMotion) {
+      ambient.set(0.55)
+      return undefined
+    }
+
     const controls = animate(ambient, 1, {
       duration: 10,
       repeat: Number.POSITIVE_INFINITY,
       repeatType: 'reverse',
-      ease: 'easeInOut'
+      ease: 'easeInOut',
     })
 
     return () => controls.stop()
-  }, [ambient])
+  }, [ambient, reduceMotion])
 
-  const fadeUpVariants: Variants = {
-    hidden: { opacity: 0, y: 30 },
+  const fadeUpMotion = {
+    hidden: { opacity: 0, y: 28 },
     visible: (i: number) => ({
       opacity: 1,
       y: 0,
       transition: {
-        duration: 1,
-        delay: 0.5 + i * 0.2,
-        ease: [0.25, 0.4, 0.25, 1]
-      }
-    })
+        duration: 0.75,
+        delay: reduceMotion ? 0 : 0.18 + i * 0.12,
+        ease: 'easeOut' as const,
+      },
+    }),
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#030303]">
+    <section className="relative overflow-hidden bg-gradient-brand-radial text-white">
       <motion.div
-        className="pointer-events-none absolute inset-0 blur-3xl bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05]"
+        className="pointer-events-none absolute inset-0 blur-3xl"
         style={{ opacity: isMounted ? glowOpacity : 0 }}
-      />
+      >
+        <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-secondary-400/25" />
+      </motion.div>
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <ElegantShape
-          delay={0.3}
-          width={600}
-          height={140}
+          delay={0.2}
+          width={620}
+          height={130}
           rotate={12}
-          gradient="from-indigo-500/[0.15]"
-          className="left-[-10%] top-[15%] md:left-[-5%] md:top-[20%]"
+          gradient="from-primary-500/[0.18]"
+          className="left-[-18%] top-[18%] md:left-[-6%] md:top-[20%]"
         />
-
+        <ElegantShape
+          delay={0.35}
+          width={470}
+          height={112}
+          rotate={-15}
+          gradient="from-secondary-500/[0.16]"
+          className="right-[-18%] top-[68%] md:right-[-3%] md:top-[66%]"
+        />
         <ElegantShape
           delay={0.5}
-          width={500}
-          height={120}
-          rotate={-15}
-          gradient="from-rose-500/[0.15]"
-          className="right-[-5%] top-[70%] md:right-[0%] md:top-[75%]"
-        />
-
-        <ElegantShape
-          delay={0.4}
-          width={300}
-          height={80}
-          rotate={-8}
-          gradient="from-violet-500/[0.15]"
-          className="left-[5%] bottom-[5%] md:left-[10%] md:bottom-[10%]"
-        />
-
-        <ElegantShape
-          delay={0.6}
-          width={200}
-          height={60}
+          width={220}
+          height={58}
           rotate={20}
-          gradient="from-amber-500/[0.15]"
-          className="right-[15%] top-[10%] md:right-[20%] md:top-[15%]"
-        />
-
-        <ElegantShape
-          delay={0.7}
-          width={150}
-          height={40}
-          rotate={-25}
-          gradient="from-cyan-500/[0.15]"
-          className="left-[20%] top-[5%] md:left-[25%] md:top-[10%]"
+          gradient="from-accent-orange/[0.16]"
+          className="right-[8%] top-[9%] md:right-[18%]"
         />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 md:px-6">
-        <div className="mx-auto max-w-3xl text-center">
+      <div className="section-shell relative z-10 grid gap-10 py-16 sm:py-20 lg:min-h-[calc(100vh-112px)] lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:py-14">
+        <div className="max-w-3xl">
           <motion.div
             custom={0}
-            variants={fadeUpVariants}
+            variants={fadeUpMotion}
             initial="hidden"
             animate="visible"
-            className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 md:mb-12"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-sm font-semibold text-white/75 shadow-brand-sm backdrop-blur"
           >
-            <Circle className="h-2 w-2 fill-rose-500/80" />
-            <span className="text-sm tracking-wide text-white/60">{badge}</span>
+            <Circle className="h-2 w-2 fill-secondary-400 text-secondary-400" />
+            <span>{badge}</span>
           </motion.div>
 
-          <motion.div custom={1} variants={fadeUpVariants} initial="hidden" animate="visible">
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl md:text-8xl">
-              <span className="bg-gradient-to-b from-white to-white/80 bg-clip-text text-transparent">{title1}</span>
+          <motion.div custom={1} variants={fadeUpMotion} initial="hidden" animate="visible">
+            <h1 className="max-w-4xl text-5xl font-bold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl">
+              <span className="bg-gradient-to-b from-white to-white/82 bg-clip-text text-transparent">{title1}</span>
               <br />
-              <span className={cn('bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300 bg-clip-text text-transparent')}>
+              <span className="bg-gradient-to-r from-primary-200 via-white to-secondary-200 bg-clip-text text-transparent">
                 {title2}
               </span>
             </h1>
           </motion.div>
 
-          <motion.div custom={2} variants={fadeUpVariants} initial="hidden" animate="visible">
-            <p className="mx-auto mb-8 max-w-xl px-4 text-base font-light leading-relaxed tracking-wide text-white/40 sm:text-lg md:text-xl">
-              Crafting exceptional digital experiences through innovative design and cutting-edge technology.
+          <motion.div custom={2} variants={fadeUpMotion} initial="hidden" animate="visible">
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/68 sm:text-xl">
+              {subtitle}
             </p>
           </motion.div>
+
+          {(primaryAction || secondaryAction) && (
+            <motion.div
+              custom={3}
+              variants={fadeUpMotion}
+              initial="hidden"
+              animate="visible"
+              className="mt-8 flex flex-col gap-3 sm:flex-row"
+            >
+              {primaryAction}
+              {secondaryAction}
+            </motion.div>
+          )}
         </div>
+
+        {preview && (
+          <motion.div
+            custom={4}
+            variants={fadeUpMotion}
+            initial="hidden"
+            animate="visible"
+            className="lg:justify-self-end"
+          >
+            {preview}
+          </motion.div>
+        )}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80" />
-    </div>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-navy via-transparent to-brand-navy/70" />
+    </section>
   )
 }
 

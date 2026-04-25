@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Award,
@@ -19,169 +18,13 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
-const MotionLink = motion.create(Link)
-
-const itemVariants = {
-  initial: { rotateX: 0, opacity: 1, y: 0 },
-  hover: { rotateX: -90, opacity: 0, y: -6 },
-}
-
-const backVariants = {
-  initial: { rotateX: 90, opacity: 0, y: 6 },
-  hover: { rotateX: 0, opacity: 1, y: 0 },
-}
-
-const glowVariants = {
-  initial: { opacity: 0, scale: 0.82 },
-  hover: {
-    opacity: 1,
-    scale: 1.9,
-    transition: {
-      opacity: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
-      scale: { duration: 0.5, type: 'spring', stiffness: 300, damping: 25 },
-    },
-  },
-}
-
-const sharedTransition = {
-  type: 'spring',
-  stiffness: 110,
-  damping: 20,
-  duration: 0.5,
-}
-
 const productNavigation = [
-  {
-    name: 'Assessment',
-    href: '/assessment',
-    icon: Target,
-    gradient: 'radial-gradient(circle, rgba(107,78,255,0.24) 0%, rgba(90,60,230,0.10) 54%, rgba(74,46,204,0) 100%)',
-    iconColor: 'group-hover:text-primary-500 group-focus-visible:text-primary-500',
-    activeIconColor: 'text-primary-600',
-  },
-  {
-    name: 'Training',
-    href: '/training',
-    icon: BookOpen,
-    gradient: 'radial-gradient(circle, rgba(0,210,255,0.24) 0%, rgba(0,180,230,0.10) 54%, rgba(0,150,204,0) 100%)',
-    iconColor: 'group-hover:text-secondary-500 group-focus-visible:text-secondary-500',
-    activeIconColor: 'text-secondary-600',
-  },
-  {
-    name: 'Certification',
-    href: '/certification',
-    icon: Award,
-    gradient: 'radial-gradient(circle, rgba(16,185,129,0.22) 0%, rgba(5,150,105,0.09) 54%, rgba(4,120,87,0) 100%)',
-    iconColor: 'group-hover:text-emerald-500 group-focus-visible:text-emerald-500',
-    activeIconColor: 'text-emerald-600',
-  },
-  {
-    name: 'Enterprise',
-    href: '/enterprise',
-    icon: Building2,
-    gradient: 'radial-gradient(circle, rgba(249,115,22,0.22) 0%, rgba(234,88,12,0.09) 54%, rgba(194,65,12,0) 100%)',
-    iconColor: 'group-hover:text-orange-500 group-focus-visible:text-orange-500',
-    activeIconColor: 'text-orange-600',
-  },
-  {
-    name: 'Pricing',
-    href: '/billing',
-    icon: CreditCard,
-    gradient: 'radial-gradient(circle, rgba(20,184,166,0.22) 0%, rgba(13,148,136,0.09) 54%, rgba(15,118,110,0) 100%)',
-    iconColor: 'group-hover:text-teal-500 group-focus-visible:text-teal-500',
-    activeIconColor: 'text-teal-600',
-  },
+  { name: 'Assessment', href: '/assessment', icon: Target },
+  { name: 'Training', href: '/training', icon: BookOpen },
+  { name: 'Certification', href: '/certification', icon: Award },
+  { name: 'Enterprise', href: '/enterprise', icon: Building2 },
+  { name: 'Pricing', href: '/billing', icon: CreditCard },
 ]
-
-const HoverGradientNavLink = ({ item, isActive, isHomePage, onClick }) => {
-  const Icon = item.icon
-  const baseTone = isHomePage
-    ? 'text-white/72 hover:text-white focus-visible:text-white'
-    : 'text-slate-600 hover:text-slate-950 focus-visible:text-slate-950'
-  const activeTone = isHomePage
-    ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/25'
-    : 'bg-white/75 text-slate-950 shadow-sm ring-1 ring-white/90'
-
-  return (
-    <MotionLink
-      to={item.href}
-      aria-label={item.name}
-      className={`group relative inline-flex h-12 min-w-[8.15rem] items-center justify-center overflow-visible rounded-full px-3 text-[13px] font-semibold tracking-tight outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/80 ${
-        isActive ? activeTone : baseTone
-      }`}
-      initial="initial"
-      whileHover="hover"
-      whileFocus="hover"
-      onClick={onClick}
-      style={{ perspective: '680px' }}
-    >
-      <motion.span
-        aria-hidden="true"
-        className="absolute inset-0 z-0 rounded-full pointer-events-none"
-        variants={glowVariants}
-        style={{ background: item.gradient }}
-      />
-      <motion.span
-        aria-hidden="true"
-        className="relative z-10 flex items-center justify-center gap-2"
-        variants={itemVariants}
-        transition={sharedTransition}
-        style={{
-          transformStyle: 'preserve-3d',
-          transformOrigin: 'center bottom',
-        }}
-      >
-        <Icon
-          className={`h-4 w-4 transition-colors duration-300 ${
-            isActive ? item.activeIconColor : item.iconColor
-          }`}
-        />
-        <span>{item.name}</span>
-      </motion.span>
-      <motion.span
-        aria-hidden="true"
-        className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-full"
-        variants={backVariants}
-        transition={sharedTransition}
-        style={{
-          transformStyle: 'preserve-3d',
-          transformOrigin: 'center top',
-        }}
-      >
-        <Icon
-          className={`h-4 w-4 transition-colors duration-300 ${
-            isActive ? item.activeIconColor : item.iconColor
-          }`}
-        />
-        <span>{item.name}</span>
-      </motion.span>
-    </MotionLink>
-  )
-}
-
-const MobileNavLink = ({ item, isActive, onClick }) => {
-  const Icon = item.icon
-
-  return (
-    <Link
-      to={item.href}
-      className={`group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold transition-all duration-200 ${
-        isActive
-          ? 'bg-white/80 text-slate-950 shadow-sm ring-1 ring-white/90'
-          : 'text-slate-700 hover:bg-white/60 hover:text-slate-950'
-      }`}
-      onClick={onClick}
-    >
-      <span
-        className="grid h-9 w-9 place-items-center rounded-2xl bg-white/55 shadow-sm ring-1 ring-white/80 transition-transform duration-200 group-hover:-translate-y-0.5"
-        style={{ backgroundImage: item.gradient }}
-      >
-        <Icon className={`h-4 w-4 ${isActive ? item.activeIconColor : 'text-slate-600'}`} />
-      </span>
-      {item.name}
-    </Link>
-  )
-}
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -210,64 +53,58 @@ const Navbar = () => {
 
   const displayName = user?.first_name || user?.email?.split('@')[0] || 'User'
   const avatarInitials = displayName.slice(0, 1).toUpperCase()
-  const isHomePage = location.pathname === '/'
-  const desktopButtonTone = isHomePage
-    ? 'text-white/80 hover:bg-white/20 hover:text-white'
-    : 'text-slate-700 hover:bg-white/80 hover:text-slate-950'
+
+  const navLinkClass = (path) =>
+    `inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors duration-200 ${
+      isActive(path)
+        ? 'bg-primary-50 text-primary-700'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+    }`
 
   return (
-    <nav
-      className={`${isHomePage ? 'absolute inset-x-0' : 'sticky'} pointer-events-none top-0 z-50 px-3 py-3 sm:px-6`}
-    >
-      <div className="pointer-events-auto mx-auto max-w-[1200px]">
-        <div className="relative flex h-16 items-center justify-between gap-3 overflow-visible xl:grid xl:grid-cols-[auto_1fr_auto]">
-          <div className="flex items-center">
-            <Link
-              to="/"
-              className={`group relative inline-flex h-14 items-center gap-2.5 rounded-[1.35rem] border border-white/50 px-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] ring-1 ring-slate-950/[0.03] backdrop-blur-2xl transition-all duration-200 ${
-                isHomePage ? 'bg-white/10 hover:bg-white/20' : 'bg-white/60 hover:bg-white/75'
-              }`}
-              onClick={closeMenus}
-            >
-              <span className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-2xl bg-gradient-primary shadow-sm ring-1 ring-white/70">
-                <span className="absolute inset-0 bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-                <span className="relative flex items-center justify-center">
-                  <Brain className="h-4 w-4 text-white" />
-                </span>
+    <nav className="relative z-50 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-xl">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            to="/"
+            className="group inline-flex items-center gap-3 rounded-2xl px-1 py-1 transition-colors duration-200"
+            onClick={closeMenus}
+          >
+            <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-gradient-primary shadow-brand-sm ring-1 ring-white/80">
+              <span className="absolute inset-0 bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+              <Brain className="relative h-5 w-5 text-white" />
+            </span>
+            <span className="leading-none">
+              <span className="block font-heading text-lg font-bold tracking-tight text-slate-950">LitmusAI</span>
+              <span className="hidden pt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:block">
+                AI literacy platform
               </span>
-              <span className="leading-none">
-                <span className={`block font-heading text-[1.06rem] tracking-tight ${isHomePage ? 'text-white' : 'text-slate-900'}`}>LitmusAI</span>
-                <span className={`hidden pt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] lg:block ${isHomePage ? 'text-white/60' : 'text-slate-500'}`}>
-                  Assessment · Training · Certification
-                </span>
-              </span>
-            </Link>
+            </span>
+          </Link>
+
+          <div className="hidden items-center gap-1 lg:flex">
+            {productNavigation.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={navLinkClass(item.href)}
+                  onClick={closeMenus}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              )
+            })}
           </div>
 
-          <div className="relative hidden justify-center xl:flex">
-            <motion.ul
-              className="inline-flex items-center gap-1 rounded-full border border-white/50 bg-white/25 p-1 shadow-[0_18px_50px_rgba(15,23,42,0.10)] shadow-white/20 ring-1 ring-slate-950/[0.03] backdrop-blur-2xl"
-              initial="initial"
-            >
-              {productNavigation.map((item) => (
-                <li key={item.name} className="relative">
-                  <HoverGradientNavLink
-                    item={item}
-                    isActive={isActive(item.href)}
-                    isHomePage={isHomePage}
-                    onClick={closeMenus}
-                  />
-                </li>
-              ))}
-            </motion.ul>
-          </div>
-
-          <div className="relative hidden items-center justify-end space-x-2 xl:flex">
+          <div className="hidden items-center justify-end gap-2 lg:flex">
             {isAuthenticated ? (
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`group inline-flex h-12 items-center gap-2 rounded-full border border-white/60 bg-white/25 px-2.5 py-1.5 text-sm font-semibold shadow-[0_18px_50px_rgba(15,23,42,0.10)] ring-1 ring-slate-950/[0.03] backdrop-blur-2xl transition-all duration-200 ${desktopButtonTone}`}
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-700 shadow-brand-sm transition-colors duration-200 hover:border-slate-300 hover:text-slate-950"
                   aria-expanded={userMenuOpen}
                   aria-haspopup="menu"
                 >
@@ -275,44 +112,25 @@ const Navbar = () => {
                     {avatarInitials}
                   </span>
                   <span>{displayName}</span>
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform duration-200 ${
-                      userMenuOpen ? 'rotate-180' : ''
-                    }`}
-                  />
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-3xl border border-white/75 bg-white/90 p-1.5 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-900/5 backdrop-blur-2xl">
-                    <Link
-                      to="/dashboard"
-                      className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950"
-                      onClick={closeMenus}
-                    >
+                  <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-brand-lg">
+                    <Link to="/dashboard" className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950" onClick={closeMenus}>
                       <LayoutDashboard className="h-4 w-4" />
                       Dashboard
                     </Link>
-                    <Link
-                      to="/profile"
-                      className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950"
-                      onClick={closeMenus}
-                    >
+                    <Link to="/profile" className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950" onClick={closeMenus}>
                       <User className="h-4 w-4" />
                       Profile Settings
                     </Link>
-                    <Link
-                      to="/billing"
-                      className="flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950"
-                      onClick={closeMenus}
-                    >
+                    <Link to="/billing" className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950" onClick={closeMenus}>
                       <CreditCard className="h-4 w-4" />
                       Billing
                     </Link>
-                    <div className="my-1 h-px bg-slate-200/80" />
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center rounded-2xl px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
-                    >
+                    <div className="my-1 h-px bg-slate-200" />
+                    <button onClick={handleLogout} className="flex w-full items-center rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600">
                       <LogOut className="mr-2 h-4 w-4" />
                       Sign Out
                     </button>
@@ -323,17 +141,13 @@ const Navbar = () => {
               <>
                 <Link
                   to="/login"
-                  className={`inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/25 px-4 py-2 text-sm font-semibold shadow-[0_18px_50px_rgba(15,23,42,0.10)] ring-1 ring-slate-950/[0.03] backdrop-blur-2xl transition-all duration-200 ${desktopButtonTone}`}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-950"
                   onClick={closeMenus}
                 >
                   <LogIn className="h-4 w-4" />
                   Sign In
                 </Link>
-                <Link
-                  to="/assessment"
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all duration-200 hover:brightness-105 hover:shadow-primary-500/30"
-                  onClick={closeMenus}
-                >
+                <Link to="/assessment" className="btn-primary inline-flex items-center gap-2 py-2.5 text-sm" onClick={closeMenus}>
                   <Sparkles className="h-4 w-4" />
                   Start free assessment
                 </Link>
@@ -341,85 +155,65 @@ const Navbar = () => {
             )}
           </div>
 
-          <div className="relative flex items-center xl:hidden">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className={`relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/70 shadow-sm transition-all duration-200 ${
-                isHomePage ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-white/60 text-slate-700 hover:bg-white/90 hover:text-slate-950'
-              }`}
-              aria-expanded={isOpen}
-              aria-controls="mobile-nav-panel"
-              aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-brand-sm transition-colors duration-200 hover:text-slate-950 lg:hidden"
+            aria-expanded={isOpen}
+            aria-controls="mobile-nav-panel"
+            aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          >
+            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
-      </div>
 
-      {isOpen && (
-        <div className="pointer-events-auto xl:hidden" id="mobile-nav-panel">
-          <div className="mx-auto mt-2 max-w-[1200px] rounded-[1.75rem] border border-white/70 bg-white/80 p-3 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-950/[0.03] backdrop-blur-2xl">
+        {isOpen && (
+          <div id="mobile-nav-panel" className="mt-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-brand-lg lg:hidden">
             <div className="space-y-1">
-              {productNavigation.map((item) => (
-                <MobileNavLink
-                  key={item.name}
-                  item={item}
-                  isActive={isActive(item.href)}
-                  onClick={closeMenus}
-                />
-              ))}
-            </div>
-            <div className="mt-3 space-y-1 border-t border-white/70 pt-4">
-              {isAuthenticated ? (
-                <>
+              {productNavigation.map((item) => {
+                const Icon = item.icon
+                return (
                   <Link
-                    to="/dashboard"
-                    className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-white/60"
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold transition-colors duration-200 ${
+                      isActive(item.href) ? 'bg-primary-50 text-primary-700' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
                     onClick={closeMenus}
                   >
+                    <Icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 space-y-1 border-t border-slate-200 pt-3">
+              {isAuthenticated ? (
+                <>
+                  <Link to="/dashboard" className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50" onClick={closeMenus}>
                     <LayoutDashboard className="h-4 w-4" />
                     Dashboard
                   </Link>
-                  <Link
-                    to="/profile"
-                    className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-white/60"
-                    onClick={closeMenus}
-                  >
+                  <Link to="/profile" className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50" onClick={closeMenus}>
                     <User className="h-4 w-4" />
                     Profile Settings
                   </Link>
-                  <Link
-                    to="/billing"
-                    className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-white/60"
-                    onClick={closeMenus}
-                  >
+                  <Link to="/billing" className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50" onClick={closeMenus}>
                     <CreditCard className="h-4 w-4" />
                     Billing
                   </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-base font-semibold text-red-600 hover:bg-red-50"
-                  >
+                  <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-base font-semibold text-red-600 hover:bg-red-50">
                     <LogOut className="h-4 w-4" />
                     Sign Out
                   </button>
                 </>
               ) : (
                 <>
-                  <Link
-                    to="/login"
-                    className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-white/60"
-                    onClick={closeMenus}
-                  >
+                  <Link to="/login" className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50" onClick={closeMenus}>
                     <LogIn className="h-4 w-4" />
                     Sign In
                   </Link>
-                  <Link
-                    to="/assessment"
-                    className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-primary-500/20"
-                    onClick={closeMenus}
-                  >
+                  <Link to="/assessment" className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gradient-primary px-4 py-3 text-center text-sm font-semibold text-white shadow-brand-sm" onClick={closeMenus}>
                     <Sparkles className="h-4 w-4" />
                     Start free assessment
                   </Link>
@@ -427,8 +221,8 @@ const Navbar = () => {
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </nav>
   )
 }

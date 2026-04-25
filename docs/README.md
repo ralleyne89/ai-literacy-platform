@@ -22,6 +22,9 @@ Older documentation and historical records (kept for reference).
 ### `/database`
 Database setup, migration scripts, and readiness checklists.
 
+### `DESIGN_SYSTEM.md`
+LitmusAI brand, UI tokens, component rules, and landing-page design guidance.
+
 ## 🚀 Quick Start
 
 **New to the project?** Start here:
