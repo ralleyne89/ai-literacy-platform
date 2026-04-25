@@ -9,12 +9,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
-      - key: CLERK_SECRET_KEY
+      - key: SUPABASE_URL
         sync: false
-      - key: CLERK_JWT_ISSUER
+      - key: SUPABASE_JWT_SECRET
         sync: false
-      - key: CLERK_JWKS_URL
-        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY

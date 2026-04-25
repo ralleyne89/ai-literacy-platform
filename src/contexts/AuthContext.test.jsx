@@ -4,7 +4,6 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
 import { AuthProvider, useAuth } from './AuthContext'
 
-
 const mockAxios = vi.hoisted(() => ({
   get: vi.fn(),
   put: vi.fn(),
@@ -15,12 +14,12 @@ const mockAxios = vi.hoisted(() => ({
   },
 }))
 
-const mockClerkState = vi.hoisted(() => ({
-  isLoaded: true,
-  isSignedIn: true,
-  getToken: vi.fn(),
-  redirectToSignIn: vi.fn(),
-  redirectToSignUp: vi.fn(),
+const mockSupabaseState = vi.hoisted(() => ({
+  isConfigured: true,
+  getSession: vi.fn(),
+  onAuthStateChange: vi.fn(),
+  signInWithOAuth: vi.fn(),
+  exchangeCodeForSession: vi.fn(),
   signOut: vi.fn(),
 }))
 
@@ -32,18 +31,18 @@ vi.mock('axios', () => ({
   },
 }))
 
-vi.mock('@clerk/clerk-react', () => ({
-  ClerkProvider: ({ children }) => children,
-  useAuth: () => ({
-    isLoaded: mockClerkState.isLoaded,
-    isSignedIn: mockClerkState.isSignedIn,
-    getToken: mockClerkState.getToken,
-  }),
-  useClerk: () => ({
-    redirectToSignIn: mockClerkState.redirectToSignIn,
-    redirectToSignUp: mockClerkState.redirectToSignUp,
-    signOut: mockClerkState.signOut,
-  }),
+vi.mock('../services/supabaseClient', () => ({
+  getSupabaseConfigError: () => 'Supabase is not configured.',
+  isSupabaseConfigured: () => mockSupabaseState.isConfigured,
+  supabase: {
+    auth: {
+      getSession: mockSupabaseState.getSession,
+      onAuthStateChange: mockSupabaseState.onAuthStateChange,
+      signInWithOAuth: mockSupabaseState.signInWithOAuth,
+      exchangeCodeForSession: mockSupabaseState.exchangeCodeForSession,
+      signOut: mockSupabaseState.signOut,
+    },
+  },
 }))
 
 let latestAuth
@@ -65,10 +64,19 @@ const renderAuthProvider = () =>
     </AuthProvider>
   )
 
-describe('AuthProvider Clerk session behavior', () => {
+const backendUser = {
+  id: 'user-123',
+  email: 'ada@example.com',
+  first_name: 'Ada',
+  last_name: 'Lovelace',
+  subscription_tier: 'free',
+}
+
+describe('AuthProvider Supabase session behavior', () => {
   const originalEnv = {
     VITE_AUTH_MODE: import.meta.env.VITE_AUTH_MODE,
-    VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   }
 
   beforeEach(() => {
@@ -77,34 +85,40 @@ describe('AuthProvider Clerk session behavior', () => {
     mockAxios.put.mockReset()
     mockAxios.defaults.headers.common = {}
 
-    mockClerkState.isLoaded = true
-    mockClerkState.isSignedIn = true
-    mockClerkState.getToken.mockReset()
-    mockClerkState.redirectToSignIn.mockReset()
-    mockClerkState.redirectToSignUp.mockReset()
-    mockClerkState.signOut.mockReset()
+    mockSupabaseState.isConfigured = true
+    mockSupabaseState.getSession.mockReset()
+    mockSupabaseState.onAuthStateChange.mockReset()
+    mockSupabaseState.signInWithOAuth.mockReset()
+    mockSupabaseState.exchangeCodeForSession.mockReset()
+    mockSupabaseState.signOut.mockReset()
+    mockSupabaseState.onAuthStateChange.mockReturnValue({
+      data: {
+        subscription: {
+          unsubscribe: vi.fn(),
+        },
+      },
+    })
 
-    import.meta.env.VITE_AUTH_MODE = 'clerk'
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY = 'pk_test_clerk'
+    import.meta.env.VITE_AUTH_MODE = 'supabase'
+    import.meta.env.VITE_SUPABASE_URL = 'https://project-ref.supabase.co'
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_test'
     window.sessionStorage.clear()
   })
 
   afterEach(() => {
     import.meta.env.VITE_AUTH_MODE = originalEnv.VITE_AUTH_MODE
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY = originalEnv.VITE_CLERK_PUBLISHABLE_KEY
+    import.meta.env.VITE_SUPABASE_URL = originalEnv.VITE_SUPABASE_URL
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY = originalEnv.VITE_SUPABASE_PUBLISHABLE_KEY
   })
 
-  it('hydrates the backend profile from a Clerk session token', async () => {
-    mockClerkState.getToken.mockResolvedValue('clerk-session-token')
+  it('hydrates the backend profile from a Supabase session token', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({
+      data: { session: { access_token: 'supabase-session-token' } },
+      error: null,
+    })
     mockAxios.get.mockResolvedValue({
       data: {
-        user: {
-          id: 'user-123',
-          email: 'ada@example.com',
-          first_name: 'Ada',
-          last_name: 'Lovelace',
-          subscription_tier: 'free',
-        },
+        user: backendUser,
       },
     })
 
@@ -114,29 +128,70 @@ describe('AuthProvider Clerk session behavior', () => {
     await waitFor(() => expect(latestAuth.loading).toBe(false))
 
     expect(latestAuth.isAuthenticated).toBe(true)
-    expect(latestAuth.user).toEqual(
-      expect.objectContaining({
-        id: 'user-123',
-        email: 'ada@example.com',
-      })
-    )
-    expect(latestAuth.token).toBe('clerk-session-token')
-    expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer clerk-session-token')
+    expect(latestAuth.user).toEqual(expect.objectContaining({ id: 'user-123' }))
+    expect(latestAuth.token).toBe('supabase-session-token')
+    expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer supabase-session-token')
     expect(mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/auth/profile'))
   })
 
-  it('logs out through Clerk and clears the auth header', async () => {
-    mockClerkState.getToken.mockResolvedValue('clerk-session-token')
-    mockClerkState.signOut.mockResolvedValue(undefined)
+  it('starts Google OAuth through Supabase', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signInWithOAuth.mockResolvedValue({ data: {}, error: null })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.login()
+
+    expect(result).toEqual(expect.objectContaining({ success: true }))
+    expect(mockSupabaseState.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'google',
+        options: expect.objectContaining({
+          redirectTo: expect.stringContaining('/auth/callback'),
+        }),
+      })
+    )
+  })
+
+  it('exchanges a callback code and syncs the backend profile', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.exchangeCodeForSession.mockResolvedValue({
+      data: { session: { access_token: 'exchanged-supabase-token' } },
+      error: null,
+    })
     mockAxios.get.mockResolvedValue({
       data: {
-        user: {
-          id: 'user-123',
-          email: 'ada@example.com',
-          first_name: 'Ada',
-          last_name: 'Lovelace',
-          subscription_tier: 'free',
-        },
+        user: backendUser,
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.exchangeOAuthCodeForSession('oauth-code')
+
+    expect(result).toEqual(expect.objectContaining({ success: true }))
+    expect(mockSupabaseState.exchangeCodeForSession).toHaveBeenCalledWith('oauth-code')
+    await waitFor(() => {
+      expect(latestAuth.user).toEqual(expect.objectContaining({ email: 'ada@example.com' }))
+    })
+    expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer exchanged-supabase-token')
+  })
+
+  it('logs out through Supabase and clears the auth header', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({
+      data: { session: { access_token: 'supabase-session-token' } },
+      error: null,
+    })
+    mockSupabaseState.signOut.mockResolvedValue({ error: null })
+    mockAxios.get.mockResolvedValue({
+      data: {
+        user: backendUser,
       },
     })
 
@@ -147,8 +202,8 @@ describe('AuthProvider Clerk session behavior', () => {
 
     const result = await latestAuth.logout()
 
-    expect(result).toEqual(expect.objectContaining({ success: true, redirected: true }))
-    expect(mockClerkState.signOut).toHaveBeenCalled()
+    expect(result).toEqual(expect.objectContaining({ success: true, redirected: false }))
+    expect(mockSupabaseState.signOut).toHaveBeenCalled()
     expect(mockAxios.defaults.headers.common.Authorization).toBeUndefined()
   })
 })

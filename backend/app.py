@@ -75,10 +75,11 @@ def _configure_app(app: Flask, test_config=None):
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///ai_literacy.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['CLERK_SECRET_KEY'] = _resolve_setting('CLERK_SECRET_KEY')
-    app.config['CLERK_JWT_ISSUER'] = _resolve_setting('CLERK_JWT_ISSUER')
-    app.config['CLERK_JWKS_URL'] = _resolve_setting('CLERK_JWKS_URL')
-    app.config['CLERK_API_URL'] = _resolve_setting('CLERK_API_URL')
+    app.config['SUPABASE_URL'] = _resolve_setting('SUPABASE_URL', 'VITE_SUPABASE_URL')
+    app.config['SUPABASE_JWT_ISSUER'] = _resolve_setting('SUPABASE_JWT_ISSUER')
+    app.config['SUPABASE_JWKS_URL'] = _resolve_setting('SUPABASE_JWKS_URL')
+    app.config['SUPABASE_JWT_AUDIENCE'] = _resolve_setting('SUPABASE_JWT_AUDIENCE') or 'authenticated'
+    app.config['SUPABASE_JWT_SECRET'] = _resolve_setting('SUPABASE_JWT_SECRET')
 
     if test_config:
         app.config.update(test_config)

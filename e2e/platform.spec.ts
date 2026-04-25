@@ -1,24 +1,25 @@
 import { expect, test } from '@playwright/test'
 import {
   TARGET_MODULE_ID,
-  readClerkStubState,
+  readSupabaseStubState,
   resetBrowserStorage,
   signInFromLoginPage,
-} from './clerkTestHelpers'
+} from './supabaseTestHelpers'
 
-test('Register entrypoint launches Clerk sign-up and lands on the dashboard', async ({ page }) => {
+test('Register entrypoint launches Supabase OAuth and lands on the dashboard', async ({ page }) => {
   await resetBrowserStorage(page)
 
   await page.goto('/register')
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Create your LitmusAI account' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Continue to Create Account' }).click()
+  await page.getByRole('button', { name: /Continue with Google/i }).click()
 
-  const clerkState = await readClerkStubState(page)
-  expect(clerkState?.lastRedirectRequest).toEqual(
+  const supabaseState = await readSupabaseStubState(page)
+  expect(supabaseState?.lastRedirectRequest).toEqual(
     expect.objectContaining({
-      type: 'sign-up',
-      redirectPath: '/dashboard',
+      type: 'oauth',
+      provider: 'google',
+      redirectPath: '/auth/callback',
     })
   )
 
@@ -26,7 +27,7 @@ test('Register entrypoint launches Clerk sign-up and lands on the dashboard', as
   await expect(page.getByRole('heading', { name: /Welcome back, Demo!/i })).toBeVisible()
 })
 
-test('Protected course routes preserve returnTo across Clerk sign-in', async ({ page }) => {
+test('Protected course routes preserve returnTo across Supabase sign-in', async ({ page }) => {
   await resetBrowserStorage(page)
 
   await page.goto(`/training/modules/${TARGET_MODULE_ID}/learn`)
@@ -35,11 +36,12 @@ test('Protected course routes preserve returnTo across Clerk sign-in', async ({ 
   await signInFromLoginPage(page)
 
   await expect(page).toHaveURL(new RegExp(`/training/modules/${TARGET_MODULE_ID}/learn$`))
-  const clerkState = await readClerkStubState(page)
-  expect(clerkState?.lastRedirectRequest).toEqual(
+  const supabaseState = await readSupabaseStubState(page)
+  expect(supabaseState?.lastRedirectRequest).toEqual(
     expect.objectContaining({
-      type: 'sign-in',
-      redirectPath: `/training/modules/${TARGET_MODULE_ID}/learn`,
+      type: 'oauth',
+      provider: 'google',
+      redirectPath: '/auth/callback',
     })
   )
 

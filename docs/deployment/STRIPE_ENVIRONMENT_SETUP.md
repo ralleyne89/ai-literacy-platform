@@ -5,14 +5,16 @@
 ### Netlify
 
 - `VITE_API_URL=https://ai-literacy-platform.onrender.com`
-- `VITE_CLERK_PUBLISHABLE_KEY=<publishable-key>`
+- `VITE_AUTH_MODE=supabase`
+- `VITE_SUPABASE_URL=<supabase-project-url>`
+- `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
 - `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
 
 ### Render
 
-- `CLERK_SECRET_KEY=<secret-key>`
-- `CLERK_JWT_ISSUER=<issuer-url>`
-- `CLERK_JWKS_URL=<jwks-url>`
+- `SUPABASE_URL=<supabase-project-url>`
+- `SUPABASE_JWT_AUDIENCE=authenticated`
+- `SUPABASE_JWT_SECRET=<legacy-jwt-secret-if-needed>`
 - `STRIPE_SECRET_KEY=<stripe-secret>`
 - `STRIPE_WEBHOOK_SECRET=<whsec_...>`
 - `FRONTEND_URL=https://litmusai.netlify.app`
@@ -26,7 +28,7 @@ Use the Render backend as the only production webhook target:
 
 ## Verification
 
-- The frontend loads with a Clerk publishable key
-- The backend can verify Clerk JWTs
+- The frontend loads with Supabase project URL and publishable key
+- The backend can verify Supabase access JWTs
 - Stripe checkout uses the Render API
 - Stripe webhook deliveries succeed against the Render endpoint

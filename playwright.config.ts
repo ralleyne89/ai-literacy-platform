@@ -61,9 +61,10 @@ export default defineConfig({
       timeout: 120000,
       env: {
         VITE_API_URL: `http://${host}:${backendPort}`,
-        VITE_AUTH_MODE: 'clerk',
-        VITE_CLERK_PUBLISHABLE_KEY: 'pk_test_playwright_clerk_stub',
-        PLAYWRIGHT_CLERK_STUB: '1',
+        VITE_AUTH_MODE: 'supabase',
+        VITE_SUPABASE_URL: 'https://project-ref.supabase.co',
+        VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_playwright_stub',
+        VITE_SUPABASE_AUTH_STUB: '1',
       },
     },
   ],

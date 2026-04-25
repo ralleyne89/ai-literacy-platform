@@ -1,18 +1,21 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { ClerkProvider, useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react'
 import axios from 'axios'
 import {
+  AUTH_CALLBACK_PATH,
   clearStoredAuthReturnTo,
   getStoredAuthReturnTo,
 } from '../config/authRoutes'
 import { AUTH_ENDPOINTS } from '../config/apiEndpoints'
+import {
+  getSupabaseConfigError,
+  isSupabaseConfigured,
+  supabase,
+} from '../services/supabaseClient'
 
 const AuthContext = createContext()
-const CLERK_AUTH_MODE = 'clerk'
+const SUPABASE_AUTH_MODE = 'supabase'
 const DEMO_AUTH_MODE = 'demo'
 const INVALID_AUTH_MODE = '__invalid_auth_mode__'
-const CLERK_AUTH_ERROR_MESSAGE = 'Clerk is not configured. Set VITE_CLERK_PUBLISHABLE_KEY.'
-
 
 const mapBackendUser = (backendUser) => {
   if (!backendUser) {
@@ -38,7 +41,7 @@ const normalizeBackendError = (error, fallbackMessage) => {
     error?.message
 
   return {
-    code: error?.response?.data?.code || 'auth_error',
+    code: error?.response?.data?.code || error?.code || 'auth_error',
     message: backendMessage || fallbackMessage,
   }
 }
@@ -63,24 +66,20 @@ const normalizeProfileResponse = (response, fallbackMessage) => {
 const getConfiguredAuthMode = () => {
   const configured = String(import.meta.env.VITE_AUTH_MODE || '').trim().toLowerCase()
   if (!configured) {
-    return CLERK_AUTH_MODE
+    return SUPABASE_AUTH_MODE
   }
 
   if (configured === DEMO_AUTH_MODE) {
     return DEMO_AUTH_MODE
   }
 
-  if (configured !== CLERK_AUTH_MODE) {
-    console.error(`Unsupported VITE_AUTH_MODE="${configured}". Supported values: clerk, demo.`)
+  if (configured !== SUPABASE_AUTH_MODE) {
+    console.error(`Unsupported VITE_AUTH_MODE="${configured}". Supported values: supabase, demo.`)
     return INVALID_AUTH_MODE
   }
 
-  return CLERK_AUTH_MODE
+  return SUPABASE_AUTH_MODE
 }
-
-const getClerkPublishableKey = () => String(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
-
-const isClerkConfigured = () => Boolean(getClerkPublishableKey())
 
 const getDefaultAuthReturnTo = () => getStoredAuthReturnTo() || '/dashboard'
 
@@ -93,6 +92,11 @@ const buildAbsoluteReturnUrl = (path = '/dashboard') => {
   return `${window.location.origin}${normalizedPath}`
 }
 
+const getSessionAccessToken = (session) =>
+  typeof session?.access_token === 'string' && session.access_token.trim()
+    ? session.access_token.trim()
+    : ''
+
 const buildUnavailableAuthValue = (errorMessage = 'Authentication mode is not configured.') => ({
   user: null,
   token: null,
@@ -104,6 +108,7 @@ const buildUnavailableAuthValue = (errorMessage = 'Authentication mode is not co
   loginWithProvider: async () => ({ success: false, error: errorMessage }),
   requestPasswordReset: async () => ({ success: false, error: errorMessage }),
   syncBackendAfterLogin: async () => ({ success: false, error: errorMessage }),
+  exchangeOAuthCodeForSession: async () => ({ success: false, error: errorMessage }),
   isAuthenticated: false,
 })
 
@@ -130,8 +135,17 @@ const DemoAuthProvider = ({ children }) => {
   axios.defaults.headers.common.Authorization = 'Bearer demo'
 
   useEffect(() => {
+    axios.defaults.headers.common.Authorization = 'Bearer demo'
+    const interceptorId = axios.interceptors.request.use((config) => ({
+      ...config,
+      headers: {
+        ...config.headers,
+        Authorization: config.headers?.Authorization || 'Bearer demo',
+      },
+    }))
+
     return () => {
-      delete axios.defaults.headers.common.Authorization
+      axios.interceptors.request.eject(interceptorId)
     }
   }, [])
 
@@ -146,15 +160,14 @@ const DemoAuthProvider = ({ children }) => {
     loginWithProvider: async () => ({ success: false, error: 'Not supported in demo mode.' }),
     requestPasswordReset: async () => ({ success: false, error: 'Not supported in demo mode.' }),
     syncBackendAfterLogin: async () => ({ success: true, user: DEMO_USER }),
+    exchangeOAuthCodeForSession: async () => ({ success: true, user: DEMO_USER }),
     isAuthenticated: true,
   }), [])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-const ClerkSessionAuthProvider = ({ children }) => {
-  const { isLoaded, isSignedIn, getToken } = useClerkAuth()
-  const clerk = useClerk()
+const SupabaseSessionAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -165,15 +178,35 @@ const ClerkSessionAuthProvider = ({ children }) => {
     delete axios.defaults.headers.common.Authorization
   }, [])
 
-  const syncBackendAfterLogin = useCallback(async () => {
+  const applySessionToken = useCallback((session) => {
+    const accessToken = getSessionAccessToken(session)
+    if (!accessToken) {
+      clearSession()
+      return ''
+    }
+
+    axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+    setToken(accessToken)
+    return accessToken
+  }, [clearSession])
+
+  const syncBackendAfterLogin = useCallback(async (sessionOverride) => {
     try {
-      const clerkToken = await getToken()
-      if (!clerkToken) {
-        clearSession()
-        return { success: false, error: 'Missing Clerk session token.' }
+      let activeSession = sessionOverride
+
+      if (!activeSession) {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) {
+          throw error
+        }
+        activeSession = data?.session
       }
 
-      axios.defaults.headers.common.Authorization = `Bearer ${clerkToken}`
+      const accessToken = applySessionToken(activeSession)
+      if (!accessToken) {
+        return { success: false, error: 'Missing Supabase session token.' }
+      }
+
       const response = await axios.get(AUTH_ENDPOINTS.profile)
       const normalized = normalizeProfileResponse(
         response,
@@ -184,7 +217,6 @@ const ClerkSessionAuthProvider = ({ children }) => {
         return { success: false, error: normalized.message, code: normalized.code }
       }
 
-      setToken(clerkToken)
       setUser(normalized.user)
       return { success: true, user: normalized.user }
     } catch (error) {
@@ -192,95 +224,146 @@ const ClerkSessionAuthProvider = ({ children }) => {
       clearSession()
       return { success: false, error: normalized.message, code: normalized.code }
     }
-  }, [clearSession, getToken])
+  }, [applySessionToken, clearSession])
 
   useEffect(() => {
     let isMounted = true
 
     const initialize = async () => {
-      if (!isLoaded) {
-        return
-      }
-
-      if (!isSignedIn) {
-        clearSession()
-        if (isMounted) {
-          setLoading(false)
-        }
-        return
-      }
-
       if (isMounted) {
         setLoading(true)
       }
 
-      const result = await syncBackendAfterLogin()
-      if (!result.success) {
-        clearSession()
-      }
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) {
+          throw error
+        }
 
-      if (isMounted) {
-        setLoading(false)
+        if (!data?.session) {
+          clearSession()
+          return
+        }
+
+        await syncBackendAfterLogin(data.session)
+      } catch {
+        clearSession()
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     initialize()
 
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        return
+      }
+
+      if (event === 'SIGNED_OUT') {
+        clearSession()
+        return
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        applySessionToken(session)
+        return
+      }
+
+      if (session) {
+        setTimeout(() => {
+          syncBackendAfterLogin(session)
+        }, 0)
+      }
+    })
+
     return () => {
       isMounted = false
+      authListener?.subscription?.unsubscribe()
     }
-  }, [clearSession, isLoaded, isSignedIn, syncBackendAfterLogin])
+  }, [applySessionToken, clearSession, syncBackendAfterLogin])
 
-  const login = useCallback(async () => {
+  const startOAuth = useCallback(async (provider = 'google') => {
     try {
-      const returnTo = buildAbsoluteReturnUrl(getDefaultAuthReturnTo())
-      await clerk.redirectToSignIn({
-        fallbackRedirectUrl: returnTo,
-        forceRedirectUrl: returnTo,
-        signUpFallbackRedirectUrl: returnTo,
-        signUpForceRedirectUrl: returnTo,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: buildAbsoluteReturnUrl(AUTH_CALLBACK_PATH),
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
       })
+
+      if (error) {
+        throw error
+      }
+
       return { success: true }
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to start Clerk sign-in.')
+      const normalized = normalizeBackendError(error, 'Unable to start Supabase sign-in.')
       return { success: false, error: normalized.message, code: normalized.code }
     }
-  }, [clerk])
+  }, [])
 
-  const register = useCallback(async () => {
+  const login = useCallback(async () => startOAuth('google'), [startOAuth])
+
+  const register = useCallback(async () => startOAuth('google'), [startOAuth])
+
+  const loginWithProvider = useCallback(async (provider = 'google') => startOAuth(provider), [startOAuth])
+
+  const exchangeOAuthCodeForSession = useCallback(async (code) => {
     try {
-      const returnTo = buildAbsoluteReturnUrl(getDefaultAuthReturnTo())
-      await clerk.redirectToSignUp({
-        fallbackRedirectUrl: returnTo,
-        forceRedirectUrl: returnTo,
-        signInFallbackRedirectUrl: returnTo,
-        signInForceRedirectUrl: returnTo,
-      })
-      return { success: true }
+      const authCode = String(code || '').trim()
+      if (!authCode) {
+        return { success: false, error: 'Missing Supabase auth code.', code: 'missing_auth_code' }
+      }
+
+      const { data, error } = await supabase.auth.exchangeCodeForSession(authCode)
+      if (error) {
+        throw error
+      }
+
+      return syncBackendAfterLogin(data?.session)
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to start Clerk sign-up.')
+      const normalized = normalizeBackendError(error, 'Unable to complete Supabase sign-in.')
+      clearSession()
       return { success: false, error: normalized.message, code: normalized.code }
     }
-  }, [clerk])
+  }, [clearSession, syncBackendAfterLogin])
 
   const logout = useCallback(async () => {
     clearSession()
     clearStoredAuthReturnTo()
 
     try {
-      await clerk.signOut({ redirectUrl: typeof window === 'undefined' ? '/' : window.location.origin })
-      return { success: true, redirected: true }
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        throw error
+      }
+
+      return { success: true, redirected: false }
     } catch (error) {
       const normalized = normalizeBackendError(error, 'Unable to sign out right now.')
       return { success: false, error: normalized.message, code: normalized.code }
     }
-  }, [clearSession, clerk])
+  }, [clearSession])
 
   const updateProfile = useCallback(async (profileData) => {
     try {
-      const activeToken = token || await getToken()
+      let activeToken = token
       if (!activeToken) {
-        return { success: false, error: 'Missing Clerk session token.' }
+        const { data, error } = await supabase.auth.getSession()
+        if (error) {
+          throw error
+        }
+        activeToken = applySessionToken(data?.session)
+      }
+
+      if (!activeToken) {
+        return { success: false, error: 'Missing Supabase session token.' }
       }
 
       axios.defaults.headers.common.Authorization = `Bearer ${activeToken}`
@@ -299,38 +382,35 @@ const ClerkSessionAuthProvider = ({ children }) => {
         return { success: false, error: normalized.message, code: normalized.code }
       }
 
-      setToken(activeToken)
       setUser(normalized.user)
       return { success: true, user: normalized.user }
     } catch (error) {
       const normalized = normalizeBackendError(error, 'Unable to update profile right now.')
       return { success: false, error: normalized.message, code: normalized.code }
     }
-  }, [getToken, token])
+  }, [applySessionToken, token])
 
   const value = useMemo(() => ({
     user,
     token,
-    loading: !isLoaded || loading,
+    loading,
     login,
     register,
     logout,
     updateProfile,
-    loginWithProvider: async () => ({
-      success: false,
-      error: 'Social sign-in is managed directly by Clerk on the hosted auth pages.',
-    }),
+    loginWithProvider,
     requestPasswordReset: async () => ({
       success: false,
-      error: 'Password reset is managed by Clerk.',
+      error: 'Password reset is not available for Google sign-in accounts.',
     }),
     syncBackendAfterLogin,
-    isAuthenticated: Boolean(user) && Boolean(isSignedIn),
+    exchangeOAuthCodeForSession,
+    isAuthenticated: Boolean(user) && Boolean(token),
   }), [
-    isLoaded,
-    isSignedIn,
+    exchangeOAuthCodeForSession,
     loading,
     login,
+    loginWithProvider,
     logout,
     register,
     syncBackendAfterLogin,
@@ -342,12 +422,6 @@ const ClerkSessionAuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-const ClerkAuthProvider = ({ children }) => (
-  <ClerkProvider publishableKey={getClerkPublishableKey()}>
-    <ClerkSessionAuthProvider>{children}</ClerkSessionAuthProvider>
-  </ClerkProvider>
-)
-
 export const AuthProvider = ({ children }) => {
   const authMode = getConfiguredAuthMode()
 
@@ -355,13 +429,13 @@ export const AuthProvider = ({ children }) => {
     return <DemoAuthProvider>{children}</DemoAuthProvider>
   }
 
-  if (authMode !== CLERK_AUTH_MODE || !isClerkConfigured()) {
+  if (authMode !== SUPABASE_AUTH_MODE || !isSupabaseConfigured()) {
     return (
-      <AuthContext.Provider value={buildUnavailableAuthValue(CLERK_AUTH_ERROR_MESSAGE)}>
+      <AuthContext.Provider value={buildUnavailableAuthValue(getSupabaseConfigError())}>
         {children}
       </AuthContext.Provider>
     )
   }
 
-  return <ClerkAuthProvider>{children}</ClerkAuthProvider>
+  return <SupabaseSessionAuthProvider>{children}</SupabaseSessionAuthProvider>
 }

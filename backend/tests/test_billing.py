@@ -4,7 +4,7 @@ from models import db, User
 
 
 @pytest.fixture()
-def authenticated_user(client, app, create_clerk_token):
+def authenticated_user(client, app, create_supabase_token):
     with app.app_context():
         user = User(
             email='billing@example.com',
@@ -18,7 +18,7 @@ def authenticated_user(client, app, create_clerk_token):
         user_id = user.id
         user_email = user.email
 
-    token = create_clerk_token(sub=user_id, email=user_email)
+    token = create_supabase_token(sub=user_id, email=user_email)
     return {
         'id': user_id,
         'email': user_email,

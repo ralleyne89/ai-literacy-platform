@@ -144,8 +144,10 @@ Before running E2E or QA:
 - `/api/assessment/recommendations` returns module payload with:
   - `id`, `title`, `reason`
   - `priority`
-  - `target_domains` when available
+  - `target_domains`, `lesson_count`, and `has_internal_lessons`
+  - `routing`/`route_path` metadata so frontend links can choose an internal lesson path only when lessons exist
 - At least one seeded training module is mapped with domain tags (`AI Fundamentals`,
   `Practical Usage`, `Ethics & Critical Thinking`, `AI Impact & Applications`, `Strategic Understanding`).
+- Recommended internal video modules have at least one `video` lesson whose content includes a playable `video_url`.
 
 Use this checklist whenever spinning a fresh dev instance or a new Supabase DB.

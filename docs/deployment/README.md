@@ -11,10 +11,10 @@ This directory contains the release configuration and deployment runbooks for Li
 
 ## Release Configuration
 
-Production release config is Clerk-only:
+Production release config uses Supabase Auth with Google OAuth:
 
-- Frontend build env: `VITE_CLERK_PUBLISHABLE_KEY`
-- Render backend env: `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`
+- Frontend build env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
+- Render backend env: `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, optional `SUPABASE_JWT_SECRET`
 - Backend API base: `VITE_API_URL`
 
 Local defaults:
@@ -43,8 +43,8 @@ Use the release validation script from the repo root after updating production c
 
 ```bash
 npm run validate:prod-env
-npm run check:clerk-config
+npm run check:supabase-config
 npm run build
 ```
 
-If you change release config in `netlify.toml` or `render.yaml`, also run the Clerk config checker script. The script filename is legacy; the check now validates Clerk release config.
+If you change release config in `netlify.toml` or `render.yaml`, run the Supabase config check and a production-style build before merging.

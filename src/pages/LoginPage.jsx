@@ -1,9 +1,25 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { AlertCircle, Brain } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { setStoredAuthReturnTo } from '../config/authRoutes'
+import AuthOAuthShell from './AuthOAuthShell'
 
+
+const getReturnPath = (fromState, fallback = '/dashboard') => {
+  if (typeof fromState === 'string') {
+    return fromState.startsWith('/') && !fromState.startsWith('//') ? fromState : fallback
+  }
+
+  const pathname = fromState?.pathname
+  if (typeof pathname !== 'string' || !pathname.startsWith('/') || pathname.startsWith('//')) {
+    return fallback
+  }
+
+  const search = typeof fromState.search === 'string' ? fromState.search : ''
+  const hash = typeof fromState.hash === 'string' ? fromState.hash : ''
+
+  return `${pathname}${search}${hash}`
+}
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false)
@@ -14,10 +30,7 @@ const LoginPage = () => {
 
   const callbackError = location.state?.authError
   const fromState = location.state?.from
-  const from =
-    typeof fromState === 'string'
-      ? fromState
-      : fromState?.pathname || '/dashboard'
+  const from = getReturnPath(fromState)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -45,46 +58,26 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-primary rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Brain className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900">
-            Sign in to continue
-          </h2>
-          <p className="mt-2 text-gray-600">
-            New here?{' '}
-            <Link to="/register" className="text-primary-600 hover:text-primary-500 font-medium">
-              create an account
-            </Link>
-          </p>
-        </div>
-
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <span className="text-red-700">{error}</span>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Authentication is handled by Clerk. Continue to the secure hosted sign-in page to access your dashboard and learning progress.
-            </p>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Redirecting...' : 'Continue to Sign In'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AuthOAuthShell
+      mode="login"
+      eyebrow="Sign in"
+      title="Sign in to LitmusAI"
+      description="Use your Google account to continue into LitmusAI and keep your learning progress connected across every step."
+      actionLabel="Continue with Google"
+      loadingLabel="Opening Google..."
+      alternatePrompt="New here?"
+      alternateLabel="Create an account"
+      alternateTo="/register"
+      alternateState={{ from }}
+      returnCopy={
+        from === '/dashboard'
+          ? 'Google will bring you back to your dashboard after sign-in.'
+          : 'Google will bring you back to your requested page after sign-in.'
+      }
+      error={error}
+      loading={loading}
+      onSubmit={handleSubmit}
+    />
   )
 }
 

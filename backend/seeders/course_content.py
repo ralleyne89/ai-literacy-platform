@@ -12,6 +12,63 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import db, TrainingModule, Lesson
+from seeders.training import (
+    DEFAULT_MODULES,
+    HR_TRAINING_VIDEO_URL,
+    MARKETING_TRAINING_VIDEO_URL,
+    SALES_TRAINING_VIDEO_URL,
+)
+from training_metadata import EXTERNAL_CONTENT_TYPES, normalize_content_type, normalize_video_embed_url
+
+
+def build_single_video_lesson(module_data):
+    video_url = normalize_video_embed_url(module_data.get('content_url'))
+    if not video_url:
+        return []
+
+    return [
+        {
+            'title': f"Video: {module_data['title']}",
+            'description': module_data.get('description') or f"Watch the core lesson for {module_data['title']}.",
+            'order_index': 1,
+            'content_type': 'video',
+            'estimated_duration_minutes': min(module_data.get('estimated_duration_minutes') or 30, 30),
+            'is_required': True,
+            'content': json.dumps({
+                'video_url': video_url,
+                'video_title': module_data['title'],
+                'summary': module_data.get('description') or '',
+                'key_points': module_data.get('learning_objectives', [])[:5],
+                'key_takeaways': module_data.get('learning_objectives', [])[:5],
+                'resources': [
+                    {'title': resource.get('label') or resource.get('title'), 'url': resource.get('url')}
+                    for resource in module_data.get('resources', [])
+                    if isinstance(resource, dict) and resource.get('url')
+                ],
+            })
+        }
+    ]
+
+
+def build_default_video_courses(existing_course_ids):
+    courses = []
+    for module_data in DEFAULT_MODULES:
+        module_id = module_data['id']
+        content_type = normalize_content_type(module_data.get('content_type'))
+        if module_id in existing_course_ids or content_type in EXTERNAL_CONTENT_TYPES:
+            continue
+
+        lessons = build_single_video_lesson(module_data)
+        if not lessons:
+            continue
+
+        courses.append({
+            'module_id': module_id,
+            'module_data': None,
+            'lessons': lessons
+        })
+
+    return courses
 
 # Sample course content - Introduction to AI Fundamentals
 # NOTE: This is original educational content, NOT the official Google AI Essentials course
@@ -305,6 +362,28 @@ AI_FUNDAMENTALS_INTRO_LESSONS = [
     }
 ]
 
+AI_FUNDAMENTALS_INTRO_LESSONS.append({
+    'title': 'Video: AI Literacy Foundations',
+    'description': 'A concise visual overview of modern AI, core concepts, and responsible use.',
+    'order_index': 8,
+    'content_type': 'video',
+    'estimated_duration_minutes': 12,
+    'is_required': True,
+    'content': json.dumps({
+        'video_url': 'https://www.youtube-nocookie.com/embed/_ZvnD73m40o',
+        'video_title': 'AI Literacy Foundations',
+        'summary': 'Use this video to connect the text lessons to a practical overview of how AI systems are used in real workflows.',
+        'key_takeaways': [
+            'AI literacy starts with clear mental models for what AI can and cannot do',
+            'Prompt quality depends on context, constraints, and examples',
+            'Responsible use requires verification, privacy awareness, and human review'
+        ],
+        'resources': [
+            {'title': 'Google AI Essentials', 'url': 'https://grow.google/ai-essentials/'}
+        ]
+    })
+})
+
 
 # Prompt Engineering Mastery - Original Content
 PROMPT_ENGINEERING_MASTERY_LESSONS = [
@@ -580,6 +659,28 @@ PROMPT_ENGINEERING_MASTERY_LESSONS = [
     }
 ]
 
+PROMPT_ENGINEERING_MASTERY_LESSONS.append({
+    'title': 'Video: Prompt Engineering in Practice',
+    'description': 'Watch a practical walkthrough of prompt structure, examples, and iteration.',
+    'order_index': 7,
+    'content_type': 'video',
+    'estimated_duration_minutes': 12,
+    'is_required': True,
+    'content': json.dumps({
+        'video_url': 'https://www.youtube-nocookie.com/embed/T9aRN5JkmL8',
+        'video_title': 'Prompt Engineering in Practice',
+        'summary': 'This video reinforces the CRAFT framework and shows how prompt specificity changes output quality.',
+        'key_takeaways': [
+            'Examples help models match your desired format and style',
+            'Breaking complex tasks into steps improves reasoning quality',
+            'Iteration is part of the workflow, not a failure state'
+        ],
+        'resources': [
+            {'title': 'Prompt Engineering Guide', 'url': 'https://www.promptingguide.ai/'}
+        ]
+    })
+})
+
 
 # Elements of AI - Curated Content with Attribution
 ELEMENTS_OF_AI_LESSONS = [
@@ -770,6 +871,65 @@ ELEMENTS_OF_AI_LESSONS = [
 ]
 
 
+def _video_lesson(title, description, video_url, key_points, duration_minutes=20):
+    return {
+        'title': title,
+        'description': description,
+        'order_index': 1,
+        'content_type': 'video',
+        'estimated_duration_minutes': duration_minutes,
+        'is_required': True,
+        'content': json.dumps({
+            'video_url': video_url,
+            'key_points': key_points,
+            'resources': []
+        })
+    }
+
+
+INTERNAL_VIDEO_MODULE_LESSONS = {
+    'module-ai-sales': [
+        _video_lesson(
+            'AI Sales Workflow Walkthrough',
+            'A guided video module on applying AI to prospecting, lead scoring, and sales enablement.',
+            SALES_TRAINING_VIDEO_URL,
+            [
+                'Use AI to prioritize accounts and next-best actions',
+                'Draft personalized outreach with clear human review steps',
+                'Connect AI workflows to existing CRM stages'
+            ],
+            duration_minutes=18,
+        )
+    ],
+    'module-ethical-hr': [
+        _video_lesson(
+            'Responsible AI for People Operations',
+            'A practical video lesson on bias checks, transparent communication, and human oversight in HR workflows.',
+            HR_TRAINING_VIDEO_URL,
+            [
+                'Audit AI-assisted hiring workflows for fairness risks',
+                'Keep humans accountable for talent decisions',
+                'Document policy and communication guardrails'
+            ],
+            duration_minutes=20,
+        )
+    ],
+    'module-marketing-ai': [
+        _video_lesson(
+            'Building AI-Powered Campaign Systems',
+            'A video lesson on using AI for campaign briefs, segmentation, content variants, and performance iteration.',
+            MARKETING_TRAINING_VIDEO_URL,
+            [
+                'Translate campaign goals into structured AI prompts',
+                'Generate audience and channel variants responsibly',
+                'Review AI output against brand and performance criteria'
+            ],
+            duration_minutes=22,
+        )
+    ],
+}
+
+
 def seed_course_content(force=False, silent=False):
     """Seed course content (lessons) for training modules"""
 
@@ -808,8 +968,19 @@ def seed_course_content(force=False, silent=False):
             'module_id': 'module-elements-of-ai',
             'module_data': None,  # Module already exists in training.py
             'lessons': ELEMENTS_OF_AI_LESSONS
-        }
+        },
+        *[
+            {
+                'module_id': module_id,
+                'module_data': None,
+                'lessons': lessons
+            }
+            for module_id, lessons in INTERNAL_VIDEO_MODULE_LESSONS.items()
+        ]
     ]
+
+    existing_course_ids = {course['module_id'] for course in courses_to_seed}
+    courses_to_seed.extend(build_default_video_courses(existing_course_ids))
 
     total_lessons_added = 0
 
@@ -884,4 +1055,3 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
         seed_course_content(force=args.force)
-

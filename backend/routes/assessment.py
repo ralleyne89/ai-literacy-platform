@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import random
 from routes import get_supabase_identity, supabase_jwt_required
+from training_metadata import build_module_metadata
 from logging_config import get_logger
 
 
@@ -634,6 +635,23 @@ def generate_recommendations(domain_scores, domain_totals, total_correct, score_
 
     return recommendations
 
+
+def serialize_course_recommendation(module, *, reason, priority, skill_gap_percentage=0):
+    return {
+        'id': module.id,
+        'title': module.title,
+        'description': module.description,
+        'difficulty_level': module.difficulty_level,
+        'estimated_duration_minutes': module.estimated_duration_minutes,
+        'content_type': module.content_type,
+        'is_premium': module.is_premium,
+        'role_specific': module.role_specific,
+        'reason': reason,
+        'priority': priority,
+        'skill_gap_percentage': skill_gap_percentage,
+        **build_module_metadata(module),
+    }
+
 @assessment_bp.route('/history', methods=['GET'])
 @supabase_jwt_required()
 def get_assessment_history():
@@ -731,18 +749,12 @@ def get_course_recommendations():
 
             recommendations = []
             for module in modules:
-                recommendations.append({
-                    'id': module.id,
-                    'title': module.title,
-                    'description': module.description,
-                    'difficulty_level': module.difficulty_level,
-                    'estimated_duration_minutes': module.estimated_duration_minutes,
-                    'content_type': module.content_type,
-                    'is_premium': module.is_premium,
-                    'reason': 'Great starting point for AI literacy',
-                    'priority': 'low',
-                    'target_domains': []
-                })
+                recommendations.append(serialize_course_recommendation(
+                    module,
+                    reason='Great starting point for AI literacy',
+                    priority='low',
+                    skill_gap_percentage=0,
+                ))
 
             return jsonify({
                 'recommendations': recommendations,
@@ -787,31 +799,18 @@ def get_course_recommendations():
                     continue
 
                 # Check if module targets this domain
-                target_domains = []
-                if module.target_domains:
-                    try:
-                        target_domains = json.loads(module.target_domains) if isinstance(module.target_domains, str) else module.target_domains
-                    except:
-                        target_domains = []
+                target_domains = build_module_metadata(module)['target_domains']
 
                 if weak_domain in target_domains or not target_domains:
                     # Module targets this weak domain or is general
                     priority = 'high' if weak_domain_info['percentage'] < 33 else 'medium'
 
-                    recommendations.append({
-                        'id': module.id,
-                        'title': module.title,
-                        'description': module.description,
-                        'difficulty_level': module.difficulty_level,
-                        'estimated_duration_minutes': module.estimated_duration_minutes,
-                        'content_type': module.content_type,
-                        'is_premium': module.is_premium,
-                        'role_specific': module.role_specific,
-                        'reason': f'Strengthen your {weak_domain} skills (scored {weak_domain_info["score"]}/{weak_domain_info["total"]})',
-                        'priority': priority,
-                        'target_domains': target_domains,
-                        'skill_gap_percentage': round(100 - weak_domain_info['percentage'], 1)
-                    })
+                    recommendations.append(serialize_course_recommendation(
+                        module,
+                        reason=f'Strengthen your {weak_domain} skills (scored {weak_domain_info["score"]}/{weak_domain_info["total"]})',
+                        priority=priority,
+                        skill_gap_percentage=round(100 - weak_domain_info['percentage'], 1),
+                    ))
 
                     seen_module_ids.add(module.id)
 
@@ -830,20 +829,12 @@ def get_course_recommendations():
 
             for module in general_modules:
                 if module.id not in seen_module_ids:
-                    recommendations.append({
-                        'id': module.id,
-                        'title': module.title,
-                        'description': module.description,
-                        'difficulty_level': module.difficulty_level,
-                        'estimated_duration_minutes': module.estimated_duration_minutes,
-                        'content_type': module.content_type,
-                        'is_premium': module.is_premium,
-                        'role_specific': module.role_specific,
-                        'reason': 'Recommended for continued learning',
-                        'priority': 'low',
-                        'target_domains': [],
-                        'skill_gap_percentage': 0
-                    })
+                    recommendations.append(serialize_course_recommendation(
+                        module,
+                        reason='Recommended for continued learning',
+                        priority='low',
+                        skill_gap_percentage=0,
+                    ))
                     seen_module_ids.add(module.id)
 
         # Sort by priority and skill gap

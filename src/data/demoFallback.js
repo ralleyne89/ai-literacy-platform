@@ -3,8 +3,7 @@
  * Used so training modules and video content still render for stakeholder demos.
  */
 
-// Replace with your preferred demo/trailer video embed URL if needed
-const DEMO_VIDEO_EMBED = 'https://www.youtube.com/embed/8n2Lc6jv1s8'
+const DEMO_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
 
 export const DEMO_FALLBACK_MODULE_IDS = ['module-ai-fundamentals', 'module-prompt-basics', 'module-ethics-overview']
 
@@ -57,7 +56,7 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 1,
     estimated_duration_minutes: 30,
     content_type: 'video',
-    content_url: DEMO_VIDEO_EMBED,
+    content_url: DEMO_VIDEO_URL,
     learning_objectives: ['Understand key AI terms', 'Identify safe use cases', 'Apply basic prompt tips'],
     content_sections: [],
     prerequisites: [],
@@ -72,7 +71,7 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 2,
     estimated_duration_minutes: 45,
     content_type: 'video',
-    content_url: DEMO_VIDEO_EMBED,
+    content_url: DEMO_VIDEO_URL,
     learning_objectives: ['Structure effective prompts', 'Iterate on outputs', 'Avoid common pitfalls'],
     content_sections: [],
     prerequisites: [],
@@ -87,7 +86,7 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 2,
     estimated_duration_minutes: 40,
     content_type: 'video',
-    content_url: DEMO_VIDEO_EMBED,
+    content_url: DEMO_VIDEO_URL,
     learning_objectives: ['Recognize algorithmic bias', 'Apply human-in-the-loop checks', 'Explain AI decisions'],
     content_sections: [],
     prerequisites: [],

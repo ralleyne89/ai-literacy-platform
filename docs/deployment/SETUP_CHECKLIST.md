@@ -3,10 +3,12 @@
 ## 1. Verify Release Env
 
 - `VITE_API_URL` points at the Render backend
-- `VITE_CLERK_PUBLISHABLE_KEY` is set for Netlify
-- `CLERK_SECRET_KEY` is set on Render
-- `CLERK_JWT_ISSUER` is set on Render
-- `CLERK_JWKS_URL` is set on Render
+- `VITE_AUTH_MODE=supabase` is set for Netlify
+- `VITE_SUPABASE_URL` is set for Netlify
+- `VITE_SUPABASE_PUBLISHABLE_KEY` is set for Netlify
+- `SUPABASE_URL` is set on Render
+- `SUPABASE_JWT_AUDIENCE=authenticated` is set on Render
+- `SUPABASE_JWT_SECRET` is set on Render only if the project still uses legacy HS256 signing
 - `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` are set
 
 ## 2. Configure Stripe Webhook
@@ -26,7 +28,7 @@ Select the standard subscription events used by the backend billing flow.
 
 ## 4. Validate
 
-- Clerk sign-in and sign-up routes load
+- Supabase Google OAuth sign-in and sign-up routes load
 - Protected routes land on `/dashboard`
 - Billing checkout uses the Render backend
 - Stripe webhook deliveries succeed against the Render endpoint

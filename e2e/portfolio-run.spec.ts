@@ -2,7 +2,7 @@ import { APIRequestContext, expect, Page, test } from '@playwright/test'
 
 const runPortfolioFlow = ['1', 'true', 'yes'].includes((process.env.PLAYWRIGHT_FULL_E2E || '').toLowerCase())
 
-test.skip(!runPortfolioFlow, 'Portfolio run is opt-in and not part of the default Clerk smoke gate.')
+test.skip(!runPortfolioFlow, 'Portfolio run is opt-in and not part of the default Supabase smoke gate.')
 
 type Credentials = {
   email: string

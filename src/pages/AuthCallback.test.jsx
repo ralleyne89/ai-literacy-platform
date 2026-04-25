@@ -3,14 +3,16 @@ import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthCallback from './AuthCallback'
 
-
 const mockNavigate = vi.fn()
 const mockLocation = {
+  search: '',
+  hash: '',
   state: undefined,
 }
 const mockAuthState = {
   loading: false,
   isAuthenticated: false,
+  exchangeOAuthCodeForSession: vi.fn(),
 }
 
 vi.mock('react-router-dom', async () => {
@@ -30,10 +32,26 @@ vi.mock('../contexts/AuthContext', () => ({
 describe('AuthCallback', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
+    mockLocation.search = ''
+    mockLocation.hash = ''
     mockLocation.state = undefined
     mockAuthState.loading = false
     mockAuthState.isAuthenticated = false
+    mockAuthState.exchangeOAuthCodeForSession.mockReset()
     window.sessionStorage.clear()
+  })
+
+  it('exchanges a Supabase auth code and restores the stored return path', async () => {
+    window.sessionStorage.setItem('ailiteracy_auth_return_to', '/training')
+    mockLocation.search = '?code=supabase-code'
+    mockAuthState.exchangeOAuthCodeForSession.mockResolvedValue({ success: true })
+
+    render(<AuthCallback />)
+
+    await waitFor(() => {
+      expect(mockAuthState.exchangeOAuthCodeForSession).toHaveBeenCalledWith('supabase-code')
+      expect(mockNavigate).toHaveBeenCalledWith('/training', { replace: true })
+    })
   })
 
   it('restores the stored return path when the user is already authenticated', async () => {
@@ -47,7 +65,8 @@ describe('AuthCallback', () => {
     })
   })
 
-  it('redirects back to login when the legacy callback route is hit without an authenticated session', async () => {
+  it('redirects OAuth errors back to login', async () => {
+    mockLocation.search = '?error_description=Google%20cancelled'
     mockLocation.state = { returnTo: '/training' }
 
     render(<AuthCallback />)
@@ -58,8 +77,27 @@ describe('AuthCallback', () => {
         state: {
           from: { pathname: '/training' },
           authError: {
-            code: 'legacy_auth_callback',
-            error: 'The legacy callback route is no longer used. Please sign in again.',
+            code: 'supabase_oauth_error',
+            error: 'Google cancelled',
+          },
+        },
+      })
+    })
+  })
+
+  it('redirects back to login when the callback has no session or code', async () => {
+    mockLocation.state = { returnTo: '/training' }
+
+    render(<AuthCallback />)
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/login', {
+        replace: true,
+        state: {
+          from: { pathname: '/training' },
+          authError: {
+            code: 'missing_supabase_callback',
+            error: 'No Supabase sign-in session was found. Please sign in again.',
           },
         },
       })

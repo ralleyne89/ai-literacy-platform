@@ -14,10 +14,11 @@ from auth_identity import (
 
 
 DEMO_USER_ID = 'demo-user'
-CLERK_PROVIDER = 'clerk'
+SUPABASE_PROVIDER = 'supabase'
 DEMO_PROVIDER = 'demo'
-_CLERK_JWKS_CLIENTS = {}
+_SUPABASE_JWKS_CLIENTS = {}
 TRUTHY_VALUES = {'1', 'true', 'yes', 'on'}
+ASYMMETRIC_ALGORITHMS = ('RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'EdDSA')
 
 
 def _config_value(key):
@@ -36,41 +37,70 @@ def _config_value(key):
     return ''
 
 
-def _normalize_issuer(raw_value=None):
-    value = _config_value('CLERK_JWT_ISSUER') if raw_value is None else str(raw_value).strip()
-    if not value:
+def _normalize_url(value):
+    normalized = str(value or '').strip().rstrip('/')
+    if not normalized:
         return ''
-    return value.rstrip('/')
+    return normalized
+
+
+def _normalize_supabase_url():
+    return _normalize_url(_config_value('SUPABASE_URL') or _config_value('VITE_SUPABASE_URL'))
+
+
+def _normalize_issuer(raw_value=None):
+    value = _normalize_url(raw_value) if raw_value is not None else _normalize_url(_config_value('SUPABASE_JWT_ISSUER'))
+    if value:
+        return value
+
+    supabase_url = _normalize_supabase_url()
+    if supabase_url:
+        return f'{supabase_url}/auth/v1'
+
+    return ''
 
 
 def _normalize_jwks_url(raw_value=None):
-    value = _config_value('CLERK_JWKS_URL') if raw_value is None else str(raw_value).strip()
-    if not value:
-        return ''
-    return value.rstrip('/')
+    value = _normalize_url(raw_value) if raw_value is not None else _normalize_url(_config_value('SUPABASE_JWKS_URL'))
+    if value:
+        return value
+
+    issuer = _normalize_issuer()
+    if issuer:
+        return f'{issuer}/.well-known/jwks.json'
+
+    return ''
 
 
-def _clerk_is_configured():
-    return bool(_normalize_issuer() and _normalize_jwks_url())
+def _normalize_audience():
+    return _config_value('SUPABASE_JWT_AUDIENCE') or 'authenticated'
 
 
-def _get_clerk_jwks_client(jwks_url):
+def _supabase_jwt_secret():
+    return _config_value('SUPABASE_JWT_SECRET')
+
+
+def _supabase_is_configured():
+    return bool(_normalize_issuer() and (_normalize_jwks_url() or _supabase_jwt_secret()))
+
+
+def _get_supabase_jwks_client(jwks_url):
     normalized = _normalize_jwks_url(jwks_url)
     if not normalized:
         return None
 
-    if normalized in _CLERK_JWKS_CLIENTS:
-        return _CLERK_JWKS_CLIENTS[normalized]
+    if normalized in _SUPABASE_JWKS_CLIENTS:
+        return _SUPABASE_JWKS_CLIENTS[normalized]
 
     try:
-        cache_keys = str(_config_value('CLERK_JWKS_CACHE_KEYS')).lower() in ('1', 'true', 'yes', 'on')
-        max_cached_keys = int(_config_value('CLERK_JWKS_MAX_KEYS') or 16)
-        cache_lifespan = int(_config_value('CLERK_JWKS_CACHE_LIFESPAN') or 300)
-        timeout = int(_config_value('CLERK_JWKS_TIMEOUT_SECONDS') or 30)
+        cache_keys = str(_config_value('SUPABASE_JWKS_CACHE_KEYS')).lower() in TRUTHY_VALUES
+        max_cached_keys = int(_config_value('SUPABASE_JWKS_MAX_KEYS') or 16)
+        cache_lifespan = int(_config_value('SUPABASE_JWKS_CACHE_LIFESPAN') or 600)
+        timeout = int(_config_value('SUPABASE_JWKS_TIMEOUT_SECONDS') or 30)
     except ValueError:
         cache_keys = False
         max_cached_keys = 16
-        cache_lifespan = 300
+        cache_lifespan = 600
         timeout = 30
 
     try:
@@ -84,7 +114,7 @@ def _get_clerk_jwks_client(jwks_url):
     except Exception:
         return None
 
-    _CLERK_JWKS_CLIENTS[normalized] = client
+    _SUPABASE_JWKS_CLIENTS[normalized] = client
     return client
 
 
@@ -143,13 +173,21 @@ def _build_identity(provider, claims):
     }
 
 
-def _decode_clerk_jwt(token):
-    issuer = _normalize_issuer()
+def _token_algorithm(token):
+    try:
+        header = jwt.get_unverified_header(token)
+    except Exception:
+        return ''
+
+    return str(header.get('alg') or '').strip()
+
+
+def _decode_supabase_jwks_jwt(token, issuer, audience):
     jwks_url = _normalize_jwks_url()
-    if not issuer or not jwks_url:
+    if not jwks_url:
         return None
 
-    client = _get_clerk_jwks_client(jwks_url)
+    client = _get_supabase_jwks_client(jwks_url)
     if client is None:
         return None
 
@@ -158,17 +196,54 @@ def _decode_clerk_jwt(token):
         claims = jwt.decode(
             token,
             signing_key,
-            algorithms=['RS256'],
-            options={'verify_aud': False},
+            algorithms=list(ASYMMETRIC_ALGORITHMS),
+            audience=audience,
+            issuer=issuer,
         )
     except Exception:
         return None
 
-    token_issuer = _normalize_issuer(claims.get('iss'))
-    if token_issuer != issuer:
+    return claims if isinstance(claims, dict) else None
+
+
+def _decode_supabase_legacy_jwt(token, issuer, audience):
+    secret = _supabase_jwt_secret()
+    if not secret:
+        return None
+
+    try:
+        claims = jwt.decode(
+            token,
+            secret,
+            algorithms=['HS256'],
+            audience=audience,
+            issuer=issuer,
+        )
+    except Exception:
         return None
 
     return claims if isinstance(claims, dict) else None
+
+
+def _decode_supabase_jwt(token):
+    issuer = _normalize_issuer()
+    audience = _normalize_audience()
+    if not issuer or not audience:
+        return None
+
+    algorithm = _token_algorithm(token)
+    claims = None
+
+    if algorithm and algorithm != 'HS256':
+        claims = _decode_supabase_jwks_jwt(token, issuer, audience)
+
+    if claims is None:
+        claims = _decode_supabase_legacy_jwt(token, issuer, audience)
+
+    if not isinstance(claims, dict) or not _normalize_identity_value(claims.get('sub')):
+        return None
+
+    return claims
 
 
 def _extract_token_value(optional=False, token=None):
@@ -194,8 +269,8 @@ def _extract_token_value(optional=False, token=None):
 
 def _default_allowed_providers():
     providers = []
-    if _clerk_is_configured():
-        providers.append(CLERK_PROVIDER)
+    if _supabase_is_configured():
+        providers.append(SUPABASE_PROVIDER)
     return tuple(providers)
 
 
@@ -215,7 +290,7 @@ def _decode_token_identity(optional=False, token=None, allowed_providers=None):
 
     providers = tuple(allowed_providers or _default_allowed_providers())
     decoders = {
-        CLERK_PROVIDER: _decode_clerk_jwt,
+        SUPABASE_PROVIDER: _decode_supabase_jwt,
     }
 
     for provider in providers:
@@ -313,7 +388,7 @@ def supabase_jwt_required(optional: bool = False, allowed_providers=None):
                     'existing_user_id': exc.existing_user.id,
                 }), 409
             except MissingIdentityEmailError as exc:
-                return jsonify({'error': str(exc), 'code': 'CLERK_EMAIL_REQUIRED'}), 400
+                return jsonify({'error': str(exc), 'code': 'SUPABASE_EMAIL_REQUIRED'}), 400
             except SQLAlchemyError:
                 return jsonify({'error': 'Authentication storage unavailable'}), 503
             except Exception:

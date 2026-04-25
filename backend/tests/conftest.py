@@ -27,7 +27,7 @@ class _FakeJwksClient:
 
 
 @pytest.fixture(scope='session')
-def clerk_keys():
+def supabase_keys():
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -42,19 +42,31 @@ def clerk_keys():
 
 
 @pytest.fixture()
-def app(tmp_path, monkeypatch, clerk_keys):
+def app(tmp_path, monkeypatch, supabase_keys):
     database_path = tmp_path / 'test.sqlite'
     test_app = create_app({
         'TESTING': True,
         'SQLALCHEMY_DATABASE_URI': f'sqlite:///{database_path}',
-        'CLERK_SECRET_KEY': 'sk_test_clerk',
-        'CLERK_JWT_ISSUER': 'https://clerk.test',
-        'CLERK_JWKS_URL': 'https://clerk.test/.well-known/jwks.json',
-        'CLERK_API_URL': 'https://api.clerk.test',
+        'SUPABASE_URL': 'https://project-ref.supabase.co',
+        'SUPABASE_JWT_ISSUER': 'https://project-ref.supabase.co/auth/v1',
+        'SUPABASE_JWKS_URL': 'https://project-ref.supabase.co/auth/v1/.well-known/jwks.json',
+        'SUPABASE_JWT_AUDIENCE': 'authenticated',
     })
 
-    _, public_key = clerk_keys
-    monkeypatch.setattr(routes, '_get_clerk_jwks_client', lambda jwks_url: _FakeJwksClient(public_key))
+    _, public_key = supabase_keys
+    monkeypatch.setattr(routes, 'PyJWKClient', lambda *args, **kwargs: _FakeJwksClient(public_key))
+    for factory_name in (
+        '_get_supabase_jwks_client',
+        '_get_auth_jwks_client',
+        '_get_jwks_client',
+    ):
+        if hasattr(routes, factory_name):
+            monkeypatch.setattr(routes, factory_name, lambda jwks_url: _FakeJwksClient(public_key))
+
+    for cache_name in ('_SUPABASE_JWKS_CLIENTS', '_AUTH_JWKS_CLIENTS'):
+        cache = getattr(routes, cache_name, None)
+        if isinstance(cache, dict):
+            cache.clear()
 
     with test_app.app_context():
         db.drop_all()
@@ -73,20 +85,36 @@ def client(app):
 
 
 @pytest.fixture()
-def create_clerk_token(app, clerk_keys):
-    private_key, _ = clerk_keys
+def create_supabase_token(app, supabase_keys):
+    private_key, _ = supabase_keys
 
-    def _create(*, sub='user_test', email='user@example.com', extra_claims=None):
+    def _create(
+        *,
+        sub='00000000-0000-4000-8000-000000000001',
+        email='user@example.com',
+        issuer=None,
+        audience=None,
+        expires_delta=timedelta(minutes=10),
+        extra_claims=None,
+    ):
         now = datetime.now(timezone.utc)
         claims = {
             'sub': sub,
-            'iss': app.config['CLERK_JWT_ISSUER'],
+            'iss': issuer or app.config['SUPABASE_JWT_ISSUER'],
+            'aud': audience or app.config['SUPABASE_JWT_AUDIENCE'],
+            'role': 'authenticated',
             'iat': int(now.timestamp()),
             'nbf': int(now.timestamp()),
-            'exp': int((now + timedelta(minutes=10)).timestamp()),
+            'exp': int((now + expires_delta).timestamp()),
+            'aal': 'aal1',
+            'session_id': '00000000-0000-4000-8000-000000000099',
+            'is_anonymous': False,
         }
         if email is not None:
             claims['email'] = email
+            claims['user_metadata'] = {
+                'email': email,
+            }
         if isinstance(extra_claims, dict):
             claims.update(extra_claims)
 
@@ -101,9 +129,9 @@ def create_clerk_token(app, clerk_keys):
 
 
 @pytest.fixture()
-def auth_headers(create_clerk_token):
+def auth_headers(create_supabase_token):
     def _headers(user, *, extra_claims=None, email=None):
-        token = create_clerk_token(
+        token = create_supabase_token(
             sub=user.id,
             email=email or user.email,
             extra_claims=extra_claims,

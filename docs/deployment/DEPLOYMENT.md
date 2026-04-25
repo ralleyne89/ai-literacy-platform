@@ -6,7 +6,7 @@ LitmusAI deploys with this split:
 
 - Netlify hosts the frontend and auto-deploys from `main`
 - Render hosts the Flask backend and PostgreSQL database
-- Clerk provides the release auth path
+- Supabase Auth provides the release auth path
 - Stripe webhooks terminate at the Render backend
 
 ## Required Environment Variables
@@ -14,13 +14,15 @@ LitmusAI deploys with this split:
 ### Netlify
 
 - `VITE_API_URL=https://ai-literacy-platform.onrender.com`
-- `VITE_CLERK_PUBLISHABLE_KEY=<publishable-key>`
+- `VITE_AUTH_MODE=supabase`
+- `VITE_SUPABASE_URL=<supabase-project-url>`
+- `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
 
 ### Render
 
-- `CLERK_SECRET_KEY=<secret-key>`
-- `CLERK_JWT_ISSUER=<issuer-url>`
-- `CLERK_JWKS_URL=<jwks-url>`
+- `SUPABASE_URL=<supabase-project-url>`
+- `SUPABASE_JWT_AUDIENCE=authenticated`
+- `SUPABASE_JWT_SECRET=<legacy-jwt-secret-if-needed>`
 - `SECRET_KEY=<generate-a-random-secret-key>`
 - `JWT_SECRET_KEY=<generate-a-random-jwt-secret>`
 - `DATABASE_URL=<render-postgres-url>`

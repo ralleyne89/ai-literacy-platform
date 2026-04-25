@@ -23,7 +23,7 @@ A comprehensive web application that combines the proven Assess → Activate →
 - **Frontend**: React 18 + Vite + Tailwind CSS
 - **Backend**: Python Flask + SQLAlchemy
 - **Database**: SQLite (development) / PostgreSQL (production)
-- **Authentication**: Clerk-only release configuration
+- **Authentication**: Supabase Auth with Google OAuth
 - **Deployment**: Netlify frontend + Render backend configuration
 
 ## 📋 Prerequisites
@@ -57,7 +57,7 @@ npm run backend
 
 The frontend will be available at `http://localhost:5173`
 
-> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and `VITE_CLERK_PUBLISHABLE_KEY` must be set for the Netlify build.
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and Supabase frontend keys must be set for the Netlify build.
 
 ### 3. Backend Setup
 
@@ -164,7 +164,7 @@ ai-literacy-platform/
 - [x] Flask backend with SQLAlchemy
 - [x] Database models and schema
 - [x] Assessment engine with 15 questions across 5 domains
-- [x] User authentication system (Clerk release path)
+- [x] User authentication system (Supabase Google OAuth release path)
 - [x] Responsive UI components
 - [x] Homepage with hero section and features
 - [x] Assessment page with interactive quiz
@@ -200,19 +200,19 @@ ai-literacy-platform/
 
 ## 🔐 Authentication
 
-LitmusAI now uses Clerk for the release auth path.
+LitmusAI uses Supabase Auth with Google OAuth for the release auth path.
 
 Production config:
 
-- Frontend build: `VITE_CLERK_PUBLISHABLE_KEY`
-- Backend/runtime: `CLERK_SECRET_KEY`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`
+- Frontend build: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
+- Backend/runtime: `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, optional `SUPABASE_JWT_SECRET` for legacy HS256 projects
 - API base URL: `VITE_API_URL` pointing at the Render backend
 
-Clerk dashboard setup:
+Supabase dashboard setup:
 
-1. Create or select the Clerk application for this project.
-2. Add the production frontend origin and local dev origin to the allowed redirect/origin settings.
-3. Keep the `/auth/callback` route available for the SPA callback flow.
+1. Enable Google as an OAuth provider in the Supabase project.
+2. Add local and production `/auth/callback` URLs to the Supabase redirect URL allow list.
+3. Keep the `/auth/callback` route available for the SPA PKCE code exchange.
 4. Update Netlify and Render env vars together, then redeploy.
 
 ## 🧪 Testing the Application
@@ -250,10 +250,10 @@ Automated end-to-end workflows expect these runtime conditions:
 - Frontend running at `http://127.0.0.1:5173`
 - Backend API running at `http://127.0.0.1:5001`
 - Test environment points to the API with `VITE_API_URL=http://127.0.0.1:5001`
-- Frontend is started with `VITE_CLERK_PUBLISHABLE_KEY`
-- The Clerk application allows the matching callback URL and web origin (`/auth/callback` on local or production)
+- Frontend is started with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+- The Supabase project allows the matching `/auth/callback` redirect URL on local and production
 - A stable dataset seeded for modules, certifications, and course content
-- Backend auth verification accepts Clerk tokens for protected routes
+- Backend auth verification accepts Supabase access tokens for protected routes
 
 Run the required seed steps from `backend/`:
 
@@ -265,21 +265,21 @@ FLASK_APP=app.py flask seed-certifications --force
 FLASK_APP=app.py flask seed-course-content --force
 ```
 
-Clerk release verification should validate the real browser flow and preserved return-to behavior:
+Supabase release verification should validate the real browser flow and preserved return-to behavior:
 
-- `/login` and `/register` open the Clerk sign-in or sign-up flow
-- Clerk returns to `/auth/callback`
+- `/login` and `/register` open the Google OAuth flow through Supabase
+- Supabase returns to `/auth/callback`
 - The callback hydrates the backend session and lands on `/dashboard`
 - At least one protected route loads successfully after sign-in (for example `/training` or a course module)
 
 Legacy note:
 
-- `npm run e2e:smoke`, `npm run e2e:flow`, and `npm run e2e` should only be treated as release gates after they exercise the Clerk browser flow.
-- If you automate against a real Clerk tenant, inject the test account details and any tenant-specific secrets through CI/local environment variables rather than hard-coding them into the suite.
+- `npm run e2e:smoke`, `npm run e2e:flow`, and `npm run e2e` should only be treated as release gates after they exercise the Supabase browser flow or the local Supabase stub.
+- If you automate against a real Supabase tenant, inject tenant-specific values through CI/local environment variables rather than hard-coding them into the suite.
 
-### Validation runbook (Clerk release path)
+### Validation runbook (Supabase release path)
 
-Use this sequence before shipping a Clerk build:
+Use this sequence before shipping a Supabase build:
 
 ```bash
 # backend prep (from /backend)
@@ -291,7 +291,7 @@ PYTHONPATH=. FLASK_APP=app.py flask seed-certifications --force
 PYTHONPATH=. FLASK_APP=app.py flask seed-course-content --force
 cd ..
 
-# unit coverage for the Clerk provider contract (from repo root)
+# unit coverage for the Supabase provider contract (from repo root)
 npm test -- src/contexts/AuthContext.test.jsx
 
 # static checks
@@ -301,13 +301,15 @@ npm run typecheck
 # backend unit coverage
 npm run test:backend
 
-# production-style frontend build with explicit Clerk env
+# production-style frontend build with explicit Supabase env
 VITE_API_URL=https://ai-literacy-platform.onrender.com \
-VITE_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key \
+VITE_AUTH_MODE=supabase \
+VITE_SUPABASE_URL=https://your-project.supabase.co \
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key \
 ENFORCE_PROD_ENV=1 \
 npm run build
 
-# stack for Clerk browser verification
+# stack for Supabase browser verification
 npm run backend
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
@@ -316,8 +318,8 @@ Checklist:
 
 - [x] Backend reachable at `http://127.0.0.1:5001/api/health` (HTTP 200).
 - [x] Frontend reachable at `http://127.0.0.1:5173/` (HTTP 200).
-- [ ] `/login` opens the Clerk sign-in flow after email submission.
-- [ ] `/register` opens the Clerk sign-up flow after email submission.
+- [ ] `/login` opens the Google OAuth flow.
+- [ ] `/register` opens the Google OAuth flow.
 - [ ] `/auth/callback` completes without an auth error.
 - [ ] Dashboard loads with an authenticated backend session.
 - [ ] At least one protected route loads successfully after sign-in.
@@ -335,10 +337,12 @@ DATABASE_URL=sqlite:///ai_literacy.db
 FLASK_ENV=development
 FLASK_DEBUG=True
 VITE_API_URL=http://localhost:5001
-VITE_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
-CLERK_SECRET_KEY=your-clerk-secret-key
-CLERK_JWT_ISSUER=https://your-clerk-issuer
-CLERK_JWKS_URL=https://your-clerk-issuer/.well-known/jwks.json
+VITE_AUTH_MODE=supabase
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_JWT_AUDIENCE=authenticated
+SUPABASE_JWT_SECRET=your-legacy-supabase-jwt-secret-if-needed
 LOG_LEVEL=INFO
 # Optional: Stripe (populate once your Stripe account is ready)
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
@@ -362,8 +366,8 @@ E2E_ADMIN_PASSWORD=super-secret-admin-password
 `npm run build` runs `scripts/validate-prod-env.mjs` before Vite build. In production contexts (`NETLIFY=true` + `CONTEXT=production`, `NODE_ENV=production`, or `ENFORCE_PROD_ENV=1`), the build will fail when:
 
 - `VITE_API_URL` is missing, invalid, or points to localhost
-- `VITE_CLERK_PUBLISHABLE_KEY` is missing
-- Legacy non-Clerk auth release variables are still present in the build environment
+- `VITE_SUPABASE_URL` or `VITE_SUPABASE_PUBLISHABLE_KEY` is missing
+- Legacy Clerk/Auth0 auth release variables are still present in the build environment
 - Billing and Stripe webhook state should terminate at the backend API, not at a separate Netlify billing state store.
 
 ## 🚀 Deployment workflow (PR -> main -> Netlify)

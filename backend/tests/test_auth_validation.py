@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+import pytest
+
 from models import User, db
 
 
@@ -24,23 +28,59 @@ def test_demo_bearer_token_is_rejected_in_production(client, app, monkeypatch):
     assert response.get_json() == {'error': 'Unauthorized'}
 
 
-def test_profile_uses_provider_scoped_clerk_identity(client, app, create_clerk_token):
+def test_profile_rejects_expired_supabase_token(client, create_supabase_token):
+    token = create_supabase_token(expires_delta=timedelta(minutes=-1))
+
+    response = client.get(
+        '/api/auth/profile',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {'error': 'Unauthorized'}
+
+
+@pytest.mark.parametrize(
+    ('claim_name', 'claim_value'),
+    [
+        ('issuer', 'https://other-project.supabase.co/auth/v1'),
+        ('audience', 'anon'),
+    ],
+)
+def test_profile_rejects_supabase_token_with_untrusted_claims(
+    client,
+    create_supabase_token,
+    claim_name,
+    claim_value,
+):
+    token = create_supabase_token(**{claim_name: claim_value})
+
+    response = client.get(
+        '/api/auth/profile',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {'error': 'Unauthorized'}
+
+
+def test_profile_uses_provider_scoped_supabase_identity(client, app, create_supabase_token):
     with app.app_context():
         user = User(
-            email='clerk-profile@example.com',
-            password_hash='clerk_managed',
-            first_name='Clerk',
+            email='supabase-profile@example.com',
+            password_hash='supabase_managed',
+            first_name='Supabase',
             last_name='Profile',
-            auth_provider='clerk',
-            auth_subject='user_clerk_profile',
+            auth_provider='supabase',
+            auth_subject='00000000-0000-4000-8000-000000000321',
         )
         db.session.add(user)
         db.session.commit()
         user_id = user.id
 
-    token = create_clerk_token(
-        sub='user_clerk_profile',
-        email='clerk-profile@example.com',
+    token = create_supabase_token(
+        sub='00000000-0000-4000-8000-000000000321',
+        email='supabase-profile@example.com',
     )
 
     response = client.get(

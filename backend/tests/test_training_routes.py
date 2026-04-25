@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timedelta
 
@@ -15,6 +16,16 @@ def create_user(email='training-tester@example.com'):
     db.session.add(user)
     db.session.commit()
     return user
+
+
+def is_playable_video_url(value):
+    return isinstance(value, str) and (
+        value.startswith('https://www.youtube-nocookie.com/embed/') or
+        value.startswith('https://player.vimeo.com/video/') or
+        value.endswith('.mp4') or
+        value.endswith('.webm') or
+        value.endswith('.ogg')
+    )
 
 
 def test_training_progress_returns_summary_and_current_lesson_id(client, app, auth_headers):
@@ -91,6 +102,20 @@ def test_training_modules_returns_user_progress_inline(client, app, auth_headers
     assert modules_by_id[module_id]['user_progress']['progress_percentage'] == 55
 
 
+def test_training_modules_include_safe_routing_metadata(client):
+    response = client.get('/api/training/modules')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    modules_by_id = {module['id']: module for module in payload['modules']}
+    sales_module = modules_by_id['module-ai-sales']
+
+    assert sales_module['target_domains'] == ['Practical Usage', 'AI Impact & Applications']
+    assert sales_module['lesson_count'] >= 1
+    assert sales_module['has_internal_lessons'] is True
+    assert sales_module['start_path'] == '/training/modules/module-ai-sales/learn'
+
+
 def test_training_module_detail_returns_authenticated_progress(client, app, auth_headers):
     with app.app_context():
         user = create_user(email='module-detail@example.com')
@@ -118,6 +143,33 @@ def test_training_module_detail_returns_authenticated_progress(client, app, auth
 
     assert payload['module']['progress']['progress_percentage'] == 25
     assert payload['module']['progress']['current_lesson_id'] == lesson_id
+
+
+def test_training_module_serializers_expose_lesson_and_routing_metadata(client):
+    response = client.get('/api/training/modules')
+
+    assert response.status_code == 200
+    modules_by_id = {
+        module['id']: module
+        for module in response.get_json()['modules']
+    }
+
+    sales_module = modules_by_id['module-ai-sales']
+    assert sales_module['target_domains'] == ['Practical Usage', 'AI Impact & Applications']
+    assert sales_module['lesson_count'] >= 1
+    assert sales_module['has_internal_lessons'] is True
+    assert sales_module['learn_path'] == '/training/modules/module-ai-sales/learn'
+    assert sales_module['route_path'] == sales_module['learn_path']
+    assert sales_module['routing']['route_type'] == 'internal_lessons'
+
+    external_module = modules_by_id['module-google-ai-essentials']
+    assert external_module['target_domains'] == ['AI Fundamentals', 'Practical Usage']
+    assert external_module['lesson_count'] == 0
+    assert external_module['has_internal_lessons'] is False
+    assert external_module['learn_path'] is None
+    assert external_module['route_path'] == '/training/modules/module-google-ai-essentials'
+    assert external_module['routing']['route_type'] == 'external_detail'
+    assert external_module['external_url'].startswith('https://')
 
 
 def test_completing_lesson_rolls_up_module_progress(client, app, auth_headers):
@@ -186,3 +238,63 @@ def test_course_module_lessons_returns_module_progress_summary(client, app, auth
     assert payload['module_progress']['total_lessons'] == lesson_count
     assert payload['module_progress']['resume_lesson_id'] == second_lesson_id
     assert payload['module_progress']['current_lesson_id'] == second_lesson_id
+
+
+def test_course_video_lesson_returns_normalized_playable_url(client, app, auth_headers):
+    with app.app_context():
+        user = create_user(email='video-lesson@example.com')
+        lesson = Lesson.query.filter_by(module_id='module-ai-sales', content_type='video').first()
+        headers = auth_headers(user)
+
+    response = client.get(f'/api/course/lessons/{lesson.id}', headers=headers)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['content_type'] == 'video'
+    assert is_playable_video_url(payload['content']['video_url'])
+    assert payload['progress']['status'] == 'in_progress'
+
+
+def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, auth_headers):
+    module_ids = [
+        'module-ai-sales',
+        'module-ethical-hr',
+        'module-marketing-ai',
+    ]
+
+    with app.app_context():
+        user = create_user(email='video-lessons@example.com')
+        headers = auth_headers(user)
+
+        for module_id in module_ids:
+            lessons = Lesson.query.filter_by(
+                module_id=module_id,
+                content_type='video',
+            ).all()
+            assert lessons, f'{module_id} should have at least one video lesson'
+
+            for lesson in lessons:
+                content = json.loads(lesson.content)
+                assert is_playable_video_url(content['video_url'])
+
+        sales_lesson = Lesson.query.filter_by(
+            module_id='module-ai-sales',
+            content_type='video',
+        ).first()
+        sales_lesson_id = sales_lesson.id
+
+    lessons_response = client.get('/api/course/modules/module-ai-sales/lessons', headers=headers)
+    assert lessons_response.status_code == 200
+    lessons_payload = lessons_response.get_json()
+    video_summary = next(lesson for lesson in lessons_payload['lessons'] if lesson['id'] == sales_lesson_id)
+
+    assert lessons_payload['module']['has_internal_lessons'] is True
+    assert lessons_payload['module']['lesson_count'] >= 1
+    assert video_summary['has_video_url'] is True
+    assert is_playable_video_url(video_summary['video_url'])
+
+    lesson_response = client.get(f'/api/course/lessons/{sales_lesson_id}', headers=headers)
+    assert lesson_response.status_code == 200
+    lesson_payload = lesson_response.get_json()
+    assert lesson_payload['content_type'] == 'video'
+    assert is_playable_video_url(lesson_payload['content']['video_url'])

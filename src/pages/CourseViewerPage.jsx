@@ -9,6 +9,17 @@ import TextLesson from '../components/course/TextLesson'
 import QuizLesson from '../components/course/QuizLesson'
 import InteractiveLesson from '../components/course/InteractiveLesson'
 
+const getLessonContentType = (lesson) => {
+  const contentType = typeof lesson?.content_type === 'string' ? lesson.content_type.toLowerCase() : ''
+  if (contentType === 'reading' || contentType === 'article') {
+    return 'text'
+  }
+  if (contentType === 'video_lesson') {
+    return 'video'
+  }
+  return contentType
+}
+
 const CourseViewerPage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
@@ -101,6 +112,65 @@ const CourseViewerPage = () => {
   const progressPercentage = moduleProgress?.progress_percentage ??
     (lessons.length > 0 ? Math.round((completedLessons / lessons.length) * 100) : 0)
 
+  const renderLessonContent = () => {
+    if (!currentLesson) {
+      return (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+          <BookOpen className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+          <h2 className="text-lg font-semibold text-gray-900">No lesson selected</h2>
+          <p className="mt-1 text-sm text-gray-600">Choose a lesson from the sidebar to begin.</p>
+        </div>
+      )
+    }
+
+    const contentType = getLessonContentType(currentLesson)
+
+    if (contentType === 'video') {
+      return (
+        <VideoLesson
+          lesson={currentLesson}
+          onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
+        />
+      )
+    }
+
+    if (contentType === 'text') {
+      return (
+        <TextLesson
+          lesson={currentLesson}
+          onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
+        />
+      )
+    }
+
+    if (contentType === 'quiz') {
+      return (
+        <QuizLesson
+          lesson={currentLesson}
+          onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
+        />
+      )
+    }
+
+    if (contentType === 'interactive') {
+      return (
+        <InteractiveLesson
+          lesson={currentLesson}
+          onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
+        />
+      )
+    }
+
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+        <h2 className="font-semibold">Unsupported lesson type</h2>
+        <p className="mt-1 text-sm">
+          This lesson type is not available in the course viewer yet.
+        </p>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div
@@ -182,7 +252,7 @@ const CourseViewerPage = () => {
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <Clock className="w-3 h-3" />
                       <span>{lesson.estimated_duration_minutes} min</span>
-                      {lesson.content_type === 'quiz' && (
+                      {getLessonContentType(lesson) === 'quiz' && (
                         <>
                           <span>•</span>
                           <Award className="w-3 h-3" />
@@ -235,34 +305,9 @@ const CourseViewerPage = () => {
 
         {/* Lesson Content */}
         <div className="flex-1 overflow-y-auto">
-          {currentLesson && (
-            <div className="max-w-4xl mx-auto p-8" data-testid={`course-viewer-lesson-content-${currentLesson.id}`}>
-              {currentLesson.content_type === 'video' && (
-                <VideoLesson
-                  lesson={currentLesson}
-                  onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
-                />
-              )}
-              {currentLesson.content_type === 'text' && (
-                <TextLesson
-                  lesson={currentLesson}
-                  onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
-                />
-              )}
-              {currentLesson.content_type === 'quiz' && (
-                <QuizLesson
-                  lesson={currentLesson}
-                  onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
-                />
-              )}
-              {currentLesson.content_type === 'interactive' && (
-                <InteractiveLesson
-                  lesson={currentLesson}
-                  onComplete={(data) => handleLessonComplete(currentLesson.id, data)}
-                />
-              )}
-            </div>
-          )}
+          <div className="max-w-4xl mx-auto p-8" data-testid={currentLesson ? `course-viewer-lesson-content-${currentLesson.id}` : 'course-viewer-empty-lesson'}>
+            {renderLessonContent()}
+          </div>
         </div>
       </div>
     </div>
@@ -270,4 +315,3 @@ const CourseViewerPage = () => {
 }
 
 export default CourseViewerPage
-

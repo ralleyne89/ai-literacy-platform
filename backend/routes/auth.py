@@ -17,7 +17,7 @@ from routes import (
 
 auth_bp = Blueprint('auth', __name__)
 logger = get_logger(__name__)
-CLERK_ONLY_AUTH_CODE = 'CLERK_ONLY_AUTH'
+SUPABASE_ONLY_AUTH_CODE = 'SUPABASE_ONLY_AUTH'
 
 
 def _auth_preflight_response():
@@ -53,8 +53,8 @@ def _upsert_authenticated_user():
 
 def _deprecated_auth_response(endpoint):
     return jsonify({
-        'error': f'{endpoint} is no longer supported. Sign in through Clerk on the frontend.',
-        'code': CLERK_ONLY_AUTH_CODE,
+        'error': f'{endpoint} is no longer supported. Sign in through Supabase OAuth on the frontend.',
+        'code': SUPABASE_ONLY_AUTH_CODE,
     }), 410
 
 
@@ -96,7 +96,7 @@ def get_profile():
         }), 409
     except MissingIdentityEmailError as exc:
         db.session.rollback()
-        return jsonify({'error': str(exc), 'code': 'CLERK_EMAIL_REQUIRED'}), 400
+        return jsonify({'error': str(exc), 'code': 'SUPABASE_EMAIL_REQUIRED'}), 400
     except Exception as exc:
         db.session.rollback()
         logger.exception('auth_profile_load_failed', error=str(exc))
@@ -151,9 +151,22 @@ def sync_user():
         claims = g.get('current_user_claims') or get_supabase_claims()
         payload = request.get_json(silent=True) or {}
 
-        email = payload.get('email') or claims.get('email')
-        first_name = payload.get('first_name') or claims.get('given_name') or claims.get('first_name')
-        last_name = payload.get('last_name') or claims.get('family_name') or claims.get('last_name')
+        user_metadata = claims.get('user_metadata') if isinstance(claims.get('user_metadata'), dict) else {}
+        email = payload.get('email') or claims.get('email') or user_metadata.get('email')
+        first_name = (
+            payload.get('first_name') or
+            user_metadata.get('first_name') or
+            user_metadata.get('given_name') or
+            claims.get('given_name') or
+            claims.get('first_name')
+        )
+        last_name = (
+            payload.get('last_name') or
+            user_metadata.get('last_name') or
+            user_metadata.get('family_name') or
+            claims.get('family_name') or
+            claims.get('last_name')
+        )
         role = payload.get('role')
         organization = payload.get('organization')
 
@@ -179,7 +192,7 @@ def sync_user():
         }), 409
     except MissingIdentityEmailError as exc:
         db.session.rollback()
-        return jsonify({'error': str(exc), 'code': 'CLERK_EMAIL_REQUIRED'}), 400
+        return jsonify({'error': str(exc), 'code': 'SUPABASE_EMAIL_REQUIRED'}), 400
     except Exception as exc:
         db.session.rollback()
         logger.exception('auth_sync_failed', error=str(exc))

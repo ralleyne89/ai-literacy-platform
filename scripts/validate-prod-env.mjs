@@ -48,8 +48,13 @@ const errors = []
 const warnings = []
 const requiredHost = 'ai-literacy-platform.onrender.com'
 const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
-const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_SUPABASE_', 'SUPABASE_']
-const placeholderValues = new Set(['pk_test_or_prod_replace_me'])
+const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_CLERK_', 'CLERK_']
+const placeholderValues = new Set([
+  'pk_test_or_prod_replace_me',
+  'https://your-project.supabase.co',
+  'sb_publishable_your-supabase-publishable-key',
+  'your-supabase-anon-or-publishable-key',
+])
 
 const isValidHttpUrl = (value) => {
   const normalized = String(value || '').trim()
@@ -101,23 +106,32 @@ if (!apiUrl) {
   }
 }
 
-const clerkPublishableKey = getEnv('VITE_CLERK_PUBLISHABLE_KEY')
-if (!clerkPublishableKey) {
-  addError('VITE_CLERK_PUBLISHABLE_KEY is required in production.')
-} else if (placeholderValues.has(clerkPublishableKey)) {
-  addError('VITE_CLERK_PUBLISHABLE_KEY is still set to a placeholder value.')
+const supabaseUrl = getEnv('VITE_SUPABASE_URL')
+if (!supabaseUrl) {
+  addError('VITE_SUPABASE_URL is required in production.')
+} else if (!isValidHttpUrl(supabaseUrl)) {
+  addError('VITE_SUPABASE_URL must be an absolute HTTP(S) Supabase project URL.')
+} else if (placeholderValues.has(supabaseUrl)) {
+  addError('VITE_SUPABASE_URL is still set to a placeholder value.')
+}
+
+const supabasePublishableKey = getEnv('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnv('VITE_SUPABASE_ANON_KEY')
+if (!supabasePublishableKey) {
+  addError('VITE_SUPABASE_PUBLISHABLE_KEY is required in production.')
+} else if (placeholderValues.has(supabasePublishableKey)) {
+  addError('VITE_SUPABASE_PUBLISHABLE_KEY is still set to a placeholder value.')
 }
 
 const authMode = getEnv('VITE_AUTH_MODE')
-if (authMode && authMode.toLowerCase() !== 'clerk') {
-  addError('VITE_AUTH_MODE is no longer supported for release builds. Remove legacy auth mode configuration and use Clerk only.')
+if (authMode && authMode.toLowerCase() !== 'supabase') {
+  addError('VITE_AUTH_MODE must be "supabase" for release builds.')
 }
 
 for (const prefix of legacyAuthPrefixes) {
   const matches = Object.keys({ ...process.env, ...fileEnv }).filter((key) => key.startsWith(prefix))
   if (matches.length > 0) {
     addWarning(
-      `Legacy auth variables are still present: ${matches.join(', ')}. They are not used by the Clerk release path and should be removed from production environments.`
+      `Legacy auth variables are still present: ${matches.join(', ')}. They are not used by the Supabase release path and should be removed from production environments.`
     )
   }
 }
@@ -130,8 +144,8 @@ if (errors.length > 0) {
 
   console.error('\nHow to fix:')
   console.error('- Ensure VITE_API_URL points at the Render backend host.')
-  console.error('- Set VITE_CLERK_PUBLISHABLE_KEY for the Netlify build.')
-  console.error('- Remove legacy Auth0/Supabase auth-mode variables from production configuration.')
+  console.error('- Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for the Netlify build.')
+  console.error('- Remove legacy Clerk/Auth0 auth-mode variables from production configuration.')
   console.error('- Re-run the build after fixing values.')
   process.exit(1)
 }

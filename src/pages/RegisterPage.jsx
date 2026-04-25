@@ -1,27 +1,45 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { AlertCircle, Brain } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { setStoredAuthReturnTo } from '../config/authRoutes'
+import AuthOAuthShell from './AuthOAuthShell'
 
+
+const getReturnPath = (fromState, fallback = '/dashboard') => {
+  if (typeof fromState === 'string') {
+    return fromState.startsWith('/') && !fromState.startsWith('//') ? fromState : fallback
+  }
+
+  const pathname = fromState?.pathname
+  if (typeof pathname !== 'string' || !pathname.startsWith('/') || pathname.startsWith('//')) {
+    return fallback
+  }
+
+  const search = typeof fromState.search === 'string' ? fromState.search : ''
+  const hash = typeof fromState.hash === 'string' ? fromState.hash : ''
+
+  return `${pathname}${search}${hash}`
+}
 
 const RegisterPage = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const from = getReturnPath(location.state?.from)
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true })
+      navigate(from, { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [from, isAuthenticated, navigate])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
     setLoading(true)
-    setStoredAuthReturnTo('/dashboard')
+    setStoredAuthReturnTo(from)
 
     const result = await register()
     if (!result.success) {
@@ -31,46 +49,26 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-primary rounded-xl flex items-center justify-center mx-auto mb-4">
-            <Brain className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-gray-600">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary-600 hover:text-primary-500 font-medium">
-              sign in
-            </Link>
-          </p>
-        </div>
-
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <span className="text-red-700">{error}</span>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Sign-up is handled by Clerk. Continue to the secure hosted registration page to create your account and come back ready to learn.
-            </p>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Redirecting...' : 'Continue to Create Account'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AuthOAuthShell
+      mode="register"
+      eyebrow="Create account"
+      title="Create your LitmusAI account"
+      description="Create a LitmusAI account with Google OAuth so assessments, training, and certifications stay connected from day one."
+      actionLabel="Continue with Google"
+      loadingLabel="Opening Google..."
+      alternatePrompt="Already have an account?"
+      alternateLabel="Sign in"
+      alternateTo="/login"
+      alternateState={{ from }}
+      returnCopy={
+        from === '/dashboard'
+          ? 'Google will bring you into your dashboard after sign-up.'
+          : 'Google will bring you back to your requested page after sign-up.'
+      }
+      error={error}
+      loading={loading}
+      onSubmit={handleSubmit}
+    />
   )
 }
 

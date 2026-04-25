@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 import {
-  readClerkStubState,
+  readSupabaseStubState,
   resetBrowserStorage,
   signInFromLoginPage,
-} from './clerkTestHelpers'
+} from './supabaseTestHelpers'
 
-test('Smoke: Clerk sign-in restores dashboard access', async ({ page }) => {
+test('Smoke: Supabase sign-in restores dashboard access', async ({ page }) => {
   await resetBrowserStorage(page)
   await page.goto('/dashboard')
 
@@ -15,14 +15,16 @@ test('Smoke: Clerk sign-in restores dashboard access', async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { name: /Welcome back, Demo!/i })).toBeVisible()
 
-  const clerkState = await readClerkStubState(page)
-  expect(clerkState).toEqual(
+  const supabaseState = await readSupabaseStubState(page)
+  expect(supabaseState).toEqual(
     expect.objectContaining({
-      isSignedIn: true,
-      token: 'demo',
+      session: expect.objectContaining({
+        access_token: 'demo',
+      }),
       lastRedirectRequest: expect.objectContaining({
-        type: 'sign-in',
-        redirectPath: '/dashboard',
+        type: 'oauth',
+        provider: 'google',
+        redirectPath: '/auth/callback',
       }),
     })
   )

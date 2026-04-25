@@ -4,6 +4,7 @@ import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 import { DEMO_FALLBACK_MODULE_DETAILS, DEMO_FALLBACK_MODULE_IDS } from '../data/demoFallback'
+import { normalizeVideoSource } from '../utils/videoUrls'
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
@@ -88,18 +89,12 @@ const TrainingModulePage = () => {
   const isCompleted = progress?.status === 'completed'
   const metadata = module?.metadata || {}
 
-  const watchUrl = useMemo(() => {
+  const watchSource = useMemo(() => {
     if (!module?.content_url) return null
     if (module.content_type && ['external', 'partner', 'affiliate'].includes(module.content_type)) {
       return null
     }
-    if (module.content_url.includes('youtube.com') && !module.content_url.includes('/embed/')) {
-      const videoId = module.content_url.split('v=')[1]?.split('&')[0]
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`
-      }
-    }
-    return module.content_url
+    return normalizeVideoSource(module.content_url)
   }, [module?.content_type, module?.content_url])
 
   if (loading) {
@@ -160,16 +155,28 @@ const TrainingModulePage = () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {watchUrl ? (
+          {watchSource?.type === 'iframe' ? (
             <div className="relative w-full overflow-hidden" style={{ paddingTop: '56.25%' }}>
               <iframe
-                src={watchUrl}
+                src={watchSource.src}
                 title={module.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 h-full w-full"
                 data-testid={`training-module-iframe-${moduleId}`}
               />
+            </div>
+          ) : watchSource?.type === 'video' ? (
+            <div className="aspect-video bg-gray-900">
+              <video
+                src={watchSource.src}
+                title={module.title}
+                controls
+                className="h-full w-full"
+                data-testid={`training-module-video-${moduleId}`}
+              >
+                Your browser does not support embedded video.
+              </video>
             </div>
           ) : (
             <div className="bg-gray-900 py-16 text-center text-white">

@@ -6,6 +6,106 @@ import { useAuth } from '../contexts/AuthContext'
 
 const STORAGE_KEY = 'assessmentProgress_v2'
 const ASSESSMENT_VERSION = '2026-03-03-randomized-v1'
+export const PENDING_ASSESSMENT_SUBMISSION_KEY = 'assessmentPendingSubmission_v1'
+
+const clearStoredAssessmentProgress = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem('assessmentProgress')
+  } catch (err) {
+    console.warn('Unable to clear assessment progress from storage:', err)
+  }
+}
+
+const readPendingAssessmentSubmission = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const saved = localStorage.getItem(PENDING_ASSESSMENT_SUBMISSION_KEY)
+    if (!saved) {
+      return null
+    }
+
+    const parsed = JSON.parse(saved)
+    if (
+      parsed?.version !== ASSESSMENT_VERSION ||
+      !parsed?.payload ||
+      typeof parsed.payload.answers !== 'object' ||
+      !Object.keys(parsed.payload.answers || {}).length
+    ) {
+      localStorage.removeItem(PENDING_ASSESSMENT_SUBMISSION_KEY)
+      return null
+    }
+
+    return parsed
+  } catch (err) {
+    console.warn('Failed to restore pending assessment submission:', err)
+    localStorage.removeItem(PENDING_ASSESSMENT_SUBMISSION_KEY)
+    return null
+  }
+}
+
+const savePendingAssessmentSubmission = ({ payload, results }) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    localStorage.setItem(
+      PENDING_ASSESSMENT_SUBMISSION_KEY,
+      JSON.stringify({
+        version: ASSESSMENT_VERSION,
+        savedAt: new Date().toISOString(),
+        payload,
+        results
+      })
+    )
+  } catch (err) {
+    console.warn('Unable to persist pending assessment submission:', err)
+  }
+}
+
+const clearPendingAssessmentSubmission = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    localStorage.removeItem(PENDING_ASSESSMENT_SUBMISSION_KEY)
+  } catch (err) {
+    console.warn('Unable to clear pending assessment submission:', err)
+  }
+}
+
+const buildAssessmentSubmissionPayload = (questions, answers, selectedQuestionIds) => {
+  const optionMap = questions.reduce((acc, question) => {
+    acc[question.id] = {
+      A: question.option_a,
+      B: question.option_b,
+      C: question.option_c,
+      D: question.option_d
+    }
+    return acc
+  }, {})
+
+  const payload = {
+    answers,
+    option_map: optionMap,
+    selected_question_ids: selectedQuestionIds
+  }
+
+  if (selectedQuestionIds.length) {
+    payload.selected_ids = selectedQuestionIds
+  }
+
+  return payload
+}
 
 const AssessmentPage = () => {
   const [questions, setQuestions] = useState([])
@@ -22,18 +122,6 @@ const AssessmentPage = () => {
 
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
-
-  const clearProgress = () => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-      localStorage.removeItem('assessmentProgress')
-    } catch (err) {
-      console.warn('Unable to clear assessment progress from storage:', err)
-    }
-  }
 
   const persistProgress = ({
     questions: persistedQuestions = questions,
@@ -91,16 +179,69 @@ const AssessmentPage = () => {
         setShowIntroModal(false)
         setResumeDetected(true)
       } else {
-        clearProgress()
+        clearStoredAssessmentProgress()
       }
     } catch (err) {
       console.warn('Failed to restore assessment progress:', err)
-      clearProgress()
+      clearStoredAssessmentProgress()
     }
   }, [])
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return undefined
+    }
+
+    const pendingSubmission = readPendingAssessmentSubmission()
+    if (!pendingSubmission) {
+      return undefined
+    }
+
+    let isCancelled = false
+
+    if (pendingSubmission.results) {
+      setResults({
+        ...pendingSubmission.results,
+        saved: Boolean(pendingSubmission.results.saved)
+      })
+      setHasStarted(false)
+      setShowIntroModal(false)
+    }
+
+    const savePendingSubmission = async () => {
+      setIsSubmitting(true)
+      setError('')
+
+      try {
+        const response = await axios.post('/api/assessment/submit', pendingSubmission.payload)
+        if (isCancelled) {
+          return
+        }
+
+        setResults(response.data)
+        clearPendingAssessmentSubmission()
+        clearStoredAssessmentProgress()
+      } catch {
+        if (!isCancelled) {
+          setError('You are signed in, but we could not save your previous assessment automatically. Please try submitting again.')
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsSubmitting(false)
+        }
+      }
+    }
+
+    savePendingSubmission()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isAuthenticated])
+
   const startAssessment = async () => {
-    clearProgress()
+    clearStoredAssessmentProgress()
+    clearPendingAssessmentSubmission()
     setLoading(true)
     setError('')
     setResults(null)
@@ -177,27 +318,15 @@ const AssessmentPage = () => {
     setIsSubmitting(true)
     setError('')
     try {
-      const optionMap = questions.reduce((acc, question) => {
-        acc[question.id] = {
-          A: question.option_a,
-          B: question.option_b,
-          C: question.option_c,
-          D: question.option_d
-        }
-        return acc
-      }, {})
-      const payload = {
-        answers,
-        option_map: optionMap,
-        selected_question_ids: selectedQuestionIds
-      }
-      if (selectedQuestionIds.length) {
-        payload.selected_ids = selectedQuestionIds
-      }
-
+      const payload = buildAssessmentSubmissionPayload(questions, answers, selectedQuestionIds)
       const response = await axios.post('/api/assessment/submit', payload)
       setResults(response.data)
-      clearProgress()
+      if (response.data?.saved) {
+        clearPendingAssessmentSubmission()
+      } else {
+        savePendingAssessmentSubmission({ payload, results: response.data })
+      }
+      clearStoredAssessmentProgress()
     } catch (error) {
       setError('Failed to submit assessment. Please try again.')
     }
@@ -265,6 +394,16 @@ const AssessmentPage = () => {
                   Results saved to your dashboard. Review them anytime.
                 </p>
               )}
+              {isAuthenticated && !results.saved && isSubmitting && (
+                <p className="mt-2 text-sm font-medium text-primary-600" data-testid="assessment-results-saving">
+                  Saving your results to your account...
+                </p>
+              )}
+              {isAuthenticated && !results.saved && error && (
+                <p className="mt-2 text-sm font-medium text-red-600" data-testid="assessment-results-save-error">
+                  {error}
+                </p>
+              )}
             </div>
 
             {/* Overall Score */}
@@ -281,27 +420,27 @@ const AssessmentPage = () => {
 
             {/* Domain Breakdown */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              {Object.entries(results.domain_scores).map(([domain, scores]) => {
+              {Object.entries(results.domain_scores || {}).map(([domain, scores]) => {
                 const domainPercentage = scores.total ? Math.round((scores.score / scores.total) * 100) : 0
                 const widthValue = scores.total ? (scores.score / scores.total) * 100 : 0
                 return (
-                <div key={domain} className="card">
-                  <h3 className={`font-semibold mb-2 ${getDomainColor(domain)}`}>
-                    {domain}
-                  </h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">{scores.score} / {scores.total}</span>
-                    <span className="font-semibold">
-                      {domainPercentage}%
-                    </span>
+                  <div key={domain} className="card">
+                    <h3 className={`font-semibold mb-2 ${getDomainColor(domain)}`}>
+                      {domain}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">{scores.score} / {scores.total}</span>
+                      <span className="font-semibold">
+                        {domainPercentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <div
+                        className="bg-primary-600 h-2 rounded-full"
+                        style={{ width: `${widthValue}%` }}
+                      ></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-primary-600 h-2 rounded-full"
-                      style={{ width: `${widthValue}%` }}
-                    ></div>
-                  </div>
-                </div>
                 )
               })}
             </div>
@@ -310,7 +449,7 @@ const AssessmentPage = () => {
             <div className="mb-8">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Personalized Recommendations</h3>
               <div className="space-y-4" data-testid="assessment-recommendations-list">
-                {results.recommendations.map((rec, index) => (
+                {(Array.isArray(results.recommendations) ? results.recommendations : []).map((rec, index) => (
                   <div
                     key={index}
                     className="border-l-4 border-primary-600 bg-primary-50 p-4 rounded-r-lg"
@@ -345,6 +484,7 @@ const AssessmentPage = () => {
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
                     <Link
                       to="/register"
+                      state={{ from: { pathname: '/assessment' } }}
                       className="btn-primary text-sm"
                       data-testid="assessment-results-create-account-link"
                     >
@@ -352,6 +492,7 @@ const AssessmentPage = () => {
                     </Link>
                     <Link
                       to="/login"
+                      state={{ from: { pathname: '/assessment' } }}
                       className="btn-outline text-sm"
                       data-testid="assessment-results-signin-link"
                     >

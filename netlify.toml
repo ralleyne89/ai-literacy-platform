@@ -14,8 +14,9 @@
 
 [context.production.environment]
   VITE_API_URL = "https://ai-literacy-platform.onrender.com"
-  # Set VITE_CLERK_PUBLISHABLE_KEY in Netlify environment variables.
-  # Do not hard-code placeholder or tenant-specific Clerk keys in this file.
+  VITE_AUTH_MODE = "supabase"
+  # Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Netlify environment variables.
+  # Do not hard-code tenant-specific Supabase keys in this file.
 
 # Billing routes and Stripe webhook callbacks are canonical on the backend API at `VITE_API_URL`.
 # Legacy Netlify billing functions proxy to the backend and are not a second source of truth.

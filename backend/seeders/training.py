@@ -2,6 +2,12 @@ import json
 
 from models import TrainingModule, db
 
+SALES_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/video/movie_300.mp4'
+HR_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/sintel/trailer.mp4'
+MARKETING_TRAINING_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+OPERATIONS_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/bunny/trailer.mp4'
+PROMPT_TRAINING_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+
 DEFAULT_MODULES = [
     {
         'id': 'module-ai-sales',
@@ -12,7 +18,7 @@ DEFAULT_MODULES = [
         'estimated_duration_minutes': 45,
         'content_type': 'video',
         'is_premium': False,
-        'content_url': 'https://www.youtube.com/embed/f6BtsZ-eZkU',
+        'content_url': SALES_TRAINING_VIDEO_URL,
         'learning_objectives': [
             'Understand AI-assisted prospecting workflows',
             'Automate lead scoring and next-best action recommendations',
@@ -48,7 +54,7 @@ DEFAULT_MODULES = [
         'estimated_duration_minutes': 55,
         'content_type': 'video',
         'is_premium': False,
-        'content_url': 'https://www.youtube.com/embed/szO4cFfF07I',
+        'content_url': HR_TRAINING_VIDEO_URL,
         'learning_objectives': [
             'Audit datasets and models for potential bias',
             'Design fair review workflows combining humans and AI',
@@ -84,7 +90,7 @@ DEFAULT_MODULES = [
         'estimated_duration_minutes': 60,
         'content_type': 'video',
         'is_premium': True,
-        'content_url': 'https://www.youtube.com/embed/x4PeQ0P5Y14',
+        'content_url': MARKETING_TRAINING_VIDEO_URL,
         'learning_objectives': [
             'Generate campaign briefs and creative variations using AI',
             'Build dynamic audience segments from zero-party data',
@@ -119,7 +125,7 @@ DEFAULT_MODULES = [
         'estimated_duration_minutes': 65,
         'content_type': 'interactive',
         'is_premium': True,
-        'content_url': 'https://www.youtube.com/embed/9dME8NwB1Vw',
+        'content_url': OPERATIONS_TRAINING_VIDEO_URL,
         'learning_objectives': [
             'Map processes to automation opportunities',
             'Deploy decision-support copilots for forecasting',
@@ -154,7 +160,7 @@ DEFAULT_MODULES = [
         'estimated_duration_minutes': 50,
         'content_type': 'interactive',
         'is_premium': False,
-        'content_url': 'https://www.youtube.com/embed/wVzuvf9D9BU',
+        'content_url': PROMPT_TRAINING_VIDEO_URL,
         'learning_objectives': [
             'Apply advanced prompt frameworks like IDEA & CRAFT',
             'Chain multi-step prompts with memory and guardrails',
