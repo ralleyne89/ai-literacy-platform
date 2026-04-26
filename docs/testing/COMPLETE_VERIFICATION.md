@@ -218,7 +218,7 @@ After completing a test checkout:
 
 ### Database Integration:
 - [x] Webhook updates user records
-- [x] Render backend integration ready
+- [x] Supabase Edge Function integration ready
 - [ ] Production database schema updated
 
 ---
@@ -235,19 +235,19 @@ Steps:
 3. Enable subscription cancellation
 4. Save changes
 
-### 2. Verify Backend Integration
+### 2. Verify Supabase API Integration
 **Time**: 5 minutes
 
 Steps:
-1. Confirm the Render backend has the Stripe and Clerk environment variables
-2. Confirm the webhook target is `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
-3. Confirm the database schema includes the Stripe subscription columns
+1. Confirm Supabase Edge Function secrets include Stripe and Supabase service-role values
+2. Confirm the webhook target is `https://<project-ref>.supabase.co/functions/v1/platform-api/api/billing/webhooks/stripe`
+3. Confirm the Supabase schema includes the Stripe subscription columns
 4. Redeploy the site if any production env vars changed
 
 ### 3. Test Complete Flow
 1. Complete a checkout
 2. Verify webhook events received
-3. Check database updated on Render
+3. Check Supabase database updated
 4. Test customer portal (if activated)
 5. Test subscription cancellation
 
@@ -311,11 +311,11 @@ All core features are working:
 1. Test the checkout flow with test cards
 2. Process real payments (when ready)
 3. Receive webhook events automatically
-4. Monitor everything through Stripe and Render dashboards
+4. Monitor everything through Stripe and Supabase dashboards
 
 **Next steps are optional** but recommended:
 - Activate customer portal for self-service management
-- Confirm database updates on the Render backend
+- Confirm database updates in Supabase
 
 ---
 

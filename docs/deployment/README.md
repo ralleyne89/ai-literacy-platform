@@ -6,7 +6,7 @@ This directory contains the release configuration and deployment runbooks for Li
 
 1. Merge the branch to `main`.
 2. Let Netlify auto-deploy the frontend from `main`.
-3. Keep the Flask backend on Render as the canonical API and Stripe webhook target.
+3. Keep the Supabase `platform-api` Edge Function as the canonical API and Stripe webhook target.
 4. Validate the live site, backend health, and billing flow after deploy.
 
 ## Release Configuration
@@ -14,8 +14,8 @@ This directory contains the release configuration and deployment runbooks for Li
 Production release config uses Supabase Auth with Google OAuth:
 
 - Frontend build env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
-- Render backend env: `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, optional `SUPABASE_JWT_SECRET`
-- Backend API base: `VITE_API_URL`
+- Supabase Edge Function secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Stripe secrets, and frontend origin
+- Backend API base: `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
 
 Local defaults:
 
@@ -23,9 +23,9 @@ Local defaults:
 - Backend API: `http://localhost:5001`
 - Start commands: `npm run dev` and `npm run backend`
 
-The canonical Stripe webhook target is the Render backend route:
+The canonical Stripe webhook target is the Supabase Edge Function route:
 
-- `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
+- `https://<project-ref>.supabase.co/functions/v1/platform-api/api/billing/webhooks/stripe`
 
 Netlify billing functions remain legacy proxies and are not the source of truth.
 

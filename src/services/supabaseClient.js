@@ -30,6 +30,17 @@ const DEFAULT_STUB_SESSION = {
   },
 }
 
+const buildStubSession = (email = DEFAULT_STUB_SESSION.user.email, provider = 'email') => ({
+  ...DEFAULT_STUB_SESSION,
+  user: {
+    ...DEFAULT_STUB_SESSION.user,
+    email,
+    app_metadata: {
+      provider,
+    },
+  },
+})
+
 const listeners = new Set()
 
 const makeAuthError = (message) => ({ message, name: 'AuthApiError' })
@@ -117,6 +128,48 @@ const createStubClient = () => ({
         error: null,
       }
     },
+    signInWithPassword: async ({ email, password } = {}) => {
+      if (!email || !password) {
+        return {
+          data: { session: null },
+          error: makeAuthError('Email and password are required.'),
+        }
+      }
+
+      const state = readStubState()
+      const session = buildStubSession(email, 'email')
+      writeStubState({
+        ...state,
+        session,
+      })
+      notifyStubListeners('SIGNED_IN', session)
+
+      return {
+        data: { session, user: session.user },
+        error: null,
+      }
+    },
+    signUp: async ({ email, password } = {}) => {
+      if (!email || !password) {
+        return {
+          data: { session: null, user: null },
+          error: makeAuthError('Email and password are required.'),
+        }
+      }
+
+      const state = readStubState()
+      const session = buildStubSession(email, 'email')
+      writeStubState({
+        ...state,
+        session,
+      })
+      notifyStubListeners('SIGNED_IN', session)
+
+      return {
+        data: { session, user: session.user },
+        error: null,
+      }
+    },
     exchangeCodeForSession: async (code) => {
       if (!code) {
         return {
@@ -161,6 +214,14 @@ const unavailableClient = {
       },
     }),
     signInWithOAuth: async () => ({
+      data: null,
+      error: makeAuthError('Supabase is not configured.'),
+    }),
+    signInWithPassword: async () => ({
+      data: null,
+      error: makeAuthError('Supabase is not configured.'),
+    }),
+    signUp: async () => ({
       data: null,
       error: makeAuthError('Supabase is not configured.'),
     }),

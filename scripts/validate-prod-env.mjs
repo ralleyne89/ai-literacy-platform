@@ -46,7 +46,6 @@ if (!isProductionBuild) {
 
 const errors = []
 const warnings = []
-const requiredHost = 'ai-literacy-platform.onrender.com'
 const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_CLERK_', 'CLERK_']
 const placeholderValues = new Set([
@@ -91,17 +90,10 @@ if (!apiUrl) {
 } else {
   const parsedApi = parseUrl(apiUrl)
   if (!parsedApi || !['http:', 'https:'].includes(parsedApi.protocol)) {
-    addError('VITE_API_URL must be an absolute HTTP(S) URL (example: https://ai-literacy-platform.onrender.com).')
+    addError('VITE_API_URL must be an absolute HTTP(S) URL (example: https://your-project.supabase.co/functions/v1/platform-api).')
   } else {
     if (localHostnames.has(parsedApi.hostname.toLowerCase())) {
       addError('VITE_API_URL cannot point to localhost in production.')
-    } else if (
-      parsedApi.hostname.toLowerCase() !== requiredHost &&
-      !parsedApi.hostname.toLowerCase().endsWith(`.${requiredHost}`)
-    ) {
-      addWarning(
-        `VITE_API_URL currently points to "${parsedApi.hostname}". Verify this is the intended backend host and keep the Render backend and Netlify frontend aligned.`
-      )
     }
   }
 }
@@ -127,6 +119,15 @@ if (authMode && authMode.toLowerCase() !== 'supabase') {
   addError('VITE_AUTH_MODE must be "supabase" for release builds.')
 }
 
+const parsedApiForSupabase = parseUrl(apiUrl)
+if (
+  parsedApiForSupabase &&
+  parsedApiForSupabase.hostname.toLowerCase().endsWith('.supabase.co') &&
+  !parsedApiForSupabase.pathname.replace(/\/+$/, '').endsWith('/functions/v1/platform-api')
+) {
+  addError('Supabase VITE_API_URL must include /functions/v1/platform-api, not only the project origin.')
+}
+
 for (const prefix of legacyAuthPrefixes) {
   const matches = Object.keys({ ...process.env, ...fileEnv }).filter((key) => key.startsWith(prefix))
   if (matches.length > 0) {
@@ -143,7 +144,7 @@ if (errors.length > 0) {
   }
 
   console.error('\nHow to fix:')
-  console.error('- Ensure VITE_API_URL points at the Render backend host.')
+  console.error('- Ensure VITE_API_URL points at the Supabase Edge Function URL.')
   console.error('- Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for the Netlify build.')
   console.error('- Remove legacy Clerk/Auth0 auth-mode variables from production configuration.')
   console.error('- Re-run the build after fixing values.')

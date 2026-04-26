@@ -32,7 +32,8 @@ const normalizeApiBaseUrl = () => {
     return ''
   }
 
-  return parsed.origin
+  const normalizedPath = trimTrailingSlashes(parsed.pathname)
+  return `${parsed.origin}${normalizedPath === '/' ? '' : normalizedPath}`
 }
 
 const normalizePath = (value) => {

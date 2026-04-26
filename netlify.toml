@@ -13,13 +13,14 @@
   SECRETS_SCAN_ENABLED = "false"
 
 [context.production.environment]
-  VITE_API_URL = "https://ai-literacy-platform.onrender.com"
   VITE_AUTH_MODE = "supabase"
+  # Set VITE_API_URL in Netlify to:
+  # https://<project-ref>.supabase.co/functions/v1/platform-api
   # Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Netlify environment variables.
   # Do not hard-code tenant-specific Supabase keys in this file.
 
-# Billing routes and Stripe webhook callbacks are canonical on the backend API at `VITE_API_URL`.
-# Legacy Netlify billing functions proxy to the backend and are not a second source of truth.
+# Billing routes and Stripe webhook callbacks are canonical on the Supabase Edge Function API at `VITE_API_URL`.
+# Legacy Netlify billing functions are retained only for old deployments and should not be the source of truth.
 # Netlify continues to auto-deploy from `main` once the branch is merged.
 # SPA fallback - must be last
 [[redirects]]

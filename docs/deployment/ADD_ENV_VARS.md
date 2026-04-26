@@ -4,29 +4,27 @@
 
 Add these production frontend variables:
 
-- `VITE_API_URL=https://ai-literacy-platform.onrender.com`
+- `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
 - `VITE_AUTH_MODE=supabase`
 - `VITE_SUPABASE_URL=<supabase-project-url>`
 - `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
-- `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
 
-## Render
+## Supabase Edge Function Secrets
 
-Add these backend variables:
+Set these with `supabase secrets set`:
 
 - `SUPABASE_URL=<supabase-project-url>`
-- `SUPABASE_JWT_AUDIENCE=authenticated`
-- `SUPABASE_JWT_SECRET=<legacy-jwt-secret-if-needed>`
-- `SECRET_KEY=<generate-a-random-secret-key>`
-- `JWT_SECRET_KEY=<generate-a-random-jwt-secret>`
-- `DATABASE_URL=<render-postgres-url>`
+- `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `FRONTEND_URL=https://litmusai.netlify.app`
 - `ALLOWED_ORIGINS=https://litmusai.netlify.app`
 - `STRIPE_SECRET_KEY=<stripe-secret>`
+- `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
 - `STRIPE_WEBHOOK_SECRET=<whsec_...>`
+- `STRIPE_PRICE_PREMIUM=<price_...>`
+- `STRIPE_PRICE_ENTERPRISE=<price_...>`
 
 ## Notes
 
-- Keep the Render backend as the canonical Stripe webhook target.
+- Keep Stripe as the billing provider; Supabase Edge Functions now host the webhook/API glue.
 - Do not rely on legacy Clerk or Auth0 release variables for production.
-- After adding or changing values, redeploy Netlify and Render from `main`.
+- After adding or changing values, redeploy Netlify and `supabase functions deploy platform-api`.

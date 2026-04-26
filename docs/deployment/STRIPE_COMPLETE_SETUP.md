@@ -8,6 +8,6 @@ This document is legacy. Use these current references instead:
 
 Current production Stripe routing:
 
-- Frontend calls the Render backend through `VITE_API_URL`
-- Stripe webhooks target `https://ai-literacy-platform.onrender.com/api/billing/webhooks/stripe`
+- Frontend calls the Supabase `platform-api` Edge Function through `VITE_API_URL`
+- Stripe webhooks target `https://<project-ref>.supabase.co/functions/v1/platform-api/api/billing/webhooks/stripe`
 - Netlify billing functions are legacy proxies only

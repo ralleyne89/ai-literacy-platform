@@ -19,6 +19,8 @@ const mockSupabaseState = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   signInWithOAuth: vi.fn(),
+  signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
   exchangeCodeForSession: vi.fn(),
   signOut: vi.fn(),
 }))
@@ -39,6 +41,8 @@ vi.mock('../services/supabaseClient', () => ({
       getSession: mockSupabaseState.getSession,
       onAuthStateChange: mockSupabaseState.onAuthStateChange,
       signInWithOAuth: mockSupabaseState.signInWithOAuth,
+      signInWithPassword: mockSupabaseState.signInWithPassword,
+      signUp: mockSupabaseState.signUp,
       exchangeCodeForSession: mockSupabaseState.exchangeCodeForSession,
       signOut: mockSupabaseState.signOut,
     },
@@ -89,6 +93,8 @@ describe('AuthProvider Supabase session behavior', () => {
     mockSupabaseState.getSession.mockReset()
     mockSupabaseState.onAuthStateChange.mockReset()
     mockSupabaseState.signInWithOAuth.mockReset()
+    mockSupabaseState.signInWithPassword.mockReset()
+    mockSupabaseState.signUp.mockReset()
     mockSupabaseState.exchangeCodeForSession.mockReset()
     mockSupabaseState.signOut.mockReset()
     mockSupabaseState.onAuthStateChange.mockReturnValue({
@@ -151,6 +157,69 @@ describe('AuthProvider Supabase session behavior', () => {
         provider: 'google',
         options: expect.objectContaining({
           redirectTo: expect.stringContaining('/auth/callback'),
+        }),
+      })
+    )
+  })
+
+  it('signs in with email and password through Supabase', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'password-session-token' } },
+      error: null,
+    })
+    mockAxios.get.mockResolvedValue({
+      data: {
+        user: backendUser,
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.loginWithPassword({
+      email: 'Ada@Example.com ',
+      password: 'secure-password',
+    })
+
+    expect(result).toEqual(expect.objectContaining({ success: true }))
+    expect(mockSupabaseState.signInWithPassword).toHaveBeenCalledWith({
+      email: 'ada@example.com',
+      password: 'secure-password',
+    })
+    expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer password-session-token')
+  })
+
+  it('starts email and password sign-up through Supabase', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signUp.mockResolvedValue({
+      data: { session: null, user: { email: 'new@example.com' } },
+      error: null,
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.registerWithPassword({
+      email: 'New@Example.com ',
+      password: 'secure-password',
+    })
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      pendingConfirmation: true,
+      email: 'new@example.com',
+    }))
+    expect(mockSupabaseState.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'new@example.com',
+        password: 'secure-password',
+        options: expect.objectContaining({
+          emailRedirectTo: expect.stringContaining('/auth/callback'),
         }),
       })
     )

@@ -22,9 +22,15 @@ const getReturnPath = (fromState, fallback = '/dashboard') => {
 }
 
 const LoginPage = () => {
-  const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const [error, setError] = useState('')
-  const { login, isAuthenticated } = useAuth()
+  const [successMessage, setSuccessMessage] = useState('')
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+  })
+  const { login, loginWithPassword, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -44,17 +50,43 @@ const LoginPage = () => {
     }
   }, [callbackError])
 
-  const handleSubmit = async (event) => {
+  const handleCredentialChange = (event) => {
+    const { name, value } = event.target
+    setCredentials((current) => ({
+      ...current,
+      [name]: value,
+    }))
+  }
+
+  const handleOAuthSubmit = async (event) => {
     event.preventDefault()
     setError('')
-    setLoading(true)
+    setSuccessMessage('')
+    setOauthLoading(true)
     setStoredAuthReturnTo(from)
 
     const result = await login()
     if (!result.success) {
       setError(result.error || 'Unable to start sign-in.')
-      setLoading(false)
+      setOauthLoading(false)
     }
+  }
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault()
+    setError('')
+    setSuccessMessage('')
+    setPasswordLoading(true)
+    setStoredAuthReturnTo(from)
+
+    const result = await loginWithPassword(credentials)
+    if (result.success) {
+      navigate(from, { replace: true })
+      return
+    }
+
+    setError(result.error || 'Unable to sign in with email and password.')
+    setPasswordLoading(false)
   }
 
   return (
@@ -62,21 +94,28 @@ const LoginPage = () => {
       mode="login"
       eyebrow="Sign in"
       title="Sign in to LitmusAI"
-      description="Use your Google account to continue into LitmusAI and keep your learning progress connected across every step."
-      actionLabel="Continue with Google"
-      loadingLabel="Opening Google..."
+      description="Use Google or your email and password to keep your learning progress connected across every step."
+      passwordActionLabel="Sign in with email"
+      passwordLoadingLabel="Signing in..."
+      oauthActionLabel="Continue with Google"
+      oauthLoadingLabel="Opening Google..."
       alternatePrompt="New here?"
       alternateLabel="Create an account"
       alternateTo="/register"
       alternateState={{ from }}
       returnCopy={
         from === '/dashboard'
-          ? 'Google will bring you back to your dashboard after sign-in.'
-          : 'Google will bring you back to your requested page after sign-in.'
+          ? 'We will bring you back to your dashboard after sign-in.'
+          : 'We will bring you back to your requested page after sign-in.'
       }
+      successMessage={successMessage}
       error={error}
-      loading={loading}
-      onSubmit={handleSubmit}
+      oauthLoading={oauthLoading}
+      passwordLoading={passwordLoading}
+      credentials={credentials}
+      onCredentialChange={handleCredentialChange}
+      onOAuthSubmit={handleOAuthSubmit}
+      onPasswordSubmit={handlePasswordSubmit}
     />
   )
 }

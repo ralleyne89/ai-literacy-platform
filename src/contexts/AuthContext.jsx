@@ -83,6 +83,10 @@ const getConfiguredAuthMode = () => {
 
 const getDefaultAuthReturnTo = () => getStoredAuthReturnTo() || '/dashboard'
 
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
+
+const normalizePassword = (password) => String(password || '')
+
 const buildAbsoluteReturnUrl = (path = '/dashboard') => {
   if (typeof window === 'undefined') {
     return path
@@ -103,6 +107,8 @@ const buildUnavailableAuthValue = (errorMessage = 'Authentication mode is not co
   loading: false,
   login: async () => ({ success: false, error: errorMessage }),
   register: async () => ({ success: false, error: errorMessage }),
+  loginWithPassword: async () => ({ success: false, error: errorMessage }),
+  registerWithPassword: async () => ({ success: false, error: errorMessage }),
   logout: async () => ({ success: false, error: errorMessage }),
   updateProfile: async () => ({ success: false, error: errorMessage }),
   loginWithProvider: async () => ({ success: false, error: errorMessage }),
@@ -155,6 +161,8 @@ const DemoAuthProvider = ({ children }) => {
     loading: false,
     login: async () => ({ success: true, user: DEMO_USER }),
     register: async () => ({ success: true, user: DEMO_USER }),
+    loginWithPassword: async () => ({ success: true, user: DEMO_USER }),
+    registerWithPassword: async () => ({ success: true, user: DEMO_USER }),
     logout: async () => ({ success: true, redirected: false }),
     updateProfile: async () => ({ success: true, user: DEMO_USER }),
     loginWithProvider: async () => ({ success: false, error: 'Not supported in demo mode.' }),
@@ -314,6 +322,73 @@ const SupabaseSessionAuthProvider = ({ children }) => {
 
   const loginWithProvider = useCallback(async (provider = 'google') => startOAuth(provider), [startOAuth])
 
+  const loginWithPassword = useCallback(async ({ email, password }) => {
+    try {
+      const normalizedEmail = normalizeEmail(email)
+      const normalizedPassword = normalizePassword(password)
+
+      if (!normalizedEmail || !normalizedPassword) {
+        return { success: false, error: 'Email and password are required.', code: 'missing_credentials' }
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: normalizedPassword,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      return syncBackendAfterLogin(data?.session)
+    } catch (error) {
+      const normalized = normalizeBackendError(error, 'Unable to sign in with email and password.')
+      clearSession()
+      return { success: false, error: normalized.message, code: normalized.code }
+    }
+  }, [clearSession, syncBackendAfterLogin])
+
+  const registerWithPassword = useCallback(async ({ email, password }) => {
+    try {
+      const normalizedEmail = normalizeEmail(email)
+      const normalizedPassword = normalizePassword(password)
+
+      if (!normalizedEmail || !normalizedPassword) {
+        return { success: false, error: 'Email and password are required.', code: 'missing_credentials' }
+      }
+
+      if (normalizedPassword.length < 8) {
+        return { success: false, error: 'Password must be at least 8 characters.', code: 'weak_password' }
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password: normalizedPassword,
+        options: {
+          emailRedirectTo: buildAbsoluteReturnUrl(AUTH_CALLBACK_PATH),
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+
+      if (data?.session) {
+        return syncBackendAfterLogin(data.session)
+      }
+
+      return {
+        success: true,
+        pendingConfirmation: true,
+        email: normalizedEmail,
+      }
+    } catch (error) {
+      const normalized = normalizeBackendError(error, 'Unable to create an account with email and password.')
+      clearSession()
+      return { success: false, error: normalized.message, code: normalized.code }
+    }
+  }, [clearSession, syncBackendAfterLogin])
+
   const exchangeOAuthCodeForSession = useCallback(async (code) => {
     try {
       const authCode = String(code || '').trim()
@@ -396,6 +471,8 @@ const SupabaseSessionAuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    loginWithPassword,
+    registerWithPassword,
     logout,
     updateProfile,
     loginWithProvider,
@@ -410,9 +487,11 @@ const SupabaseSessionAuthProvider = ({ children }) => {
     exchangeOAuthCodeForSession,
     loading,
     login,
+    loginWithPassword,
     loginWithProvider,
     logout,
     register,
+    registerWithPassword,
     syncBackendAfterLogin,
     token,
     updateProfile,

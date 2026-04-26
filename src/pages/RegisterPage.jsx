@@ -22,9 +22,15 @@ const getReturnPath = (fromState, fallback = '/dashboard') => {
 }
 
 const RegisterPage = () => {
-  const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const [error, setError] = useState('')
-  const { register, isAuthenticated } = useAuth()
+  const [successMessage, setSuccessMessage] = useState('')
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+  })
+  const { register, registerWithPassword, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = getReturnPath(location.state?.from)
@@ -35,17 +41,49 @@ const RegisterPage = () => {
     }
   }, [from, isAuthenticated, navigate])
 
-  const handleSubmit = async (event) => {
+  const handleCredentialChange = (event) => {
+    const { name, value } = event.target
+    setCredentials((current) => ({
+      ...current,
+      [name]: value,
+    }))
+  }
+
+  const handleOAuthSubmit = async (event) => {
     event.preventDefault()
     setError('')
-    setLoading(true)
+    setSuccessMessage('')
+    setOauthLoading(true)
     setStoredAuthReturnTo(from)
 
     const result = await register()
     if (!result.success) {
       setError(result.error || 'Unable to start sign-up.')
-      setLoading(false)
+      setOauthLoading(false)
     }
+  }
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault()
+    setError('')
+    setSuccessMessage('')
+    setPasswordLoading(true)
+    setStoredAuthReturnTo(from)
+
+    const result = await registerWithPassword(credentials)
+    if (result.success && result.pendingConfirmation) {
+      setSuccessMessage(`Check ${result.email || credentials.email} to confirm your account, then come back to sign in.`)
+      setPasswordLoading(false)
+      return
+    }
+
+    if (result.success) {
+      navigate(from, { replace: true })
+      return
+    }
+
+    setError(result.error || 'Unable to create an account with email and password.')
+    setPasswordLoading(false)
   }
 
   return (
@@ -53,21 +91,28 @@ const RegisterPage = () => {
       mode="register"
       eyebrow="Create account"
       title="Create your LitmusAI account"
-      description="Create a LitmusAI account with Google OAuth so assessments, training, and certifications stay connected from day one."
-      actionLabel="Continue with Google"
-      loadingLabel="Opening Google..."
+      description="Sign up with Google or email and password so assessments, training, and certifications stay connected from day one."
+      passwordActionLabel="Create account with email"
+      passwordLoadingLabel="Creating account..."
+      oauthActionLabel="Continue with Google"
+      oauthLoadingLabel="Opening Google..."
       alternatePrompt="Already have an account?"
       alternateLabel="Sign in"
       alternateTo="/login"
       alternateState={{ from }}
       returnCopy={
         from === '/dashboard'
-          ? 'Google will bring you into your dashboard after sign-up.'
-          : 'Google will bring you back to your requested page after sign-up.'
+          ? 'We will bring you into your dashboard after sign-up.'
+          : 'We will bring you back to your requested page after sign-up.'
       }
+      successMessage={successMessage}
       error={error}
-      loading={loading}
-      onSubmit={handleSubmit}
+      oauthLoading={oauthLoading}
+      passwordLoading={passwordLoading}
+      credentials={credentials}
+      onCredentialChange={handleCredentialChange}
+      onOAuthSubmit={handleOAuthSubmit}
+      onPasswordSubmit={handlePasswordSubmit}
     />
   )
 }

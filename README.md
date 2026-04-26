@@ -21,10 +21,10 @@ A comprehensive web application that combines the proven Assess → Activate →
 ### Technical Stack
 
 - **Frontend**: React 18 + Vite + Tailwind CSS
-- **Backend**: Python Flask + SQLAlchemy
-- **Database**: SQLite (development) / PostgreSQL (production)
+- **Backend**: Supabase Edge Functions for production, Python Flask as a local fallback
+- **Database**: Supabase Postgres for production, SQLite for local Flask fallback
 - **Authentication**: Supabase Auth with Google OAuth
-- **Deployment**: Netlify frontend + Render backend configuration
+- **Deployment**: Netlify frontend + Supabase Auth/Postgres/Edge Functions
 
 ## 📋 Prerequisites
 
@@ -57,7 +57,7 @@ npm run backend
 
 The frontend will be available at `http://localhost:5173`
 
-> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local development. For production builds, `VITE_API_URL` must be a deployed absolute API URL (for example `https://ai-literacy-platform.onrender.com`) and Supabase frontend keys must be set for the Netlify build.
+> **Note:** Create a `.env` file in the project root with `VITE_API_URL=http://localhost:5001` for local Flask development. For production builds, set `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api` and set Supabase frontend keys in Netlify.
 
 ### 3. Backend Setup
 
@@ -205,15 +205,15 @@ LitmusAI uses Supabase Auth with Google OAuth for the release auth path.
 Production config:
 
 - Frontend build: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
-- Backend/runtime: `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, optional `SUPABASE_JWT_SECRET` for legacy HS256 projects
-- API base URL: `VITE_API_URL` pointing at the Render backend
+- Edge Function runtime: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Stripe secrets, and frontend origin
+- API base URL: `VITE_API_URL` pointing at the Supabase `platform-api` Edge Function
 
 Supabase dashboard setup:
 
 1. Enable Google as an OAuth provider in the Supabase project.
 2. Add local and production `/auth/callback` URLs to the Supabase redirect URL allow list.
 3. Keep the `/auth/callback` route available for the SPA PKCE code exchange.
-4. Update Netlify and Render env vars together, then redeploy.
+4. Update Netlify env vars and Supabase Edge Function secrets together, then redeploy.
 
 ## 🧪 Testing the Application
 
@@ -302,7 +302,7 @@ npm run typecheck
 npm run test:backend
 
 # production-style frontend build with explicit Supabase env
-VITE_API_URL=https://ai-literacy-platform.onrender.com \
+VITE_API_URL=https://your-project.supabase.co/functions/v1/platform-api \
 VITE_AUTH_MODE=supabase \
 VITE_SUPABASE_URL=https://your-project.supabase.co \
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key \
@@ -341,19 +341,16 @@ VITE_AUTH_MODE=supabase
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_AUDIENCE=authenticated
-SUPABASE_JWT_SECRET=your-legacy-supabase-jwt-secret-if-needed
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 LOG_LEVEL=INFO
 # Optional: Stripe (populate once your Stripe account is ready)
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
 STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_PUBLISHABLE_KEY=pk_live_or_test_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 STRIPE_PRICE_PREMIUM=price_live_or_test_premium
 STRIPE_PRICE_ENTERPRISE=price_live_or_test_enterprise
 FRONTEND_URL=https://your-netlify-site.netlify.app
 ALLOWED_ORIGINS=https://your-netlify-site.netlify.app
-# Optional explicit backend URL for legacy Netlify billing/webhook proxy functions
-BACKEND_API_URL=https://ai-literacy-platform.onrender.com
 E2E_TEST_EMAIL=autotest+playwright@example.com
 E2E_TEST_PASSWORD=super-secret-test-password
 # Optional: override default admin credentials used by E2E fallback path
@@ -383,19 +380,14 @@ For production releases, use this path:
 
 The application uses SQLite for development. The database will be automatically created when you first run the Flask application.
 
-Common production databases (free or low-cost):
-
-- Neon
-- Render PostgreSQL
-- Railway PostgreSQL
-- Aiven PostgreSQL
-- ElephantSQL (availability may vary)
+Production uses Supabase Postgres. Apply the SQL migration in `supabase/migrations/001_create_tables.sql`, deploy `supabase/functions/platform-api`, and import legacy Render data with `scripts/migrate-render-data-to-supabase.sh` if needed.
 
 Migration checklist:
 
-1. Update `DATABASE_URL`
-2. Run `cd backend && FLASK_APP=app.py flask db upgrade`
-3. Re-run seeders where required (`flask seed-training-modules --force`, `flask seed-certifications --force`, `flask seed-course-content --force`)
+1. Apply Supabase migrations.
+2. Deploy `platform-api`.
+3. Set Supabase function secrets.
+4. Run the Render-to-Supabase data migration script before retiring Render.
 
 ## 📚 Documentation
 
@@ -403,6 +395,7 @@ Comprehensive documentation is available in the `/docs` directory:
 
 ### Quick Links
 
+- **[Supabase API Consolidation](docs/deployment/SUPABASE_API_CONSOLIDATION.md)** - Supabase Edge Function deployment and cutover
 - **[Deployment Guide](docs/deployment/DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
 - **[Push & Deploy Guide](docs/deployment/PUSH_AND_DEPLOY_GUIDE.md)** - Quick start for deployment
 - **[Course Catalog](docs/course-content/COURSE_CATALOG.md)** - Available courses and content
@@ -463,4 +456,4 @@ For support, email support@ailiteracyplatform.com or create an issue in this rep
 
 - Inspired by GenAIPI's proven methodology
 - Design influenced by CYPHER Learning's modern aesthetic
-- Built for the Netlify and Render deployment path
+- Built for the Netlify and Supabase deployment path
