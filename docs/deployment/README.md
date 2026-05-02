@@ -17,6 +17,8 @@ Production release config uses Supabase Auth with Google OAuth:
 - Supabase Edge Function secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Stripe secrets, and frontend origin
 - Backend API base: `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
 
+Do not use the Supabase REST URL (`https://<project-ref>.supabase.co/rest/v1`) for `VITE_API_URL`. The browser calls `/api/*` routes, so the base URL must be the `platform-api` Edge Function.
+
 Local defaults:
 
 - Frontend: `http://localhost:5173`

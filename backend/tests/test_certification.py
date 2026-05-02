@@ -104,3 +104,22 @@ def test_apply_for_certification_is_idempotent(client, app, auth_headers):
     with app.app_context():
         records = Certification.query.filter_by(user_id=user.id, catalog_id='litmusai-professional').all()
         assert len(records) == 1
+
+
+def test_apply_for_fundamentals_certification_returns_exact_next_steps(client, app, auth_headers):
+    with app.app_context():
+        user = create_enterprise_user(email='fundamentals-next-steps@example.com')
+        headers = auth_headers(user)
+
+    response = client.post(
+        '/api/certification/apply/ai-fundamentals',
+        headers=headers,
+        json={}
+    )
+
+    assert response.status_code == 422
+    payload = response.get_json()
+
+    assert payload['status'] == 'requirements_not_met'
+    assert any('Take the AI readiness assessment' in item for item in payload['missing_requirements'])
+    assert any('module-ai-fundamentals-intro' in item for item in payload['missing_requirements'])

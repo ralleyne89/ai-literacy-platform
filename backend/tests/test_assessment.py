@@ -171,6 +171,11 @@ def test_assessment_recommendations_include_safe_training_metadata(client, app, 
         assert 'target_domains' in recommendation
         assert 'lesson_count' in recommendation
         assert 'has_internal_lessons' in recommendation
+        assert recommendation['track'] in ['General', 'Sales', 'HR', 'Marketing', 'Operations']
+        assert isinstance(recommendation['source_domains'], list)
+        assert recommendation['next_action_label']
+        assert recommendation['recommended_path'] == recommendation['start_path']
+        assert 0.35 <= recommendation['confidence'] <= 0.98
         assert recommendation['start_path'].startswith(f"/training/modules/{recommendation['id']}")
         if recommendation['has_internal_lessons']:
             assert recommendation['lesson_count'] > 0
@@ -241,6 +246,11 @@ def test_course_recommendations_include_training_metadata_and_safe_routes(client
         assert isinstance(recommendation['target_domains'], list)
         assert isinstance(recommendation['lesson_count'], int)
         assert isinstance(recommendation['has_internal_lessons'], bool)
+        assert recommendation['track'] in ['General', 'Sales', 'HR', 'Marketing', 'Operations']
+        assert isinstance(recommendation['source_domains'], list)
+        assert recommendation['next_action_label']
+        assert recommendation['recommended_path'] == recommendation['start_path']
+        assert 0.35 <= recommendation['confidence'] <= 0.98
         assert recommendation['detail_path'].startswith('/training/modules/')
         assert recommendation['route_path'].startswith('/training/modules/')
         assert recommendation['routing']['primary_path'] == recommendation['route_path']
@@ -251,3 +261,34 @@ def test_course_recommendations_include_training_metadata_and_safe_routes(client
             assert recommendation['routing']['route_type'] == 'internal_lessons'
         else:
             assert recommendation['learn_path'] is None
+
+
+def test_course_recommendations_prioritize_profile_workplace_track(client, app, auth_headers):
+    with app.app_context():
+        user = create_user(email='sales-track@example.com')
+        user.role = 'Sales'
+        db.session.add(AssessmentResult(
+            user_id=user.id,
+            total_score=2,
+            max_score=15,
+            percentage=13.3,
+            domain_scores={
+                'Practical Usage': {'score': 0, 'total': 3},
+                'AI Fundamentals': {'score': 2, 'total': 3},
+                'Ethics & Critical Thinking': {'score': 3, 'total': 3},
+                'AI Impact & Applications': {'score': 2, 'total': 3},
+                'Strategic Understanding': {'score': 2, 'total': 3},
+            },
+        ))
+        db.session.commit()
+        headers = auth_headers(user)
+
+    response = client.get('/api/assessment/recommendations', headers=headers)
+
+    assert response.status_code == 200
+    recommendations = response.get_json()['recommendations']
+
+    assert recommendations[0]['id'] == 'module-ai-sales'
+    assert recommendations[0]['track'] == 'Sales'
+    assert recommendations[0]['source_domains'] == ['Practical Usage']
+    assert recommendations[0]['next_action_label'] == 'Build certification readiness'

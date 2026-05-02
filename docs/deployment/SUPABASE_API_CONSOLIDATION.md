@@ -6,7 +6,7 @@ This project now supports a Supabase-native API target that preserves the existi
 VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
 ```
 
-Do not set `VITE_API_URL` to the plain Supabase project URL. The frontend appends paths such as `/api/auth/profile`, so the API base must include `/functions/v1/platform-api`.
+Do not set `VITE_API_URL` to the plain Supabase project URL or the Supabase REST URL (`/rest/v1`). The frontend appends paths such as `/api/auth/profile`, so the API base must include `/functions/v1/platform-api`.
 
 ## Supabase Setup
 

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g
-from models import db, Assessment, AssessmentResult, User, TrainingModule
+from models import db, Assessment, AssessmentResult, User, TrainingModule, UserProgress
 from datetime import datetime
 import json
 import random
@@ -399,6 +399,186 @@ DOMAIN_TOTALS = {
     for domain in DOMAINS
 }
 
+WORKPLACE_TRACKS = ('General', 'Sales', 'HR', 'Marketing', 'Operations')
+
+TRACK_ALIASES = {
+    'general': 'General',
+    'sales': 'Sales',
+    'business development': 'Sales',
+    'business-development': 'Sales',
+    'bd': 'Sales',
+    'hr': 'HR',
+    'human resources': 'HR',
+    'people': 'HR',
+    'people ops': 'HR',
+    'people operations': 'HR',
+    'marketing': 'Marketing',
+    'growth': 'Marketing',
+    'operations': 'Operations',
+    'ops': 'Operations',
+}
+
+TRACK_DOMAIN_HINTS = {
+    'General': {'AI Fundamentals', 'Practical Usage', 'Ethics & Critical Thinking'},
+    'Sales': {'Practical Usage', 'AI Impact & Applications'},
+    'HR': {'Ethics & Critical Thinking', 'AI Impact & Applications'},
+    'Marketing': {'Practical Usage', 'Strategic Understanding'},
+    'Operations': {'Strategic Understanding', 'AI Impact & Applications'},
+}
+
+
+def _normalize_workplace_track(value):
+    normalized = str(value or '').strip().lower()
+    return TRACK_ALIASES.get(normalized, 'General')
+
+
+def _parse_domain_scores_payload(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            value = {}
+
+    return value if isinstance(value, dict) else {}
+
+
+def _assessment_domain_entries(assessment):
+    domain_scores_data = _parse_domain_scores_payload(assessment.domain_scores if assessment else {})
+    entries = []
+
+    for domain in DOMAINS:
+        if domain not in domain_scores_data:
+            continue
+
+        raw_entry = domain_scores_data.get(domain, {})
+        if isinstance(raw_entry, dict):
+            score = raw_entry.get('score', 0) or 0
+            total = raw_entry.get('total', 0) or 0
+        else:
+            score = 0
+            total = 0
+
+        if not total:
+            total = DOMAIN_TOTALS.get(domain, 0)
+
+        percentage = (score / total * 100) if total > 0 else 0
+        entries.append({
+            'domain': domain,
+            'score': score,
+            'total': total,
+            'percentage': percentage,
+            'gap_percentage': max(0, 100 - percentage),
+        })
+
+    return entries
+
+
+def _recommended_difficulty(assessment):
+    percentage = assessment.percentage if assessment and assessment.percentage is not None else 0
+    if percentage < 50:
+        return 1
+    if percentage < 75:
+        return 2
+    return 3
+
+
+def _certification_source_domains(assessment, completed_module_ids, completed_modules_count):
+    source_domains = set()
+
+    if not assessment:
+        source_domains.add('AI Fundamentals')
+    elif assessment.percentage is None or assessment.percentage < 70:
+        source_domains.update(['AI Fundamentals', 'Practical Usage', 'Strategic Understanding'])
+
+    ethics_entry = next(
+        (entry for entry in _assessment_domain_entries(assessment) if entry['domain'] == 'Ethics & Critical Thinking'),
+        None,
+    )
+    if not assessment or (ethics_entry and ethics_entry['score'] < 3):
+        source_domains.add('Ethics & Critical Thinking')
+
+    if 'module-ai-fundamentals-intro' not in completed_module_ids:
+        source_domains.add('AI Fundamentals')
+    if completed_modules_count < 3:
+        source_domains.update(['Practical Usage', 'AI Impact & Applications'])
+
+    return source_domains
+
+
+def _next_action_label(module_metadata, certification_relevant=False):
+    if certification_relevant:
+        return 'Build certification readiness'
+    if module_metadata.get('has_internal_lessons'):
+        return 'Start workplace lessons'
+    if module_metadata.get('external_url'):
+        return 'Open recommended course'
+    return 'Review module'
+
+
+def _recommendation_priority(score):
+    if score >= 65:
+        return 'high'
+    if score >= 40:
+        return 'medium'
+    return 'low'
+
+
+def _recommendation_confidence(score):
+    return round(max(0.35, min(0.98, score / 100)), 2)
+
+
+def _score_module_recommendation(
+    module,
+    *,
+    module_metadata,
+    profile_track,
+    weak_domains,
+    fallback_domains,
+    certification_domains,
+    ideal_difficulty,
+):
+    target_domains = module_metadata.get('target_domains') or []
+    target_domain_set = set(target_domains)
+    weak_domain_map = {entry['domain']: entry for entry in weak_domains}
+    weak_matches = [domain for domain in target_domains if domain in weak_domain_map]
+    fallback_matches = [domain for domain in target_domains if domain in fallback_domains]
+    certification_matches = [domain for domain in target_domains if domain in certification_domains]
+    module_track = _normalize_workplace_track(module.role_specific)
+    source_domains = weak_matches or fallback_matches or certification_matches or target_domains[:2]
+
+    score = 8
+    if weak_matches:
+        score += sum(weak_domain_map[domain]['gap_percentage'] for domain in weak_matches) / len(weak_matches) * 0.45
+    elif fallback_matches:
+        score += 12
+    elif not target_domain_set:
+        score += 6
+
+    if module_track == profile_track and module_track != 'General':
+        score += 24
+    elif module_track == 'General':
+        score += 14
+    elif target_domain_set & TRACK_DOMAIN_HINTS.get(profile_track, set()):
+        score += 10
+
+    difficulty_delta = abs((module.difficulty_level or 1) - ideal_difficulty)
+    score += max(0, 16 - (difficulty_delta * 6))
+
+    if module_metadata.get('has_internal_lessons'):
+        score += 12
+    elif module_metadata.get('external_url'):
+        score += 4
+
+    if certification_matches:
+        score += 10
+
+    return {
+        'score': score,
+        'track': module_track,
+        'source_domains': source_domains,
+        'certification_relevant': bool(certification_matches),
+    }
+
 @assessment_bp.route('/questions', methods=['GET'])
 def get_assessment_questions():
     """Get assessment questions - no authentication required for free tier"""
@@ -636,7 +816,31 @@ def generate_recommendations(domain_scores, domain_totals, total_correct, score_
     return recommendations
 
 
-def serialize_course_recommendation(module, *, reason, priority, skill_gap_percentage=0):
+def serialize_course_recommendation(
+    module,
+    *,
+    reason,
+    priority,
+    skill_gap_percentage=0,
+    track=None,
+    source_domains=None,
+    next_action_label=None,
+    recommended_path=None,
+    confidence=None,
+):
+    module_metadata = build_module_metadata(module)
+    extra_fields = {}
+    if track:
+        extra_fields['track'] = track
+    if source_domains is not None:
+        extra_fields['source_domains'] = source_domains
+    if next_action_label:
+        extra_fields['next_action_label'] = next_action_label
+    if recommended_path:
+        extra_fields['recommended_path'] = recommended_path
+    if confidence is not None:
+        extra_fields['confidence'] = confidence
+
     return {
         'id': module.id,
         'title': module.title,
@@ -649,7 +853,8 @@ def serialize_course_recommendation(module, *, reason, priority, skill_gap_perce
         'reason': reason,
         'priority': priority,
         'skill_gap_percentage': skill_gap_percentage,
-        **build_module_metadata(module),
+        **module_metadata,
+        **extra_fields,
     }
 
 @assessment_bp.route('/history', methods=['GET'])
@@ -740,106 +945,137 @@ def get_course_recommendations():
                                              .order_by(AssessmentResult.completed_at.desc())\
                                              .first()
 
-        if not latest_result:
-            # No assessment taken yet - return beginner-friendly modules
-            modules = TrainingModule.query.filter_by(
-                is_active=True,
-                difficulty_level=1
-            ).limit(6).all()
+        user = User.query.get(user_id)
+        profile_track = _normalize_workplace_track(user.role if user else None)
+        completed_progress = UserProgress.query.filter_by(user_id=user_id, status='completed').all()
+        completed_module_ids = {progress.module_id for progress in completed_progress}
+        completed_modules_count = len(completed_progress)
+        all_modules = TrainingModule.query.filter_by(is_active=True).all()
 
-            recommendations = []
-            for module in modules:
-                recommendations.append(serialize_course_recommendation(
+        if not latest_result:
+            certification_domains = _certification_source_domains(None, completed_module_ids, completed_modules_count)
+            scored_recommendations = []
+
+            for module in all_modules:
+                module_metadata = build_module_metadata(module)
+                score_data = _score_module_recommendation(
                     module,
-                    reason='Great starting point for AI literacy',
-                    priority='low',
-                    skill_gap_percentage=0,
+                    module_metadata=module_metadata,
+                    profile_track=profile_track,
+                    weak_domains=[],
+                    fallback_domains=TRACK_DOMAIN_HINTS.get(profile_track, set()),
+                    certification_domains=certification_domains,
+                    ideal_difficulty=1,
+                )
+                score = score_data['score']
+                scored_recommendations.append((
+                    score,
+                    serialize_course_recommendation(
+                        module,
+                        reason='Great starting point for workplace AI literacy',
+                        priority=_recommendation_priority(score),
+                        skill_gap_percentage=0,
+                        track=score_data['track'],
+                        source_domains=score_data['source_domains'],
+                        next_action_label=_next_action_label(
+                            module_metadata,
+                            certification_relevant=score_data['certification_relevant'],
+                        ),
+                        recommended_path=module_metadata.get('start_path'),
+                        confidence=_recommendation_confidence(score),
+                    ),
                 ))
 
+            scored_recommendations.sort(
+                key=lambda item: (
+                    -item[0],
+                    item[1]['track'] != profile_track,
+                    -int(item[1].get('has_internal_lessons', False)),
+                    item[1]['title'],
+                )
+            )
+
             return jsonify({
-                'recommendations': recommendations,
+                'recommendations': [item[1] for item in scored_recommendations[:6]],
                 'message': 'Take an assessment to get personalized recommendations'
             }), 200
 
-        # Parse domain scores
-        domain_scores_data = latest_result.domain_scores or {}
-
-        # Identify weak domains (score <= 50% of total questions in that domain)
-        weak_domains = []
-        for domain, data in domain_scores_data.items():
-            if isinstance(data, dict):
-                score = data.get('score', 0)
-                total = data.get('total', 1)
-                percentage = (score / total * 100) if total > 0 else 0
-
-                if percentage < 50:  # Less than 50% correct
-                    weak_domains.append({
-                        'domain': domain,
-                        'score': score,
-                        'total': total,
-                        'percentage': percentage
-                    })
-
-        # Sort by percentage (weakest first)
+        domain_entries = _assessment_domain_entries(latest_result)
+        weak_domains = [entry for entry in domain_entries if entry['percentage'] < 50]
         weak_domains.sort(key=lambda x: x['percentage'])
+        fallback_domains = {
+            entry['domain']
+            for entry in sorted(domain_entries, key=lambda x: x['percentage'])[:3]
+        }
+        certification_domains = _certification_source_domains(
+            latest_result,
+            completed_module_ids,
+            completed_modules_count,
+        )
 
-        # Get training modules that target weak domains
-        recommendations = []
-        seen_module_ids = set()
+        scored_recommendations = []
+        weak_domain_map = {entry['domain']: entry for entry in weak_domains}
+        ideal_difficulty = _recommended_difficulty(latest_result)
 
-        # First, get modules that specifically target weak domains
-        for weak_domain_info in weak_domains[:3]:  # Focus on top 3 weakest domains
-            weak_domain = weak_domain_info['domain']
+        for module in all_modules:
+            module_metadata = build_module_metadata(module)
+            score_data = _score_module_recommendation(
+                module,
+                module_metadata=module_metadata,
+                profile_track=profile_track,
+                weak_domains=weak_domains,
+                fallback_domains=fallback_domains,
+                certification_domains=certification_domains,
+                ideal_difficulty=ideal_difficulty,
+            )
+            source_domains = score_data['source_domains']
+            matched_weak_domains = [domain for domain in source_domains if domain in weak_domain_map]
+            if matched_weak_domains:
+                primary_domain = matched_weak_domains[0]
+                primary_gap = weak_domain_map[primary_domain]
+                reason = (
+                    f'Strengthen your {primary_domain} skills '
+                    f'(scored {primary_gap["score"]}/{primary_gap["total"]})'
+                )
+                skill_gap_percentage = round(primary_gap['gap_percentage'], 1)
+            elif score_data['certification_relevant']:
+                reason = 'Supports certification readiness requirements'
+                skill_gap_percentage = 0
+            elif score_data['track'] == profile_track and profile_track != 'General':
+                reason = f'Fits your {profile_track} workplace AI track'
+                skill_gap_percentage = 0
+            else:
+                reason = 'Good next step from your latest assessment'
+                skill_gap_percentage = 0
 
-            # Query modules that target this domain
-            modules = TrainingModule.query.filter_by(is_active=True).all()
+            score = score_data['score']
+            scored_recommendations.append((
+                score,
+                serialize_course_recommendation(
+                    module,
+                    reason=reason,
+                    priority=_recommendation_priority(score),
+                    skill_gap_percentage=skill_gap_percentage,
+                    track=score_data['track'],
+                    source_domains=source_domains,
+                    next_action_label=_next_action_label(
+                        module_metadata,
+                        certification_relevant=score_data['certification_relevant'],
+                    ),
+                    recommended_path=module_metadata.get('start_path'),
+                    confidence=_recommendation_confidence(score),
+                ),
+            ))
 
-            for module in modules:
-                if module.id in seen_module_ids:
-                    continue
-
-                # Check if module targets this domain
-                target_domains = build_module_metadata(module)['target_domains']
-
-                if weak_domain in target_domains or not target_domains:
-                    # Module targets this weak domain or is general
-                    priority = 'high' if weak_domain_info['percentage'] < 33 else 'medium'
-
-                    recommendations.append(serialize_course_recommendation(
-                        module,
-                        reason=f'Strengthen your {weak_domain} skills (scored {weak_domain_info["score"]}/{weak_domain_info["total"]})',
-                        priority=priority,
-                        skill_gap_percentage=round(100 - weak_domain_info['percentage'], 1),
-                    ))
-
-                    seen_module_ids.add(module.id)
-
-                    if len(recommendations) >= 6:
-                        break
-
-            if len(recommendations) >= 6:
-                break
-
-        # If we don't have enough recommendations, add some general modules
-        if len(recommendations) < 3:
-            general_modules = TrainingModule.query.filter_by(
-                is_active=True,
-                role_specific='General'
-            ).limit(6 - len(recommendations)).all()
-
-            for module in general_modules:
-                if module.id not in seen_module_ids:
-                    recommendations.append(serialize_course_recommendation(
-                        module,
-                        reason='Recommended for continued learning',
-                        priority='low',
-                        skill_gap_percentage=0,
-                    ))
-                    seen_module_ids.add(module.id)
-
-        # Sort by priority and skill gap
-        priority_order = {'high': 0, 'medium': 1, 'low': 2}
-        recommendations.sort(key=lambda x: (priority_order.get(x['priority'], 3), -x.get('skill_gap_percentage', 0)))
+        scored_recommendations.sort(
+            key=lambda item: (
+                -item[0],
+                item[1]['track'] != profile_track,
+                -int(item[1].get('has_internal_lessons', False)),
+                item[1]['title'],
+            )
+        )
+        recommendations = [item[1] for item in scored_recommendations[:6]]
 
         logger.info(
             'course_recommendations_generated',
@@ -849,9 +1085,10 @@ def get_course_recommendations():
         )
 
         return jsonify({
-            'recommendations': recommendations[:6],  # Return top 6
+            'recommendations': recommendations,
             'assessment_score': latest_result.percentage,
-            'weak_domains': [d['domain'] for d in weak_domains[:3]]
+            'weak_domains': [d['domain'] for d in weak_domains[:3]],
+            'weak_domain_details': weak_domains[:3]
         }), 200
 
     except Exception as e:

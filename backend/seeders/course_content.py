@@ -16,6 +16,7 @@ from seeders.training import (
     DEFAULT_MODULES,
     HR_TRAINING_VIDEO_URL,
     MARKETING_TRAINING_VIDEO_URL,
+    OPERATIONS_TRAINING_VIDEO_URL,
     SALES_TRAINING_VIDEO_URL,
 )
 from training_metadata import EXTERNAL_CONTENT_TYPES, normalize_content_type, normalize_video_embed_url
@@ -182,6 +183,45 @@ AI_FUNDAMENTALS_INTRO_LESSONS = [
                     ],
                     'correct_answer': 1,
                     'explanation': 'Email spam filters use machine learning to identify and filter spam based on patterns learned from data, making them a practical example of AI in daily use.'
+                },
+                {
+                    'id': 'q4',
+                    'question': 'A sales manager wants AI to summarize CRM notes before a pipeline review. What is the safest first step?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Paste every customer record into a public chatbot',
+                        'Use approved tools and remove sensitive customer details where possible',
+                        'Skip human review because summaries are low risk',
+                        'Ask AI to invent missing details for incomplete records'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Workplace AI use should follow approved tooling and data-handling rules, especially when customer information is involved.'
+                },
+                {
+                    'id': 'q5',
+                    'question': 'An HR team uses AI to draft interview questions. What should remain a human responsibility?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Checking questions for fairness and job relevance',
+                        'Letting AI choose the final candidate alone',
+                        'Using different standards for different applicants',
+                        'Avoiding documentation of the process'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'AI can draft support material, but humans must review for fairness, relevance, and compliance.'
+                },
+                {
+                    'id': 'q6',
+                    'question': 'An operations analyst asks AI to identify bottlenecks in a weekly report. What makes the output more useful?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'A prompt with the workflow context, metrics, and desired format',
+                        'A one-word prompt: "optimize"',
+                        'Asking AI to ignore the source report',
+                        'Requesting a final decision without evidence'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Context, metrics, and format constraints help AI produce analysis that can be reviewed and acted on.'
                 }
             ]
         })
@@ -356,6 +396,45 @@ AI_FUNDAMENTALS_INTRO_LESSONS = [
                     ],
                     'correct_answer': 1,
                     'explanation': 'Transformer architecture is the foundation of modern LLMs, enabling them to understand context and generate coherent text.'
+                },
+                {
+                    'id': 'q6',
+                    'question': 'A marketing lead asks AI for three campaign subject lines. Which review step is most important before sending?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Check brand voice, factual claims, and audience fit',
+                        'Send the first output immediately',
+                        'Remove all human editing to save time',
+                        'Ask AI to guarantee conversion rates'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Marketing teams should review AI drafts for brand alignment, accuracy, and audience relevance before publishing.'
+                },
+                {
+                    'id': 'q7',
+                    'question': 'A team wants to use AI to draft a standard operating procedure. What input will improve the result?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'The current workflow steps, owners, exceptions, and required format',
+                        'Only the department name',
+                        'A request to make up missing compliance rules',
+                        'No context so the model can be creative'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Operational documentation works best when AI receives real workflow context, ownership, exceptions, and output requirements.'
+                },
+                {
+                    'id': 'q8',
+                    'question': 'When an AI answer affects a customer, employee, or business decision, what should you do?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Treat the answer as final because AI is objective',
+                        'Use human review and verify important facts or assumptions',
+                        'Hide that AI was involved',
+                        'Delete source materials after generating the answer'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'High-impact workplace uses require verification, accountability, and appropriate transparency.'
                 }
             ]
         })
@@ -498,6 +577,45 @@ PROMPT_ENGINEERING_MASTERY_LESSONS = [
                     ],
                     'correct_answer': 1,
                     'explanation': 'The second option uses role assignment, specifies the topic, sets a length constraint, and defines the target audience - all elements of a well-structured prompt.'
+                },
+                {
+                    'id': 'q4',
+                    'question': 'A sales rep wants AI to draft a follow-up email after a demo. Which prompt gives the best workplace context?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        '"Write a follow-up"',
+                        '"Act as a B2B sales rep. Draft a friendly follow-up for a finance buyer after a 30-minute demo, include 3 agreed pain points, next step, and a concise CTA."',
+                        '"Make it good and persuasive"',
+                        '"Send a sales email with no details"'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'The best prompt includes role, audience, business context, required content, tone, and format.'
+                },
+                {
+                    'id': 'q5',
+                    'question': 'An HR partner asks AI to rewrite a policy update for employees. What constraint should be included?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Make the message clear, neutral, and consistent with the approved policy',
+                        'Use legal claims that are not in the source document',
+                        'Avoid mentioning who employees can contact',
+                        'Use a different policy for each employee group without review'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'HR communication prompts should preserve approved policy meaning, use appropriate tone, and support employee clarity.'
+                },
+                {
+                    'id': 'q6',
+                    'question': 'A prompt asks AI to compare vendor proposals. What output format is most actionable for an operations team?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'A comparison table with criteria, evidence, risks, and recommended next steps',
+                        'A single sentence naming a winner with no rationale',
+                        'A creative poem about each vendor',
+                        'A list of unsupported assumptions'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Structured comparison formats help teams review evidence, risks, and decisions consistently.'
                 }
             ]
         })
@@ -653,6 +771,45 @@ PROMPT_ENGINEERING_MASTERY_LESSONS = [
                     ],
                     'correct_answer': 2,
                     'explanation': 'Specificity comes from clearly defining parameters like audience, length, format, tone, and any constraints or requirements.'
+                },
+                {
+                    'id': 'q6',
+                    'question': 'A marketing team wants reusable AI prompts for campaign briefs. What is the best design choice?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Create a template with fields for audience, offer, channel, proof points, constraints, and review criteria',
+                        'Use a different unstructured prompt every time',
+                        'Ask AI to ignore brand guidelines',
+                        'Only provide the campaign name'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Reusable workplace prompts need structured variables and review criteria so outputs are consistent and on brand.'
+                },
+                {
+                    'id': 'q7',
+                    'question': 'An operations lead uses chain-of-thought prompting to evaluate a process change. What should the final output include?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'A recommendation with assumptions, risks, evidence, and owner-ready next steps',
+                        'Only the hidden reasoning with no conclusion',
+                        'A decision that bypasses the process owner',
+                        'A list of unrelated ideas'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Complex workplace analysis should end in reviewable recommendations with evidence, assumptions, risks, and next steps.'
+                },
+                {
+                    'id': 'q8',
+                    'question': 'A team is evaluating prompts for customer-facing answers. Which metric is most important?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Whether answers are accurate, policy-compliant, helpful, and appropriately escalated',
+                        'Whether answers are always long',
+                        'Whether the model sounds confident even when uncertain',
+                        'Whether human reviewers are removed from the workflow'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Customer-facing prompt quality should be measured against accuracy, policy compliance, helpfulness, and safe escalation.'
                 }
             ]
         })
@@ -797,6 +954,45 @@ ELEMENTS_OF_AI_LESSONS = [
                     ],
                     'correct_answer': 1,
                     'explanation': 'The AI Effect refers to the phenomenon where once AI solves a problem successfully, we tend to stop calling it "AI" and it becomes just another technology.'
+                },
+                {
+                    'id': 'q4',
+                    'question': 'A support team wants to use AI to classify incoming tickets. Which task is AI well suited for?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Finding patterns in ticket text and suggesting categories for human review',
+                        'Making final refund decisions without policy checks',
+                        'Ignoring unusual or urgent tickets',
+                        'Replacing all customer communication rules'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'AI is useful for pattern recognition and triage, while policy-sensitive decisions still need oversight.'
+                },
+                {
+                    'id': 'q5',
+                    'question': 'A manager receives an AI-generated forecast. What should they check before acting on it?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'The data source, assumptions, uncertainty, and whether recent changes are reflected',
+                        'Only whether the chart looks polished',
+                        'Whether the forecast confirms the original plan',
+                        'Nothing, because forecasts are always objective'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Forecasts depend on data quality and assumptions, so leaders should review inputs, uncertainty, and context.'
+                },
+                {
+                    'id': 'q6',
+                    'question': 'Which workplace use case needs the strongest human oversight?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Drafting a lunch menu',
+                        'Summarizing public product reviews',
+                        'Screening job applicants or making employment recommendations',
+                        'Reformatting a meeting agenda'
+                    ],
+                    'correct_answer': 2,
+                    'explanation': 'Employment-related AI use can affect people materially and requires fairness, compliance, and accountable human review.'
                 }
             ]
         })
@@ -887,6 +1083,21 @@ def _video_lesson(title, description, video_url, key_points, duration_minutes=20
     }
 
 
+def _quiz_lesson(title, description, order_index, questions, duration_minutes=12, passing_score=80):
+    return {
+        'title': title,
+        'description': description,
+        'order_index': order_index,
+        'content_type': 'quiz',
+        'estimated_duration_minutes': duration_minutes,
+        'is_required': True,
+        'content': json.dumps({
+            'passing_score': passing_score,
+            'questions': questions,
+        })
+    }
+
+
 INTERNAL_VIDEO_MODULE_LESSONS = {
     'module-ai-sales': [
         _video_lesson(
@@ -899,6 +1110,91 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Connect AI workflows to existing CRM stages'
             ],
             duration_minutes=18,
+        ),
+        _quiz_lesson(
+            'Sales AI Scenario Check',
+            'Apply AI sales workflow concepts to realistic pipeline and outreach decisions.',
+            2,
+            [
+                {
+                    'id': 'sales-q1',
+                    'question': 'A rep wants AI to personalize outreach to a prospect. What input should they provide?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Relevant public company context, persona, pain point, offer, tone, and CTA',
+                        'Confidential contract terms copied from another customer',
+                        'No context so the AI can be creative',
+                        'A request to exaggerate product claims'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Good sales prompts use relevant, permissible context and clear constraints without exposing sensitive data or unsupported claims.'
+                },
+                {
+                    'id': 'sales-q2',
+                    'question': 'AI ranks a low-fit account as high priority. What should the sales manager do?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Accept the ranking without review',
+                        'Review the scoring factors against ICP, CRM data, and recent account context',
+                        'Delete all other accounts from the pipeline',
+                        'Ask AI to hide the reason'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Lead scoring should be explainable and checked against real qualification criteria before teams act on it.'
+                },
+                {
+                    'id': 'sales-q3',
+                    'question': 'Which AI use is best suited for human review in a deal cycle?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Drafting call summaries and suggested follow-up steps',
+                        'Signing contracts on behalf of the company',
+                        'Changing pricing without approval',
+                        'Guaranteeing prospect budget'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'AI can assist with summaries and next-step suggestions, while approvals and commitments stay human-owned.'
+                },
+                {
+                    'id': 'sales-q4',
+                    'question': 'A generated sales email mentions a feature that does not exist. What is the correct response?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Send it because it sounds persuasive',
+                        'Remove the unsupported claim and verify product details before sending',
+                        'Ask AI to make the claim more subtle',
+                        'Use it only for enterprise prospects'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Sales content must be accurate and reviewed before it reaches prospects or customers.'
+                },
+                {
+                    'id': 'sales-q5',
+                    'question': 'What is the strongest metric for an AI-assisted outbound pilot?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Number of prompts written',
+                        'Reply quality, meeting conversion, accuracy of personalization, and review time saved',
+                        'How confident the model sounds',
+                        'The length of generated emails'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'A useful pilot measures business outcomes and quality controls, not just AI activity.'
+                },
+                {
+                    'id': 'sales-q6',
+                    'question': 'When should a sales team avoid using AI-generated personalization?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'When it relies on private, unverified, or sensitive information',
+                        'When the prospect has a public website',
+                        'When the email has a CTA',
+                        'When a manager reviews it'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Personalization should be based on appropriate and verified information.'
+                }
+            ],
         )
     ],
     'module-ethical-hr': [
@@ -912,6 +1208,91 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Document policy and communication guardrails'
             ],
             duration_minutes=20,
+        ),
+        _quiz_lesson(
+            'HR AI Governance Scenario Check',
+            'Practice responsible decisions for AI-assisted hiring and employee workflows.',
+            2,
+            [
+                {
+                    'id': 'hr-q1',
+                    'question': 'An AI screening tool rejects qualified candidates from one demographic group at a higher rate. What should HR do first?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Pause or limit use, investigate bias, and require human review',
+                        'Use the tool more because it is efficient',
+                        'Hide the pattern from hiring managers',
+                        'Lower the standard only for some candidates'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Disparate outcomes require investigation, controls, and accountable human review before continued use.'
+                },
+                {
+                    'id': 'hr-q2',
+                    'question': 'Which data should not be pasted into an unapproved public AI tool?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'A public job description',
+                        'An anonymized interview rubric',
+                        'Employee medical, performance, or personal data',
+                        'A generic onboarding checklist'
+                    ],
+                    'correct_answer': 2,
+                    'explanation': 'Sensitive employee data needs approved systems and privacy protections.'
+                },
+                {
+                    'id': 'hr-q3',
+                    'question': 'AI drafts a performance review with harsh language not supported by manager notes. What is the best response?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Send it unchanged',
+                        'Revise against documented evidence and manager judgment',
+                        'Ask AI to make it harsher',
+                        'Delete the source notes'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'HR outputs should be evidence-based, fair, and reviewed by accountable humans.'
+                },
+                {
+                    'id': 'hr-q4',
+                    'question': 'What belongs in an employee-facing AI use policy?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Approved tools, prohibited data, review expectations, and escalation contacts',
+                        'A promise that AI is always correct',
+                        'Instructions to avoid documenting AI use',
+                        'A rule that AI can make final employment decisions'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Clear policies tell employees what tools are approved, what data is restricted, and when to escalate.'
+                },
+                {
+                    'id': 'hr-q5',
+                    'question': 'A recruiter uses AI to generate interview questions. What should they verify?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Questions are job-related, consistent, inclusive, and legally appropriate',
+                        'Questions are surprising and personal',
+                        'AI selected different criteria for each candidate',
+                        'The questions avoid the actual job requirements'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Interview support should reinforce consistent, fair, job-relevant evaluation.'
+                },
+                {
+                    'id': 'hr-q6',
+                    'question': 'Which AI task is lowest risk for HR when using approved tools?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Drafting a first version of a general onboarding FAQ for review',
+                        'Automatically terminating employees',
+                        'Predicting protected characteristics',
+                        'Making final promotion decisions'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Drafting general materials for review is lower risk than employment decisions or protected-characteristic analysis.'
+                }
+            ],
         )
     ],
     'module-marketing-ai': [
@@ -925,6 +1306,189 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Review AI output against brand and performance criteria'
             ],
             duration_minutes=22,
+        ),
+        _quiz_lesson(
+            'Marketing AI Scenario Check',
+            'Apply AI campaign concepts to segmentation, content, and performance review.',
+            2,
+            [
+                {
+                    'id': 'marketing-q1',
+                    'question': 'A marketer asks AI to create campaign variants. What input is most important?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Audience, offer, channel, brand voice, constraints, and claims that are approved',
+                        'A request to copy a competitor exactly',
+                        'No product information',
+                        'Instructions to invent customer testimonials'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Campaign prompts need audience and offer context plus brand, channel, and claim constraints.'
+                },
+                {
+                    'id': 'marketing-q2',
+                    'question': 'AI proposes an audience segment using sensitive personal traits. What should the team do?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Use it immediately for higher performance',
+                        'Reject or revise the segment according to privacy, ethics, and platform rules',
+                        'Hide the criteria in the campaign name',
+                        'Ask AI for more sensitive traits'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Segmentation must respect privacy, fairness, and platform requirements.'
+                },
+                {
+                    'id': 'marketing-q3',
+                    'question': 'What is the best use of AI in A/B test analysis?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Summarize results, flag patterns, and suggest hypotheses for human review',
+                        'Declare a winner without enough data',
+                        'Change historical metrics',
+                        'Ignore statistical uncertainty'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'AI can speed analysis, but teams still need to check evidence, uncertainty, and business context.'
+                },
+                {
+                    'id': 'marketing-q4',
+                    'question': 'A generated landing page claim sounds impressive but is unsupported. What should happen?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Publish it because it may convert',
+                        'Remove or revise it to match verified proof points',
+                        'Use it only in paid ads',
+                        'Ask AI to add a fake citation'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Marketing claims should be accurate, substantiated, and approved before publishing.'
+                },
+                {
+                    'id': 'marketing-q5',
+                    'question': 'Which review loop improves AI-generated content systems?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Compare outputs to brand guidelines, performance data, compliance needs, and customer feedback',
+                        'Keep every first draft',
+                        'Avoid measuring results',
+                        'Only optimize for word count'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Strong marketing systems combine AI generation with brand, compliance, performance, and audience review.'
+                },
+                {
+                    'id': 'marketing-q6',
+                    'question': 'When should generated content be escalated before launch?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'When it includes regulated claims, legal risk, sensitive targeting, or brand-sensitive messaging',
+                        'When it has a headline',
+                        'Whenever it has bullet points',
+                        'Only after it has already launched'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Higher-risk campaign content needs the right human review before launch.'
+                }
+            ],
+        )
+    ],
+    'module-ops-ai': [
+        _video_lesson(
+            'Operational AI Copilot Walkthrough',
+            'A practical video lesson on finding automation opportunities, designing copilots, and monitoring outcomes.',
+            OPERATIONS_TRAINING_VIDEO_URL,
+            [
+                'Map repetitive workflows before selecting an AI intervention',
+                'Define human checkpoints for forecasts and process recommendations',
+                'Measure cycle time, quality, and exception handling after launch'
+            ],
+            duration_minutes=22,
+        ),
+        _quiz_lesson(
+            'Operations AI Scenario Check',
+            'Practice AI decisions for process automation, forecasting, and governance.',
+            2,
+            [
+                {
+                    'id': 'ops-q1',
+                    'question': 'An operations team wants to automate invoice triage. What should they map first?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Current workflow steps, exceptions, data sources, owners, and approval rules',
+                        'Only the name of the finance system',
+                        'A plan to remove all approvers immediately',
+                        'A list of unrelated automation ideas'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Good automation starts with process mapping, exception handling, ownership, and approval requirements.'
+                },
+                {
+                    'id': 'ops-q2',
+                    'question': 'AI flags a demand forecast as highly confident, but recent supply disruptions are missing. What should happen?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Use the forecast unchanged',
+                        'Update the context, review assumptions, and document uncertainty before acting',
+                        'Delete the disruption data',
+                        'Ask AI to guarantee accuracy'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'Forecasts need current context, assumption review, and uncertainty documentation.'
+                },
+                {
+                    'id': 'ops-q3',
+                    'question': 'Which KPI best shows an AI process pilot is working?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Improved cycle time, fewer errors, clear exception handling, and user adoption',
+                        'More prompts per employee',
+                        'Longer generated reports',
+                        'Less documentation'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Operations pilots should measure workflow outcomes, quality, governance, and adoption.'
+                },
+                {
+                    'id': 'ops-q4',
+                    'question': 'A copilot suggests bypassing a required safety check. What is the right response?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Follow the suggestion to save time',
+                        'Reject the suggestion and reinforce the safety check in the workflow guardrails',
+                        'Hide the event from supervisors',
+                        'Disable all human review'
+                    ],
+                    'correct_answer': 1,
+                    'explanation': 'AI copilots must respect required controls, especially safety or compliance checkpoints.'
+                },
+                {
+                    'id': 'ops-q5',
+                    'question': 'What makes an AI-generated process recommendation easier to review?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'Evidence, assumptions, expected impact, risk, owner, and next step',
+                        'A confident answer with no sources',
+                        'Only a vague benefit statement',
+                        'A recommendation that cannot be audited'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Operational decisions need traceable evidence, ownership, impact, and risk review.'
+                },
+                {
+                    'id': 'ops-q6',
+                    'question': 'When should an AI workflow route work to a human?',
+                    'type': 'multiple_choice',
+                    'options': [
+                        'When confidence is low, policy exceptions appear, data is missing, or customer impact is high',
+                        'Never, because automation is the goal',
+                        'Only after the deadline passes',
+                        'When the output is short'
+                    ],
+                    'correct_answer': 0,
+                    'explanation': 'Human-in-the-loop escalation protects quality and accountability in operational workflows.'
+                }
+            ],
         )
     ],
 }

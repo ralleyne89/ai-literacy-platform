@@ -298,3 +298,22 @@ def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, 
     lesson_payload = lesson_response.get_json()
     assert lesson_payload['content_type'] == 'video'
     assert is_playable_video_url(lesson_payload['content']['video_url'])
+
+
+def test_seeded_workplace_track_modules_include_scenario_quizzes(client, app):
+    module_ids = [
+        'module-ai-sales',
+        'module-ethical-hr',
+        'module-marketing-ai',
+        'module-ops-ai',
+    ]
+
+    with app.app_context():
+        for module_id in module_ids:
+            quiz = Lesson.query.filter_by(module_id=module_id, content_type='quiz').first()
+            assert quiz is not None, f'{module_id} should include a scenario quiz'
+
+            content = json.loads(quiz.content)
+            assert content['passing_score'] == 80
+            assert len(content['questions']) >= 6
+            assert any('AI' in question['question'] for question in content['questions'])

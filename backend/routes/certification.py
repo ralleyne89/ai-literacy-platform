@@ -27,6 +27,17 @@ TIER_RANK = {
     'affiliate': 1,
 }
 
+CERTIFICATION_MODULE_STEPS = {
+    'ai-fundamentals': {
+        'module_id': 'module-ai-fundamentals-intro',
+        'title': 'Introduction to AI Fundamentals',
+    },
+    'ai-ethics-specialist': {
+        'module_id': 'module-ethical-hr',
+        'title': 'Ethical AI in HR Practices',
+    },
+}
+
 
 def _normalize_tier(value):
     return (value or 'free').lower()
@@ -113,28 +124,63 @@ def _extract_domain_score(assessment: Optional[AssessmentResult], domain: str) -
     return int(fallback_map.get(domain, 0) or 0)
 
 
+def _remaining_count(required, completed):
+    return max(0, required - completed)
+
+
+def _module_completion_message(module_step):
+    return f"Complete {module_step['title']} ({module_step['module_id']}) from Training."
+
+
 def _evaluate_certification_readiness(
     cert_type: CertificationType,
     assessment: Optional[AssessmentResult],
     completed_modules: int,
+    completed_module_ids=None,
 ):
     reasons = []
+    completed_module_ids = set(completed_module_ids or [])
 
     if cert_type.id == 'ai-fundamentals':
         if not assessment:
-            reasons.append('Complete the AI readiness assessment to unlock this certificate.')
+            reasons.append('Take the AI readiness assessment, then complete Introduction to AI Fundamentals.')
+        module_step = CERTIFICATION_MODULE_STEPS['ai-fundamentals']
+        if module_step['module_id'] not in completed_module_ids:
+            reasons.append(_module_completion_message(module_step))
     elif cert_type.id == 'litmusai-professional':
         percentage = assessment.percentage if assessment else 0
         if percentage is None or percentage < 70:
-            reasons.append('Score at least 70% on the AI readiness assessment.')
+            if assessment:
+                current_score = f'{percentage:.1f}%' if percentage is not None else '0.0%'
+                reasons.append(
+                    f'Retake the AI readiness assessment and raise your score from {current_score} to at least 70%.'
+                )
+            else:
+                reasons.append('Take the AI readiness assessment and score at least 70%.')
         if completed_modules < 3:
-            reasons.append('Complete at least 3 training modules before applying.')
+            remaining = _remaining_count(3, completed_modules)
+            reasons.append(
+                f'Complete {remaining} more training module{"s" if remaining != 1 else ""} '
+                f'({completed_modules}/3 completed) before applying.'
+            )
     elif cert_type.id == 'ai-ethics-specialist':
         ethics_score = _extract_domain_score(assessment, 'Ethics & Critical Thinking')
-        if ethics_score < 3:
-            reasons.append('Increase your Ethics & Critical Thinking score to 3 or higher.')
+        if not assessment:
+            reasons.append('Take the AI readiness assessment and score 3/3 in Ethics & Critical Thinking.')
+        elif ethics_score < 3:
+            reasons.append(
+                'Review Ethical AI in HR Practices, then retake the assessment and raise '
+                f'Ethics & Critical Thinking from {ethics_score}/3 to 3/3.'
+            )
+        module_step = CERTIFICATION_MODULE_STEPS['ai-ethics-specialist']
+        if module_step['module_id'] not in completed_module_ids:
+            reasons.append(_module_completion_message(module_step))
         if completed_modules < 2:
-            reasons.append('Complete at least 2 training modules to demonstrate applied practice.')
+            remaining = _remaining_count(2, completed_modules)
+            reasons.append(
+                f'Complete {remaining} more training module{"s" if remaining != 1 else ""} '
+                f'({completed_modules}/2 completed) to demonstrate applied practice.'
+            )
 
     return {'eligible': len(reasons) == 0, 'reasons': reasons}
 
@@ -169,15 +215,18 @@ def get_available_certifications():
 
         latest_assessment = None
         completed_modules = 0
+        completed_module_ids = set()
         current_tier = _normalize_tier(user.subscription_tier) if user else 'free'
         if user:
             latest_assessment = (AssessmentResult.query
                                  .filter_by(user_id=user.id)
                                  .order_by(AssessmentResult.completed_at.desc())
                                  .first())
-            completed_modules = (UserProgress.query
-                                 .filter_by(user_id=user.id, status='completed')
-                                 .count())
+            completed_progress = (UserProgress.query
+                                  .filter_by(user_id=user.id, status='completed')
+                                  .all())
+            completed_modules = len(completed_progress)
+            completed_module_ids = {progress.module_id for progress in completed_progress}
 
         records = CertificationType.query.order_by(CertificationType.title.asc()).all()
         payload = []
@@ -187,7 +236,12 @@ def get_available_certifications():
             upgrade_required = not _has_tier_access(current_tier, required_tier)
 
             if user:
-                readiness = _evaluate_certification_readiness(record, latest_assessment, completed_modules)
+                readiness = _evaluate_certification_readiness(
+                    record,
+                    latest_assessment,
+                    completed_modules,
+                    completed_module_ids,
+                )
             else:
                 readiness = {
                     'eligible': False,
@@ -196,7 +250,9 @@ def get_available_certifications():
 
             missing_requirements = list(readiness['reasons'])
             if upgrade_required:
-                missing_requirements.append(f'Upgrade to {required_tier} to unlock this certification.')
+                missing_requirements.append(
+                    f'Upgrade to {required_tier} in billing to unlock this certification.'
+                )
 
             serialized.update({
                 'required_tier': required_tier,
@@ -343,11 +399,18 @@ def apply_for_certification(certification_id):
                              .filter_by(user_id=user_id)
                              .order_by(AssessmentResult.completed_at.desc())
                              .first())
-        completed_modules = (UserProgress.query
-                             .filter_by(user_id=user_id, status='completed')
-                             .count())
+        completed_progress = (UserProgress.query
+                              .filter_by(user_id=user_id, status='completed')
+                              .all())
+        completed_modules = len(completed_progress)
+        completed_module_ids = {progress.module_id for progress in completed_progress}
 
-        readiness = _evaluate_certification_readiness(cert_type, latest_assessment, completed_modules)
+        readiness = _evaluate_certification_readiness(
+            cert_type,
+            latest_assessment,
+            completed_modules,
+            completed_module_ids,
+        )
         if not readiness['eligible']:
             logger.info(
                 'certification_apply_requirements_not_met',

@@ -162,6 +162,31 @@ describe('AuthProvider Supabase session behavior', () => {
     )
   })
 
+  it('returns a distinct setup error when Google OAuth is not configured', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signInWithOAuth.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'provider_disabled',
+        message: 'Unsupported provider: provider is not enabled',
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.login()
+
+    expect(result).toEqual({
+      success: false,
+      code: 'google_oauth_provider_misconfigured',
+      error: expect.stringContaining('Google sign-in is not configured correctly'),
+    })
+    expect(mockAxios.get).not.toHaveBeenCalled()
+  })
+
   it('signs in with email and password through Supabase', async () => {
     mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
     mockSupabaseState.signInWithPassword.mockResolvedValue({
@@ -190,6 +215,65 @@ describe('AuthProvider Supabase session behavior', () => {
       password: 'secure-password',
     })
     expect(mockAxios.defaults.headers.common.Authorization).toBe('Bearer password-session-token')
+  })
+
+  it('keeps invalid email and password errors distinct from deployment issues', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signInWithPassword.mockResolvedValue({
+      data: { session: null },
+      error: {
+        code: 'invalid_credentials',
+        message: 'Invalid login credentials',
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.loginWithPassword({
+      email: 'ada@example.com',
+      password: 'wrong-password',
+    })
+
+    expect(result).toEqual({
+      success: false,
+      code: 'invalid_credentials',
+      error: 'The email or password is incorrect.',
+    })
+    expect(mockAxios.get).not.toHaveBeenCalled()
+  })
+
+  it('reports auth API routing problems after a valid password session', async () => {
+    mockSupabaseState.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabaseState.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'password-session-token' } },
+      error: null,
+    })
+    mockAxios.get.mockRejectedValue({
+      response: {
+        status: 404,
+        data: { error: 'Not found' },
+      },
+    })
+
+    renderAuthProvider()
+
+    await waitFor(() => expect(latestAuth).toBeDefined())
+    await waitFor(() => expect(latestAuth.loading).toBe(false))
+
+    const result = await latestAuth.loginWithPassword({
+      email: 'ada@example.com',
+      password: 'secure-password',
+    })
+
+    expect(result).toEqual({
+      success: false,
+      code: 'backend_auth_route_unavailable',
+      error: expect.stringContaining('auth API route is unavailable'),
+    })
+    expect(mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/auth/profile'))
   })
 
   it('starts email and password sign-up through Supabase', async () => {

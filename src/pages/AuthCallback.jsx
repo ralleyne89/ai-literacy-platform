@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { clearStoredAuthReturnTo, getStoredAuthReturnTo } from '../config/authRoutes'
+import {
+  clearStoredAuthReturnTo,
+  getStoredAuthReturnTo,
+  normalizeOAuthProviderError,
+} from '../config/authRoutes'
 import { useAuth } from '../contexts/AuthContext'
 
 const readAuthError = (location) => {
@@ -35,6 +39,11 @@ const AuthCallback = () => {
 
     const authError = readAuthError(location)
     if (authError) {
+      const normalizedError = normalizeOAuthProviderError(
+        authError,
+        'Unable to complete Google sign-in.',
+        'google'
+      )
       hasHandledCallback.current = true
       clearStoredAuthReturnTo()
       navigate('/login', {
@@ -42,8 +51,8 @@ const AuthCallback = () => {
         state: {
           from: { pathname: returnTo },
           authError: {
-            code: 'supabase_oauth_error',
-            error: authError,
+            code: normalizedError.code,
+            error: normalizedError.error,
           },
         },
       })

@@ -41,4 +41,22 @@ describe('apiEndpoints', () => {
     expect(endpoints.API_BASE_URL).toBe('https://api.example.com')
     expect(endpoints.AUTH_ENDPOINTS.profile).toBe('https://api.example.com/api/auth/profile')
   })
+
+  it('flags Supabase REST URLs as API routing misconfiguration', async () => {
+    const endpoints = await loadApiEndpoints('https://project-ref.supabase.co/rest/v1')
+
+    expect(endpoints.getApiRoutingIssue()).toEqual({
+      code: 'supabase_rest_api_misroute',
+      message: expect.stringContaining('/functions/v1/platform-api'),
+    })
+  })
+
+  it('requires Supabase project URLs to target the platform-api Edge Function', async () => {
+    const endpoints = await loadApiEndpoints('https://project-ref.supabase.co')
+
+    expect(endpoints.getApiRoutingIssue()).toEqual({
+      code: 'supabase_edge_function_url_required',
+      message: expect.stringContaining('/functions/v1/platform-api'),
+    })
+  })
 })

@@ -48,6 +48,8 @@ const errors = []
 const warnings = []
 const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0'])
 const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_CLERK_', 'CLERK_']
+const supabasePlatformApiPath = '/functions/v1/platform-api'
+const supabasePlatformApiExample = `https://<project-ref>.supabase.co${supabasePlatformApiPath}`
 const placeholderValues = new Set([
   'pk_test_or_prod_replace_me',
   'https://your-project.supabase.co',
@@ -122,10 +124,14 @@ if (authMode && authMode.toLowerCase() !== 'supabase') {
 const parsedApiForSupabase = parseUrl(apiUrl)
 if (
   parsedApiForSupabase &&
-  parsedApiForSupabase.hostname.toLowerCase().endsWith('.supabase.co') &&
-  !parsedApiForSupabase.pathname.replace(/\/+$/, '').endsWith('/functions/v1/platform-api')
+  parsedApiForSupabase.hostname.toLowerCase().endsWith('.supabase.co')
 ) {
-  addError('Supabase VITE_API_URL must include /functions/v1/platform-api, not only the project origin.')
+  const normalizedApiPath = parsedApiForSupabase.pathname.replace(/\/+$/, '') || '/'
+  if (normalizedApiPath === '/rest/v1' || normalizedApiPath.startsWith('/rest/v1/')) {
+    addError(`VITE_API_URL points at Supabase REST (/rest/v1). Use the Edge Function URL instead: ${supabasePlatformApiExample}.`)
+  } else if (normalizedApiPath !== supabasePlatformApiPath) {
+    addError(`Supabase VITE_API_URL must be the Edge Function URL ${supabasePlatformApiExample}, not only the project origin.`)
+  }
 }
 
 for (const prefix of legacyAuthPrefixes) {
@@ -144,7 +150,8 @@ if (errors.length > 0) {
   }
 
   console.error('\nHow to fix:')
-  console.error('- Ensure VITE_API_URL points at the Supabase Edge Function URL.')
+  console.error(`- Ensure VITE_API_URL points at the Supabase Edge Function URL: ${supabasePlatformApiExample}`)
+  console.error('- Do not use the Supabase REST endpoint (/rest/v1) for frontend API routing.')
   console.error('- Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for the Netlify build.')
   console.error('- Remove legacy Clerk/Auth0 auth-mode variables from production configuration.')
   console.error('- Re-run the build after fixing values.')

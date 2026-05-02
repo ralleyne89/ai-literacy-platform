@@ -4,8 +4,9 @@ import {
   AUTH_CALLBACK_PATH,
   clearStoredAuthReturnTo,
   getStoredAuthReturnTo,
+  normalizeOAuthProviderError,
 } from '../config/authRoutes'
-import { AUTH_ENDPOINTS } from '../config/apiEndpoints'
+import { AUTH_ENDPOINTS, getApiRoutingIssue } from '../config/apiEndpoints'
 import {
   getSupabaseConfigError,
   isSupabaseConfigured,
@@ -34,14 +35,82 @@ const mapBackendUser = (backendUser) => {
   }
 }
 
-const normalizeBackendError = (error, fallbackMessage) => {
-  const backendMessage =
+const getBackendErrorMessage = (error) =>
+  String(
     error?.response?.data?.error ||
-    error?.response?.data?.details ||
-    error?.message
+      error?.response?.data?.details ||
+      error?.message ||
+      ''
+  ).trim()
+
+const getBackendErrorCode = (error) =>
+  String(error?.response?.data?.code || error?.code || '').trim()
+
+const isInvalidCredentialError = (error) => {
+  const searchable = `${getBackendErrorCode(error)} ${getBackendErrorMessage(error)}`.toLowerCase()
+  return searchable.includes('invalid_credentials') ||
+    searchable.includes('invalid login credentials') ||
+    searchable.includes('invalid credentials')
+}
+
+const isEmailConfirmationError = (error) => {
+  const searchable = `${getBackendErrorCode(error)} ${getBackendErrorMessage(error)}`.toLowerCase()
+  return searchable.includes('email_not_confirmed') ||
+    searchable.includes('email not confirmed') ||
+    searchable.includes('confirm your email')
+}
+
+const isAuthRouteUnavailableError = (error) => {
+  const status = Number(error?.response?.status)
+  return status === 404 || status === 405
+}
+
+const isApiNetworkError = (error) =>
+  error?.code === 'ERR_NETWORK' || (!error?.response && Boolean(error?.request))
+
+const normalizeBackendError = (error, fallbackMessage, options = {}) => {
+  if (options.authRoute) {
+    const apiRoutingIssue = getApiRoutingIssue()
+    if (apiRoutingIssue) {
+      return {
+        code: apiRoutingIssue.code,
+        message: apiRoutingIssue.message,
+      }
+    }
+  }
+
+  if (isInvalidCredentialError(error)) {
+    return {
+      code: 'invalid_credentials',
+      message: 'The email or password is incorrect.',
+    }
+  }
+
+  if (isEmailConfirmationError(error)) {
+    return {
+      code: 'email_not_confirmed',
+      message: 'Confirm your email address before signing in.',
+    }
+  }
+
+  if (options.authRoute && isAuthRouteUnavailableError(error)) {
+    return {
+      code: 'backend_auth_route_unavailable',
+      message: 'The auth API route is unavailable. Check that VITE_API_URL points to the platform-api Edge Function, not Supabase REST.',
+    }
+  }
+
+  if (options.authRoute && isApiNetworkError(error)) {
+    return {
+      code: 'backend_api_unreachable',
+      message: 'The backend API could not be reached. Check VITE_API_URL and the platform-api deployment.',
+    }
+  }
+
+  const backendMessage = getBackendErrorMessage(error)
 
   return {
-    code: error?.response?.data?.code || error?.code || 'auth_error',
+    code: getBackendErrorCode(error) || 'auth_error',
     message: backendMessage || fallbackMessage,
   }
 }
@@ -215,6 +284,12 @@ const SupabaseSessionAuthProvider = ({ children }) => {
         return { success: false, error: 'Missing Supabase session token.' }
       }
 
+      const apiRoutingIssue = getApiRoutingIssue()
+      if (apiRoutingIssue) {
+        clearSession()
+        return { success: false, error: apiRoutingIssue.message, code: apiRoutingIssue.code }
+      }
+
       const response = await axios.get(AUTH_ENDPOINTS.profile)
       const normalized = normalizeProfileResponse(
         response,
@@ -228,7 +303,9 @@ const SupabaseSessionAuthProvider = ({ children }) => {
       setUser(normalized.user)
       return { success: true, user: normalized.user }
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to load your account right now.')
+      const normalized = normalizeBackendError(error, 'Unable to load your account right now.', {
+        authRoute: true,
+      })
       clearSession()
       return { success: false, error: normalized.message, code: normalized.code }
     }
@@ -311,8 +388,12 @@ const SupabaseSessionAuthProvider = ({ children }) => {
 
       return { success: true }
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to start Supabase sign-in.')
-      return { success: false, error: normalized.message, code: normalized.code }
+      const normalized = normalizeOAuthProviderError(
+        error,
+        provider === 'google' ? 'Unable to start Google sign-in.' : 'Unable to start provider sign-in.',
+        provider
+      )
+      return { success: false, error: normalized.error, code: normalized.code }
     }
   }, [])
 
@@ -403,9 +484,13 @@ const SupabaseSessionAuthProvider = ({ children }) => {
 
       return syncBackendAfterLogin(data?.session)
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to complete Supabase sign-in.')
+      const normalized = normalizeOAuthProviderError(
+        error,
+        'Unable to complete Google sign-in.',
+        'google'
+      )
       clearSession()
-      return { success: false, error: normalized.message, code: normalized.code }
+      return { success: false, error: normalized.error, code: normalized.code }
     }
   }, [clearSession, syncBackendAfterLogin])
 
@@ -441,6 +526,11 @@ const SupabaseSessionAuthProvider = ({ children }) => {
         return { success: false, error: 'Missing Supabase session token.' }
       }
 
+      const apiRoutingIssue = getApiRoutingIssue()
+      if (apiRoutingIssue) {
+        return { success: false, error: apiRoutingIssue.message, code: apiRoutingIssue.code }
+      }
+
       axios.defaults.headers.common.Authorization = `Bearer ${activeToken}`
       const response = await axios.put(AUTH_ENDPOINTS.profile, {
         first_name: profileData.first_name,
@@ -460,7 +550,9 @@ const SupabaseSessionAuthProvider = ({ children }) => {
       setUser(normalized.user)
       return { success: true, user: normalized.user }
     } catch (error) {
-      const normalized = normalizeBackendError(error, 'Unable to update profile right now.')
+      const normalized = normalizeBackendError(error, 'Unable to update profile right now.', {
+        authRoute: true,
+      })
       return { success: false, error: normalized.message, code: normalized.code }
     }
   }, [applySessionToken, token])

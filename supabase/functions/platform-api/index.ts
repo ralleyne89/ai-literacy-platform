@@ -19,6 +19,31 @@ const DOMAINS = [
   'Strategic Understanding',
 ]
 
+const TRACK_ALIASES: Record<string, string> = {
+  general: 'General',
+  sales: 'Sales',
+  'business development': 'Sales',
+  'business-development': 'Sales',
+  bd: 'Sales',
+  hr: 'HR',
+  'human resources': 'HR',
+  people: 'HR',
+  'people ops': 'HR',
+  'people operations': 'HR',
+  marketing: 'Marketing',
+  growth: 'Marketing',
+  operations: 'Operations',
+  ops: 'Operations',
+}
+
+const TRACK_DOMAIN_HINTS: Record<string, Set<string>> = {
+  General: new Set(['AI Fundamentals', 'Practical Usage', 'Ethics & Critical Thinking']),
+  Sales: new Set(['Practical Usage', 'AI Impact & Applications']),
+  HR: new Set(['Ethics & Critical Thinking', 'AI Impact & Applications']),
+  Marketing: new Set(['Practical Usage', 'Strategic Understanding']),
+  Operations: new Set(['Strategic Understanding', 'AI Impact & Applications']),
+}
+
 const QUESTIONS_PER_DOMAIN = 3
 
 const SAMPLE_QUESTIONS = [
@@ -364,6 +389,17 @@ const TIER_RANK: Record<string, number> = {
   affiliate: 1,
 }
 
+const CERTIFICATION_MODULE_STEPS: Record<string, { module_id: string; title: string }> = {
+  'ai-fundamentals': {
+    module_id: 'module-ai-fundamentals-intro',
+    title: 'Introduction to AI Fundamentals',
+  },
+  'ai-ethics-specialist': {
+    module_id: 'module-ethical-hr',
+    title: 'Ethical AI in HR Practices',
+  },
+}
+
 type ApiContext = {
   admin: ReturnType<typeof createClient>
   req: Request
@@ -645,20 +681,16 @@ const getBearerToken = (req: Request) => {
 const mapUserMetadata = (authUser: any, payload: Record<string, unknown> = {}) => {
   const metadata = authUser?.user_metadata || {}
   const email = String(payload.email || authUser?.email || metadata.email || '').trim().toLowerCase()
-  const firstName = String(
-    payload.first_name || metadata.first_name || metadata.given_name || authUser?.given_name || 'AI'
-  ).trim()
-  const lastName = String(
-    payload.last_name || metadata.last_name || metadata.family_name || authUser?.family_name || 'Learner'
-  ).trim()
+  const firstName = String(payload.first_name || metadata.first_name || metadata.given_name || authUser?.given_name || '').trim()
+  const lastName = String(payload.last_name || metadata.last_name || metadata.family_name || authUser?.family_name || '').trim()
 
   return {
     email,
-    first_name: firstName || 'AI',
-    last_name: lastName || 'Learner',
-    role: typeof payload.role === 'string' ? payload.role.trim() || null : metadata.role || null,
+    first_name: firstName,
+    last_name: lastName,
+    role: typeof payload.role === 'string' ? payload.role.trim() || null : metadata.role ?? null,
     organization:
-      typeof payload.organization === 'string' ? payload.organization.trim() || null : metadata.organization || null,
+      typeof payload.organization === 'string' ? payload.organization.trim() || null : metadata.organization ?? null,
   }
 }
 
@@ -713,10 +745,10 @@ const upsertProfileForAuthUser = async (
 
   const values = {
     email: mapped.email,
-    first_name: mapped.first_name,
-    last_name: mapped.last_name,
-    role: mapped.role,
-    organization: mapped.organization,
+    first_name: mapped.first_name || profile?.first_name || 'AI',
+    last_name: mapped.last_name || profile?.last_name || 'Learner',
+    role: mapped.role ?? profile?.role ?? null,
+    organization: mapped.organization ?? profile?.organization ?? null,
     auth_provider: 'supabase',
     auth_subject: subject,
     password_hash: 'supabase_managed',
@@ -900,6 +932,142 @@ const classifyScore = (totalCorrect: number) => {
   if (totalCorrect <= 6) return 'Beginner'
   if (totalCorrect <= 11) return 'Intermediate'
   return 'Advanced'
+}
+
+const normalizeWorkplaceTrack = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return TRACK_ALIASES[normalized] || 'General'
+}
+
+const assessmentDomainEntries = (assessment: any) => {
+  const domainScoresData = safeJsonParse(assessment?.domain_scores, {})
+  return DOMAINS.filter((domain) => Object.prototype.hasOwnProperty.call(domainScoresData, domain)).map((domain) => {
+    const entry = domainScoresData?.[domain] || {}
+    const fallbackTotal = SAMPLE_QUESTIONS.filter((question) => question.domain === domain).length
+    const score = Number(entry?.score || 0)
+    const total = Number(entry?.total || fallbackTotal || 0)
+    const percentage = total > 0 ? (score / total) * 100 : 0
+    return {
+      domain,
+      score,
+      total,
+      percentage,
+      gap_percentage: Math.max(0, 100 - percentage),
+    }
+  })
+}
+
+const recommendedDifficulty = (assessment: any) => {
+  const percentage = Number(assessment?.percentage || 0)
+  if (percentage < 50) return 1
+  if (percentage < 75) return 2
+  return 3
+}
+
+const certificationSourceDomains = (
+  assessment: any,
+  completedModuleIds: Set<string>,
+  completedModulesCount: number
+) => {
+  const sourceDomains = new Set<string>()
+  if (!assessment) {
+    sourceDomains.add('AI Fundamentals')
+  } else if (Number(assessment.percentage || 0) < 70) {
+    sourceDomains.add('AI Fundamentals')
+    sourceDomains.add('Practical Usage')
+    sourceDomains.add('Strategic Understanding')
+  }
+
+  const ethicsEntry = assessmentDomainEntries(assessment).find((entry) => entry.domain === 'Ethics & Critical Thinking')
+  if (!assessment || Number(ethicsEntry?.score || 0) < 3) {
+    sourceDomains.add('Ethics & Critical Thinking')
+  }
+  if (!completedModuleIds.has('module-ai-fundamentals-intro')) {
+    sourceDomains.add('AI Fundamentals')
+  }
+  if (completedModulesCount < 3) {
+    sourceDomains.add('Practical Usage')
+    sourceDomains.add('AI Impact & Applications')
+  }
+
+  return sourceDomains
+}
+
+const nextActionLabel = (metadata: any, certificationRelevant = false) => {
+  if (certificationRelevant) return 'Build certification readiness'
+  if (metadata.has_internal_lessons) return 'Start workplace lessons'
+  if (metadata.external_url) return 'Open recommended course'
+  return 'Review module'
+}
+
+const recommendationPriority = (score: number) => {
+  if (score >= 65) return 'high'
+  if (score >= 40) return 'medium'
+  return 'low'
+}
+
+const recommendationConfidence = (score: number) => Math.round(Math.max(0.35, Math.min(0.98, score / 100)) * 100) / 100
+
+const scoreModuleRecommendation = (
+  module: any,
+  moduleMetadata: any,
+  profileTrack: string,
+  weakDomains: any[],
+  fallbackDomains: Set<string>,
+  certificationDomains: Set<string>,
+  idealDifficulty: number
+) => {
+  const targetDomains = moduleMetadata.target_domains || []
+  const targetDomainSet = new Set<string>(targetDomains)
+  const weakDomainMap = new Map(weakDomains.map((entry) => [entry.domain, entry]))
+  const weakMatches = targetDomains.filter((domain: string) => weakDomainMap.has(domain))
+  const fallbackMatches = targetDomains.filter((domain: string) => fallbackDomains.has(domain))
+  const certificationMatches = targetDomains.filter((domain: string) => certificationDomains.has(domain))
+  const moduleTrack = normalizeWorkplaceTrack(module.role_specific)
+  const sourceDomains = weakMatches.length
+    ? weakMatches
+    : fallbackMatches.length
+      ? fallbackMatches
+      : certificationMatches.length
+        ? certificationMatches
+        : targetDomains.slice(0, 2)
+
+  let score = 8
+  if (weakMatches.length) {
+    score += weakMatches.reduce((sum: number, domain: string) => sum + (weakDomainMap.get(domain)?.gap_percentage || 0), 0) / weakMatches.length * 0.45
+  } else if (fallbackMatches.length) {
+    score += 12
+  } else if (!targetDomainSet.size) {
+    score += 6
+  }
+
+  if (moduleTrack === profileTrack && moduleTrack !== 'General') {
+    score += 24
+  } else if (moduleTrack === 'General') {
+    score += 14
+  } else if (targetDomains.some((domain: string) => TRACK_DOMAIN_HINTS[profileTrack]?.has(domain))) {
+    score += 10
+  }
+
+  const difficultyDelta = Math.abs(Number(module.difficulty_level || 1) - idealDifficulty)
+  score += Math.max(0, 16 - difficultyDelta * 6)
+
+  if (moduleMetadata.has_internal_lessons) {
+    score += 12
+  } else if (moduleMetadata.external_url) {
+    score += 4
+  }
+
+  if (certificationMatches.length) {
+    score += 10
+  }
+
+  return {
+    score,
+    track: moduleTrack,
+    source_domains: sourceDomains,
+    certification_relevant: Boolean(certificationMatches.length),
+  }
 }
 
 const generateRecommendations = (
@@ -1109,6 +1277,7 @@ const handleAssessment = async (ctx: ApiContext) => {
 
   if (ctx.routePath === '/api/assessment/recommendations' && ctx.req.method === 'GET') {
     const auth = await requireAuth(ctx)
+    const profileTrack = normalizeWorkplaceTrack(auth?.profile?.role)
     const latest = await ctx.admin
       .from(TABLES.assessmentResult)
       .select('*')
@@ -1118,55 +1287,131 @@ const handleAssessment = async (ctx: ApiContext) => {
       .maybeSingle()
     if (latest.error) throw latest.error
 
-    const modulesQuery = ctx.admin.from(TABLES.trainingModule).select('*').eq('is_active', true)
-    const modulesResult = latest.data
-      ? await modulesQuery
-      : await modulesQuery.eq('difficulty_level', 1).limit(6)
+    const modulesResult = await ctx.admin.from(TABLES.trainingModule).select('*').eq('is_active', true)
     if (modulesResult.error) throw modulesResult.error
 
-    const lessonCounts = await getLessonCounts(ctx.admin, (modulesResult.data || []).map((module: any) => module.id))
+    const completed = await ctx.admin
+      .from(TABLES.userProgress)
+      .select('module_id')
+      .eq('user_id', auth!.userId)
+      .eq('status', 'completed')
+    if (completed.error) throw completed.error
+    const completedModuleIds = new Set((completed.data || []).map((progress: any) => progress.module_id))
+    const completedModulesCount = completed.data?.length || 0
+    const modules = modulesResult.data || []
+    const lessonCounts = await getLessonCounts(ctx.admin, modules.map((module: any) => module.id))
+
     if (!latest.data) {
-      const recommendations = (modulesResult.data || []).map((module: any) => ({
-        ...serializeCourseRecommendation(module, lessonCounts.get(module.id) || 0, 'Great starting point for AI literacy', 'low', 0),
-      }))
+      const certificationDomains = certificationSourceDomains(null, completedModuleIds, completedModulesCount)
+      const scoredRecommendations = modules.map((module: any) => {
+        const lessonCount = lessonCounts.get(module.id) || 0
+        const moduleMetadata = buildModuleMetadata(module, lessonCount)
+        const scoreData = scoreModuleRecommendation(
+          module,
+          moduleMetadata,
+          profileTrack,
+          [],
+          TRACK_DOMAIN_HINTS[profileTrack] || new Set<string>(),
+          certificationDomains,
+          1
+        )
+        return {
+          score: scoreData.score,
+          recommendation: serializeCourseRecommendation(
+            module,
+            lessonCount,
+            'Great starting point for workplace AI literacy',
+            recommendationPriority(scoreData.score),
+            0,
+            {
+              track: scoreData.track,
+              source_domains: scoreData.source_domains,
+              next_action_label: nextActionLabel(moduleMetadata, scoreData.certification_relevant),
+              recommended_path: moduleMetadata.start_path,
+              confidence: recommendationConfidence(scoreData.score),
+            }
+          ),
+        }
+      })
+      scoredRecommendations.sort((a, b) =>
+        b.score - a.score ||
+        Number(a.recommendation.track !== profileTrack) - Number(b.recommendation.track !== profileTrack) ||
+        Number(Boolean(b.recommendation.has_internal_lessons)) - Number(Boolean(a.recommendation.has_internal_lessons)) ||
+        String(a.recommendation.title).localeCompare(String(b.recommendation.title))
+      )
       return jsonResponse(ctx.req, {
-        recommendations,
+        recommendations: scoredRecommendations.slice(0, 6).map((entry) => entry.recommendation),
         message: 'Take an assessment to get personalized recommendations',
       })
     }
 
-    const domainScoresData = safeJsonParse(latest.data.domain_scores, {})
-    const weakDomains = Object.entries(domainScoresData)
-      .map(([domain, value]: [string, any]) => {
-        const total = Number(value?.total || 1)
-        const score = Number(value?.score || 0)
-        const percentage = total > 0 ? (score / total) * 100 : 0
-        return { domain, score, total, percentage }
-      })
+    const domainEntries = assessmentDomainEntries(latest.data)
+    const weakDomains = domainEntries
       .filter((entry) => entry.percentage < 50)
+      .sort((a, b) => a.percentage - b.percentage)
+    const fallbackDomains = new Set(
+      [...domainEntries].sort((a, b) => a.percentage - b.percentage).slice(0, 3).map((entry) => entry.domain)
+    )
+    const certificationDomains = certificationSourceDomains(latest.data, completedModuleIds, completedModulesCount)
+    const weakDomainMap = new Map(weakDomains.map((entry) => [entry.domain, entry]))
+    const idealDifficulty = recommendedDifficulty(latest.data)
 
-    const weakDomainNames = new Set(weakDomains.map((entry) => entry.domain))
-    const selectedModules = (modulesResult.data || [])
-      .filter((module: any) => {
-        const domains = parseJsonArray(module.target_domains)
-        return weakDomainNames.size === 0 || domains.some((domain) => weakDomainNames.has(domain))
-      })
-      .slice(0, 6)
-
-    const recommendations = selectedModules.map((module: any) =>
-      serializeCourseRecommendation(
+    const scoredRecommendations = modules.map((module: any) => {
+      const lessonCount = lessonCounts.get(module.id) || 0
+      const moduleMetadata = buildModuleMetadata(module, lessonCount)
+      const scoreData = scoreModuleRecommendation(
         module,
-        lessonCounts.get(module.id) || 0,
-        weakDomainNames.size ? 'Targets a skill gap from your latest assessment' : 'Good next step from your latest assessment',
-        weakDomainNames.size ? 'high' : 'medium',
-        weakDomainNames.size ? 50 : 0
+        moduleMetadata,
+        profileTrack,
+        weakDomains,
+        fallbackDomains,
+        certificationDomains,
+        idealDifficulty
       )
+      const matchedWeakDomains = scoreData.source_domains.filter((domain: string) => weakDomainMap.has(domain))
+      let reason = 'Good next step from your latest assessment'
+      let skillGapPercentage = 0
+      if (matchedWeakDomains.length) {
+        const primaryDomain = matchedWeakDomains[0]
+        const primaryGap = weakDomainMap.get(primaryDomain)
+        reason = `Strengthen your ${primaryDomain} skills (scored ${primaryGap?.score || 0}/${primaryGap?.total || 0})`
+        skillGapPercentage = Math.round((primaryGap?.gap_percentage || 0) * 10) / 10
+      } else if (scoreData.certification_relevant) {
+        reason = 'Supports certification readiness requirements'
+      } else if (scoreData.track === profileTrack && profileTrack !== 'General') {
+        reason = `Fits your ${profileTrack} workplace AI track`
+      }
+
+      return {
+        score: scoreData.score,
+        recommendation: serializeCourseRecommendation(
+          module,
+          lessonCount,
+          reason,
+          recommendationPriority(scoreData.score),
+          skillGapPercentage,
+          {
+            track: scoreData.track,
+            source_domains: scoreData.source_domains,
+            next_action_label: nextActionLabel(moduleMetadata, scoreData.certification_relevant),
+            recommended_path: moduleMetadata.start_path,
+            confidence: recommendationConfidence(scoreData.score),
+          }
+        ),
+      }
+    })
+    scoredRecommendations.sort((a, b) =>
+      b.score - a.score ||
+      Number(a.recommendation.track !== profileTrack) - Number(b.recommendation.track !== profileTrack) ||
+      Number(Boolean(b.recommendation.has_internal_lessons)) - Number(Boolean(a.recommendation.has_internal_lessons)) ||
+      String(a.recommendation.title).localeCompare(String(b.recommendation.title))
     )
 
     return jsonResponse(ctx.req, {
-      recommendations,
+      recommendations: scoredRecommendations.slice(0, 6).map((entry) => entry.recommendation),
       assessment_score: latest.data.percentage,
-      weak_domains: weakDomains,
+      weak_domains: weakDomains.slice(0, 3).map((entry) => entry.domain),
+      weak_domain_details: weakDomains.slice(0, 3),
     })
   }
 
@@ -1178,7 +1423,8 @@ const serializeCourseRecommendation = (
   lessonCount: number,
   reason: string,
   priority: string,
-  skillGapPercentage = 0
+  skillGapPercentage = 0,
+  extra: Record<string, unknown> = {}
 ) => ({
   id: module.id,
   title: module.title,
@@ -1192,6 +1438,7 @@ const serializeCourseRecommendation = (
   priority,
   skill_gap_percentage: skillGapPercentage,
   ...buildModuleMetadata(module, lessonCount),
+  ...extra,
 })
 
 const getProgressLookup = async (admin: ReturnType<typeof createClient>, userId: string | null, moduleIds: string[]) => {
@@ -1570,13 +1817,32 @@ const handleCourse = async (ctx: ApiContext) => {
     const lessonResult = await ctx.admin.from(TABLES.lesson).select('*').eq('id', lessonId).maybeSingle()
     if (lessonResult.error) throw lessonResult.error
     if (!lessonResult.data) return errorResponse(ctx.req, 'Lesson not found', 404)
-    const progress = await upsertLessonProgress(ctx.admin, auth!.userId, lessonResult.data, {
+    const existing = await ctx.admin
+      .from(TABLES.lessonProgress)
+      .select('*')
+      .eq('user_id', auth!.userId)
+      .eq('lesson_id', lessonId)
+      .maybeSingle()
+    if (existing.error) throw existing.error
+
+    const completionValues: Record<string, unknown> = {
       status: 'completed',
       completed_at: nowIso(),
       last_accessed: nowIso(),
-      time_spent_minutes: Number(body.time_spent_minutes || 0),
-      quiz_score: 'quiz_score' in body ? Number(body.quiz_score) : null,
-      quiz_attempts: lessonResult.data.content_type === 'quiz' && 'quiz_score' in body ? 1 : 0,
+      started_at: existing.data?.started_at || nowIso(),
+      time_spent_minutes: 'time_spent_minutes' in body
+        ? Math.max(Number(body.time_spent_minutes || 0), Number(existing.data?.time_spent_minutes || 0))
+        : existing.data?.time_spent_minutes || 0,
+    }
+    if ('quiz_score' in body) {
+      completionValues.quiz_score = Number(body.quiz_score)
+      completionValues.quiz_attempts = lessonResult.data.content_type === 'quiz' ? 1 : 0
+    } else if (existing.data?.quiz_score !== undefined) {
+      completionValues.quiz_score = existing.data.quiz_score
+    }
+
+    const progress = await upsertLessonProgress(ctx.admin, auth!.userId, lessonResult.data, {
+      ...completionValues,
     })
     await recalculateModuleProgress(ctx.admin, auth!.userId, lessonResult.data.module_id)
     return jsonResponse(ctx.req, {
@@ -1665,17 +1931,45 @@ const serializeCertificationType = (record: any) => ({
   updated_at: record.updated_at,
 })
 
-const evaluateCertificationReadiness = (certType: any, assessment: any, completedModules: number) => {
+const moduleCompletionMessage = (moduleStep: { module_id: string; title: string }) =>
+  `Complete ${moduleStep.title} (${moduleStep.module_id}) from Training.`
+
+const evaluateCertificationReadiness = (
+  certType: any,
+  assessment: any,
+  completedModules: number,
+  completedModuleIds = new Set<string>()
+) => {
   const reasons: string[] = []
   if (certType.id === 'ai-fundamentals') {
-    if (!assessment) reasons.push('Complete the AI readiness assessment to unlock this certificate.')
+    if (!assessment) reasons.push('Take the AI readiness assessment, then complete Introduction to AI Fundamentals.')
+    const moduleStep = CERTIFICATION_MODULE_STEPS['ai-fundamentals']
+    if (!completedModuleIds.has(moduleStep.module_id)) reasons.push(moduleCompletionMessage(moduleStep))
   } else if (certType.id === 'litmusai-professional') {
-    if (!assessment || Number(assessment.percentage || 0) < 70) reasons.push('Score at least 70% on the AI readiness assessment.')
-    if (completedModules < 3) reasons.push('Complete at least 3 training modules before applying.')
+    if (!assessment || Number(assessment.percentage || 0) < 70) {
+      reasons.push(
+        assessment
+          ? `Retake the AI readiness assessment and raise your score from ${Number(assessment.percentage || 0).toFixed(1)}% to at least 70%.`
+          : 'Take the AI readiness assessment and score at least 70%.'
+      )
+    }
+    if (completedModules < 3) {
+      const remaining = Math.max(0, 3 - completedModules)
+      reasons.push(`Complete ${remaining} more training module${remaining === 1 ? '' : 's'} (${completedModules}/3 completed) before applying.`)
+    }
   } else if (certType.id === 'ai-ethics-specialist') {
     const ethics = safeJsonParse(assessment?.domain_scores, {})['Ethics & Critical Thinking']?.score || assessment?.rhetorical_score || 0
-    if (ethics < 3) reasons.push('Increase your Ethics & Critical Thinking score to 3 or higher.')
-    if (completedModules < 2) reasons.push('Complete at least 2 training modules to demonstrate applied practice.')
+    if (!assessment) {
+      reasons.push('Take the AI readiness assessment and score 3/3 in Ethics & Critical Thinking.')
+    } else if (ethics < 3) {
+      reasons.push(`Review Ethical AI in HR Practices, then retake the assessment and raise Ethics & Critical Thinking from ${ethics}/3 to 3/3.`)
+    }
+    const moduleStep = CERTIFICATION_MODULE_STEPS['ai-ethics-specialist']
+    if (!completedModuleIds.has(moduleStep.module_id)) reasons.push(moduleCompletionMessage(moduleStep))
+    if (completedModules < 2) {
+      const remaining = Math.max(0, 2 - completedModules)
+      reasons.push(`Complete ${remaining} more training module${remaining === 1 ? '' : 's'} (${completedModules}/2 completed) to demonstrate applied practice.`)
+    }
   }
   return { eligible: reasons.length === 0, reasons }
 }
@@ -1684,6 +1978,28 @@ const generateVerificationCode = () => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   const bytes = crypto.getRandomValues(new Uint8Array(8))
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('')
+}
+
+const insertCertificationWithUniqueCode = async (
+  admin: ReturnType<typeof createClient>,
+  values: Record<string, unknown>
+) => {
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { data, error } = await admin
+      .from(TABLES.certification)
+      .insert({
+        ...values,
+        verification_code: generateVerificationCode(),
+      })
+      .select('*')
+      .single()
+
+    if (!error) return data
+    lastError = error
+    if (error.code !== '23505') break
+  }
+  throw lastError
 }
 
 const serializeAwardedCertification = (certification: any, certType?: any) => ({
@@ -1707,6 +2023,7 @@ const handleCertification = async (ctx: ApiContext) => {
     if (certs.error) throw certs.error
     let latestAssessment: any = null
     let completedModules = 0
+    let completedModuleIds = new Set<string>()
     if (auth?.userId) {
       const latest = await ctx.admin
         .from(TABLES.assessmentResult)
@@ -1719,21 +2036,22 @@ const handleCertification = async (ctx: ApiContext) => {
       latestAssessment = latest.data
       const progress = await ctx.admin
         .from(TABLES.userProgress)
-        .select('id')
+        .select('module_id')
         .eq('user_id', auth.userId)
         .eq('status', 'completed')
       if (progress.error) throw progress.error
       completedModules = progress.data?.length || 0
+      completedModuleIds = new Set((progress.data || []).map((entry: any) => entry.module_id))
     }
     const certifications = (certs.data || []).map((record: any) => {
       const serialized = serializeCertificationType(record)
       const requiredTier = record.access_tier || (record.is_premium ? 'professional' : 'free')
       const readiness = auth?.userId
-        ? evaluateCertificationReadiness(record, latestAssessment, completedModules)
+        ? evaluateCertificationReadiness(record, latestAssessment, completedModules, completedModuleIds)
         : { eligible: false, reasons: ['Sign in to evaluate your certification readiness.'] }
       const upgradeRequired = !hasTierAccess(currentTier, requiredTier)
       const missingRequirements = [...readiness.reasons]
-      if (upgradeRequired) missingRequirements.push(`Upgrade to ${requiredTier} to unlock this certification.`)
+      if (upgradeRequired) missingRequirements.push(`Upgrade to ${requiredTier} in billing to unlock this certification.`)
       return {
         ...serialized,
         required_tier: requiredTier,
@@ -1858,11 +2176,17 @@ const handleCertification = async (ctx: ApiContext) => {
     if (latest.error) throw latest.error
     const completed = await ctx.admin
       .from(TABLES.userProgress)
-      .select('id')
+      .select('module_id')
       .eq('user_id', auth!.userId)
       .eq('status', 'completed')
     if (completed.error) throw completed.error
-    const readiness = evaluateCertificationReadiness(certType.data, latest.data, completed.data?.length || 0)
+    const completedModuleIds = new Set((completed.data || []).map((entry: any) => entry.module_id))
+    const readiness = evaluateCertificationReadiness(
+      certType.data,
+      latest.data,
+      completed.data?.length || 0,
+      completedModuleIds
+    )
     if (!readiness.eligible) {
       return jsonResponse(ctx.req, {
         message: 'Certification requirements not met yet.',
@@ -1873,20 +2197,14 @@ const handleCertification = async (ctx: ApiContext) => {
 
     const issuedAt = new Date()
     const expiresAt = certType.data.is_premium ? new Date(issuedAt.getTime() + 730 * 24 * 60 * 60 * 1000).toISOString() : null
-    const { data, error } = await ctx.admin
-      .from(TABLES.certification)
-      .insert({
-        user_id: auth!.userId,
-        certification_type: certType.data.title,
-        catalog_id: certType.data.id,
-        verification_code: generateVerificationCode(),
-        issued_at: issuedAt.toISOString(),
-        expires_at: expiresAt,
-        skills_validated: JSON.stringify(parseJsonArray(certType.data.skills_validated)),
-      })
-      .select('*')
-      .single()
-    if (error) throw error
+    const data = await insertCertificationWithUniqueCode(ctx.admin, {
+      user_id: auth!.userId,
+      certification_type: certType.data.title,
+      catalog_id: certType.data.id,
+      issued_at: issuedAt.toISOString(),
+      expires_at: expiresAt,
+      skills_validated: JSON.stringify(parseJsonArray(certType.data.skills_validated)),
+    })
     return jsonResponse(ctx.req, {
       status: 'issued',
       message: 'Certification granted successfully',

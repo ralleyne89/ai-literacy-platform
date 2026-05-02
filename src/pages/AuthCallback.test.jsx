@@ -85,6 +85,26 @@ describe('AuthCallback', () => {
     })
   })
 
+  it('redirects Google provider setup errors back to login with a config code', async () => {
+    mockLocation.search = '?error_description=Unsupported%20provider%3A%20provider%20is%20not%20enabled'
+    mockLocation.state = { returnTo: '/training' }
+
+    render(<AuthCallback />)
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/login', {
+        replace: true,
+        state: {
+          from: { pathname: '/training' },
+          authError: {
+            code: 'google_oauth_provider_misconfigured',
+            error: expect.stringContaining('Google sign-in is not configured correctly'),
+          },
+        },
+      })
+    })
+  })
+
   it('redirects back to login when the callback has no session or code', async () => {
     mockLocation.state = { returnTo: '/training' }
 
