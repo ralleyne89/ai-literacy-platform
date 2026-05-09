@@ -1,4 +1,6 @@
 from datetime import timedelta
+import base64
+import json
 
 import pytest
 
@@ -22,6 +24,49 @@ def test_demo_bearer_token_is_rejected_in_production(client, app, monkeypatch):
     response = client.get(
         '/api/auth/profile',
         headers={'Authorization': 'Bearer demo'},
+    )
+
+    assert response.status_code == 401
+    assert response.get_json() == {'error': 'Unauthorized'}
+
+
+def test_demo_payload_token_creates_review_user_when_enabled(client, app):
+    payload = {
+        'email': 'reggiealleyne89@gmail.com',
+        'user_metadata': {
+            'first_name': 'Reggie',
+            'last_name': 'Alleyne',
+        },
+        'role': 'learner',
+    }
+    encoded = base64.urlsafe_b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8').rstrip('=')
+
+    response = client.get(
+        '/api/auth/profile',
+        headers={'Authorization': f'Bearer demo.{encoded}'},
+    )
+
+    assert response.status_code == 200
+    user = response.get_json()['user']
+    assert user['email'] == 'reggiealleyne89@gmail.com'
+    assert user['first_name'] == 'Reggie'
+    assert user['last_name'] == 'Alleyne'
+
+    with app.app_context():
+        stored = User.query.get(user['id'])
+        assert stored is not None
+        assert stored.auth_provider == 'demo'
+
+
+def test_demo_payload_token_is_rejected_in_production(client, app, monkeypatch):
+    payload = {'email': 'reggiealleyne89@gmail.com'}
+    encoded = base64.urlsafe_b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8').rstrip('=')
+    monkeypatch.setitem(app.config, 'TESTING', False)
+    monkeypatch.setitem(app.config, 'FLASK_ENV', 'production')
+
+    response = client.get(
+        '/api/auth/profile',
+        headers={'Authorization': f'Bearer demo.{encoded}'},
     )
 
     assert response.status_code == 401

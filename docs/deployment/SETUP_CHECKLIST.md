@@ -7,7 +7,7 @@
 - `VITE_SUPABASE_URL` is set for Netlify
 - `VITE_SUPABASE_PUBLISHABLE_KEY` is set for Netlify
 - `SUPABASE_SERVICE_ROLE_KEY` is set as a Supabase Edge Function secret
-- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and `STRIPE_WEBHOOK_SECRET` are set as Supabase Edge Function secrets
+- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PREMIUM`, and `STRIPE_PRICE_ENTERPRISE` are set as Supabase Edge Function secrets
 
 ## 2. Configure Stripe Webhook
 

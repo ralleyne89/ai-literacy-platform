@@ -30,13 +30,13 @@ const parseNumericValue = (value, fallback = null) => {
   return fallback
 }
 
-export const normalizeContentType = (value, fallback = 'video') =>
+const normalizeContentType = (value, fallback = 'video') =>
   getStringValue(value, fallback).toLowerCase()
 
-export const isExternalContentType = (value) =>
+const isExternalContentType = (value) =>
   EXTERNAL_CONTENT_TYPES.has(normalizeContentType(value, ''))
 
-export const hasInternalLessons = (item = {}) => {
+const hasInternalLessons = (item = {}) => {
   const explicitValue = item.has_internal_lessons ?? item.hasInternalLessons
   if (explicitValue === true || explicitValue === 'true') {
     return true
@@ -53,7 +53,7 @@ export const hasInternalLessons = (item = {}) => {
   return lessonCount !== null ? lessonCount > 0 : false
 }
 
-export const getSafeTrainingModulePath = (item = {}, { preferLearn = false } = {}) => {
+const getSafeTrainingModulePath = (item = {}, { preferLearn = false } = {}) => {
   const moduleId = getStringValue(item.id, getStringValue(item.module_id, getStringValue(item.moduleId)))
   if (!moduleId) {
     return '/training'
@@ -155,6 +155,7 @@ const TrainingPage = () => {
   const [recommendations, setRecommendations] = useState([])
   const [recommendationsMessage, setRecommendationsMessage] = useState('')
   const [recommendationsLoading, setRecommendationsLoading] = useState(false)
+  const [recommendationContext, setRecommendationContext] = useState({})
 
   const { isAuthenticated, user } = useAuth()
 
@@ -217,6 +218,7 @@ const TrainingPage = () => {
       if (!isAuthenticated) {
         setRecommendations([])
         setRecommendationsMessage('')
+        setRecommendationContext({})
         setRecommendationsLoading(false)
         return
       }
@@ -230,8 +232,13 @@ const TrainingPage = () => {
           return
         }
 
-        setRecommendations(normalizeRecommendations(response?.data?.recommendations))
-        setRecommendationsMessage(getStringValue(response?.data?.message))
+	        setRecommendations(normalizeRecommendations(response?.data?.recommendations))
+	        setRecommendationsMessage(getStringValue(response?.data?.message))
+	        setRecommendationContext({
+	          assessmentLevel: getStringValue(response?.data?.assessment_level),
+	          assessmentScore: response?.data?.assessment_score,
+	          weakDomains: Array.isArray(response?.data?.weak_domains) ? response.data.weak_domains : []
+	        })
       } catch {
         if (!isMounted) {
           return
@@ -246,11 +253,13 @@ const TrainingPage = () => {
               has_internal_lessons: false
             }))
           )
-          setRecommendationsMessage('')
-        } else {
-          setRecommendations([])
-          setRecommendationsMessage('Take or retake the assessment to refresh your course recommendations.')
-        }
+	          setRecommendationsMessage('')
+	          setRecommendationContext({})
+	        } else {
+	          setRecommendations([])
+	          setRecommendationsMessage('Take or retake the assessment to refresh your course recommendations.')
+	          setRecommendationContext({})
+	        }
       } finally {
         if (isMounted) {
           setRecommendationsLoading(false)
@@ -322,6 +331,14 @@ const TrainingPage = () => {
       return normalised.charAt(0).toUpperCase() + normalised.slice(1)
     }
     return texts[normalised] || 'Unknown'
+  }
+
+  const getAssessmentLevelText = (level) => {
+    const normalized = String(level || '').trim().toLowerCase()
+    if (!normalized) {
+      return ''
+    }
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
   }
 
   const getContentTypeIcon = (type) => {
@@ -410,10 +427,19 @@ const TrainingPage = () => {
                   Personalized path
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900">Recommended for your AI readiness</h2>
-                <p className="mt-1 max-w-2xl text-sm text-gray-600">
-                  Based on your latest assessment, start with the courses most likely to strengthen your next skill gap.
-                </p>
-              </div>
+	                <p className="mt-1 max-w-2xl text-sm text-gray-600">
+	                  Based on your latest assessment, start with the courses most likely to strengthen your next skill gap.
+	                </p>
+	                {recommendationContext.assessmentLevel && (
+	                  <p className="mt-2 text-sm font-medium text-primary-700" data-testid="training-recommendations-context">
+	                    Tuned from your {getAssessmentLevelText(recommendationContext.assessmentLevel)} assessment
+	                    {typeof recommendationContext.assessmentScore === 'number'
+	                      ? ` at ${Math.round(recommendationContext.assessmentScore)}%`
+	                      : ''}
+	                    .
+	                  </p>
+	                )}
+	              </div>
               <Link to="/assessment" className="text-sm font-semibold text-primary-600 hover:text-primary-700">
                 Refresh assessment
               </Link>

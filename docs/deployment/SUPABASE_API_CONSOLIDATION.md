@@ -25,9 +25,9 @@ supabase secrets set \
   SUPABASE_URL="https://<project-ref>.supabase.co" \
   SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
   FRONTEND_URL="https://litmusai.netlify.app" \
-  STRIPE_SECRET_KEY="sk_live_or_test_..." \
-  STRIPE_PUBLISHABLE_KEY="pk_live_or_test_..." \
-  STRIPE_WEBHOOK_SECRET="whsec_..." \
+  STRIPE_SECRET_KEY="<stripe-secret-key>" \
+  STRIPE_PUBLISHABLE_KEY="<stripe-publishable-key>" \
+  STRIPE_WEBHOOK_SECRET="<stripe-webhook-secret>" \
   STRIPE_PRICE_PREMIUM="price_..." \
   STRIPE_PRICE_ENTERPRISE="price_..."
 ```

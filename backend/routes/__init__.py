@@ -1,10 +1,13 @@
 from functools import wraps
+import base64
+import json
 import os
+import uuid
 
 import jwt
 from jwt import PyJWKClient
 from flask import current_app, g, jsonify, request
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from auth_identity import (
     AuthIdentityConflictError,
@@ -14,6 +17,7 @@ from auth_identity import (
 
 
 DEMO_USER_ID = 'demo-user'
+DEMO_TOKEN_PREFIX = 'demo.'
 SUPABASE_PROVIDER = 'supabase'
 DEMO_PROVIDER = 'demo'
 _SUPABASE_JWKS_CLIENTS = {}
@@ -139,25 +143,121 @@ def _demo_auth_enabled():
     return _truthy_config('ENABLE_DEMO_AUTH') or environment == 'demo'
 
 
-def _get_or_create_demo_user():
+def _truncate(value, max_length, fallback=''):
+    normalized = str(value or '').strip()
+    if not normalized:
+        return fallback
+    return normalized[:max_length]
+
+
+def _default_demo_claims():
+    return {
+        'sub': DEMO_USER_ID,
+        'email': 'demo@example.com',
+        'user_metadata': {
+            'first_name': 'Demo',
+            'last_name': 'User',
+        },
+        'role': 'learner',
+    }
+
+
+def _decode_demo_payload_token(token):
+    if token == 'demo':
+        return _default_demo_claims()
+
+    if not isinstance(token, str) or not token.startswith(DEMO_TOKEN_PREFIX):
+        return None
+
+    encoded = token[len(DEMO_TOKEN_PREFIX):].strip()
+    if not encoded:
+        return None
+
+    try:
+        padding = '=' * (-len(encoded) % 4)
+        decoded = base64.urlsafe_b64decode(f'{encoded}{padding}'.encode('utf-8')).decode('utf-8')
+        payload = json.loads(decoded)
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    email = _truncate(payload.get('email'), 120).lower()
+    if '@' not in email:
+        return None
+
+    metadata = payload.get('user_metadata') if isinstance(payload.get('user_metadata'), dict) else {}
+    first_name = _truncate(metadata.get('first_name') or payload.get('first_name'), 50, 'Review')
+    last_name = _truncate(metadata.get('last_name') or payload.get('last_name'), 50, 'User')
+    role = _truncate(payload.get('role'), 50, 'learner')
+    organization = _truncate(payload.get('organization'), 100, '')
+    subject = str(uuid.uuid5(uuid.NAMESPACE_URL, f'litmusai-demo-review:{email}'))
+
+    return {
+        'sub': subject,
+        'email': email,
+        'user_metadata': {
+            'first_name': first_name,
+            'last_name': last_name,
+        },
+        'role': role,
+        'organization': organization,
+    }
+
+
+def _get_or_create_demo_user(claims=None):
     from models import User, db
 
-    user = User.query.get(DEMO_USER_ID)
+    demo_claims = claims if isinstance(claims, dict) else _default_demo_claims()
+    subject = _truncate(demo_claims.get('sub'), 36, DEMO_USER_ID)
+    email = _truncate(demo_claims.get('email'), 120, 'demo@example.com').lower()
+    metadata = demo_claims.get('user_metadata') if isinstance(demo_claims.get('user_metadata'), dict) else {}
+    first_name = _truncate(metadata.get('first_name'), 50, 'Demo')
+    last_name = _truncate(metadata.get('last_name'), 50, 'User')
+    role = _truncate(demo_claims.get('role'), 50, 'learner')
+    organization = _truncate(demo_claims.get('organization'), 100, '')
+
+    user = User.query.get(subject)
     if user is not None:
+        user.email = email
+        user.first_name = first_name
+        user.last_name = last_name
+        user.role = role
+        user.organization = organization or None
+        db.session.commit()
+        return user
+
+    user = User.query.filter_by(email=email).first()
+    if user is not None:
+        user.auth_provider = DEMO_PROVIDER
+        user.auth_subject = subject
+        user.first_name = first_name
+        user.last_name = last_name
+        user.role = role
+        user.organization = organization or None
+        db.session.commit()
         return user
 
     user = User(
-        id=DEMO_USER_ID,
-        email='demo@example.com',
+        id=subject,
+        email=email,
         password_hash='demo',
         auth_provider=DEMO_PROVIDER,
-        auth_subject=DEMO_USER_ID,
-        first_name='Demo',
-        last_name='User',
-        role='learner',
+        auth_subject=subject,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+        organization=organization or None,
     )
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        user = User.query.get(subject) or User.query.filter_by(email=email).first()
+        if user is None:
+            raise
     return user
 
 
@@ -279,13 +379,14 @@ def _decode_token_identity(optional=False, token=None, allowed_providers=None):
     if token is None:
         return None
 
-    if token == 'demo' and _demo_auth_enabled():
-        demo_user = _get_or_create_demo_user()
+    demo_claims = _decode_demo_payload_token(token)
+    if demo_claims and _demo_auth_enabled():
+        demo_user = _get_or_create_demo_user(demo_claims)
         return {
             'provider': DEMO_PROVIDER,
-            'subject': DEMO_USER_ID,
+            'subject': demo_claims['sub'],
             'user_id': demo_user.id,
-            'claims': {'sub': demo_user.id},
+            'claims': demo_claims,
         }
 
     providers = tuple(allowed_providers or _default_allowed_providers())

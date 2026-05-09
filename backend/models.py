@@ -57,6 +57,7 @@ class AssessmentResult(db.Model):
     total_score = db.Column(db.Integer, nullable=False)
     max_score = db.Column(db.Integer, nullable=False)
     percentage = db.Column(db.Float, nullable=False)
+    assessment_level = db.Column(db.String(20), default='beginner')
     functional_score = db.Column(db.Integer, default=0)
     ethical_score = db.Column(db.Integer, default=0)
     rhetorical_score = db.Column(db.Integer, default=0)

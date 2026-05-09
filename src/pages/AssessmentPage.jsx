@@ -5,8 +5,36 @@ import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
 const STORAGE_KEY = 'assessmentProgress_v2'
-const ASSESSMENT_VERSION = '2026-03-03-randomized-v1'
+export const ASSESSMENT_VERSION = '2026-05-09-level-aware-v1'
 export const PENDING_ASSESSMENT_SUBMISSION_KEY = 'assessmentPendingSubmission_v1'
+
+const ASSESSMENT_LEVEL_OPTIONS = [
+  {
+    value: 'beginner',
+    label: 'Beginner',
+    description: 'I am learning the basics and want plain-language questions.'
+  },
+  {
+    value: 'intermediate',
+    label: 'Intermediate',
+    description: 'I use AI sometimes and want practical workplace scenarios.'
+  },
+  {
+    value: 'advanced',
+    label: 'Advanced',
+    description: 'I already use AI often and want more strategic questions.'
+  }
+]
+
+const normalizeAssessmentLevel = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return ASSESSMENT_LEVEL_OPTIONS.some(option => option.value === normalized) ? normalized : ''
+}
+
+const getAssessmentLevelLabel = (value) => {
+  const normalized = normalizeAssessmentLevel(value)
+  return ASSESSMENT_LEVEL_OPTIONS.find(option => option.value === normalized)?.label || ''
+}
 
 const clearStoredAssessmentProgress = () => {
   if (typeof window === 'undefined') {
@@ -83,7 +111,12 @@ const clearPendingAssessmentSubmission = () => {
   }
 }
 
-const buildAssessmentSubmissionPayload = (questions, answers, selectedQuestionIds) => {
+const buildAssessmentSubmissionPayload = (
+  questions,
+  answers,
+  selectedQuestionIds,
+  { assessmentLevel, questionSetToken } = {}
+) => {
   const optionMap = questions.reduce((acc, question) => {
     acc[question.id] = {
       A: question.option_a,
@@ -98,6 +131,14 @@ const buildAssessmentSubmissionPayload = (questions, answers, selectedQuestionId
     answers,
     option_map: optionMap,
     selected_question_ids: selectedQuestionIds
+  }
+
+  if (assessmentLevel) {
+    payload.assessment_level = assessmentLevel
+  }
+
+  if (questionSetToken) {
+    payload.question_set_token = questionSetToken
   }
 
   if (selectedQuestionIds.length) {
@@ -119,23 +160,32 @@ const AssessmentPage = () => {
   const [showIntroModal, setShowIntroModal] = useState(true)
   const [resumeDetected, setResumeDetected] = useState(false)
   const [error, setError] = useState('')
+  const [assessmentLevel, setAssessmentLevel] = useState('')
+  const [questionSetToken, setQuestionSetToken] = useState('')
+  const [generationSource, setGenerationSource] = useState('')
 
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
   const persistProgress = ({
-    questions: persistedQuestions = questions,
-    answers: persistedAnswers = answers,
-    selectedQuestionIds: persistedSelectedQuestionIds = selectedQuestionIds,
-    currentIndex = currentQuestion
-  }) => {
-    const payload = {
-      questions: persistedQuestions,
-      answers: persistedAnswers,
-      selectedQuestionIds: persistedSelectedQuestionIds,
-      currentQuestion: currentIndex,
-      version: ASSESSMENT_VERSION
-    }
+	    questions: persistedQuestions = questions,
+	    answers: persistedAnswers = answers,
+	    selectedQuestionIds: persistedSelectedQuestionIds = selectedQuestionIds,
+	    currentIndex = currentQuestion,
+	    assessmentLevel: persistedAssessmentLevel = assessmentLevel,
+	    questionSetToken: persistedQuestionSetToken = questionSetToken,
+	    generationSource: persistedGenerationSource = generationSource
+	  }) => {
+	    const payload = {
+	      questions: persistedQuestions,
+	      answers: persistedAnswers,
+	      selectedQuestionIds: persistedSelectedQuestionIds,
+	      currentQuestion: currentIndex,
+	      assessmentLevel: persistedAssessmentLevel,
+	      questionSetToken: persistedQuestionSetToken,
+	      generationSource: persistedGenerationSource,
+	      version: ASSESSMENT_VERSION
+	    }
 
     if (typeof window === 'undefined') {
       return
@@ -157,10 +207,11 @@ const AssessmentPage = () => {
       if (!saved) {
         return
       }
-      const parsed = JSON.parse(saved)
-      const isValidVersion = parsed?.version === ASSESSMENT_VERSION
-      const hasQuestions = Array.isArray(parsed?.questions) && parsed.questions.length === 15
-      const persistedSelectedIds = Array.isArray(parsed?.selectedQuestionIds)
+	      const parsed = JSON.parse(saved)
+	      const isValidVersion = parsed?.version === ASSESSMENT_VERSION
+	      const hasQuestions = Array.isArray(parsed?.questions) && parsed.questions.length === 15
+	      const restoredLevel = normalizeAssessmentLevel(parsed?.assessmentLevel || parsed?.assessment_level)
+	      const persistedSelectedIds = Array.isArray(parsed?.selectedQuestionIds)
         ? parsed.selectedQuestionIds
         : Array.isArray(parsed?.selected_question_ids)
           ? parsed.selected_question_ids
@@ -170,14 +221,17 @@ const AssessmentPage = () => {
               ? parsed.questionIds
               : []
 
-      if (isValidVersion && hasQuestions) {
-        setQuestions(parsed.questions)
-        setAnswers(parsed.answers || {})
-        setSelectedQuestionIds(persistedSelectedIds.length ? persistedSelectedIds : parsed.questions.map((question) => question.id))
-        setCurrentQuestion(parsed.currentQuestion || 0)
-        setHasStarted(true)
-        setShowIntroModal(false)
-        setResumeDetected(true)
+	      if (isValidVersion && hasQuestions && restoredLevel) {
+	        setQuestions(parsed.questions)
+	        setAnswers(parsed.answers || {})
+	        setSelectedQuestionIds(persistedSelectedIds.length ? persistedSelectedIds : parsed.questions.map((question) => question.id))
+	        setCurrentQuestion(parsed.currentQuestion || 0)
+	        setAssessmentLevel(restoredLevel)
+	        setQuestionSetToken(parsed.questionSetToken || parsed.question_set_token || '')
+	        setGenerationSource(parsed.generationSource || parsed.generation_source || '')
+	        setHasStarted(true)
+	        setShowIntroModal(false)
+	        setResumeDetected(true)
       } else {
         clearStoredAssessmentProgress()
       }
@@ -239,19 +293,34 @@ const AssessmentPage = () => {
     }
   }, [isAuthenticated])
 
-  const startAssessment = async () => {
-    clearStoredAssessmentProgress()
-    clearPendingAssessmentSubmission()
-    setLoading(true)
-    setError('')
-    setResults(null)
-    setAnswers({})
-    setSelectedQuestionIds([])
-    setCurrentQuestion(0)
-    try {
-      const response = await axios.get('/api/assessment/questions')
-      const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
-      const payloadSelectedQuestionIds = Array.isArray(response.data?.selectedQuestionIds)
+	  const startAssessment = async () => {
+	    const requestedLevel = normalizeAssessmentLevel(assessmentLevel)
+	    if (!requestedLevel) {
+	      setError('Choose the AI level that feels closest before you start.')
+	      return
+	    }
+
+	    clearStoredAssessmentProgress()
+	    clearPendingAssessmentSubmission()
+	    setLoading(true)
+	    setError('')
+	    setResults(null)
+	    setAnswers({})
+	    setSelectedQuestionIds([])
+	    setQuestionSetToken('')
+	    setGenerationSource('')
+	    setCurrentQuestion(0)
+	    try {
+	      const response = await axios.get('/api/assessment/questions', {
+	        params: {
+	          level: requestedLevel
+	        }
+	      })
+	      const loadedQuestions = Array.isArray(response.data.questions) ? response.data.questions.slice(0, 15) : []
+	      const responseLevel = normalizeAssessmentLevel(response.data?.assessment_level) || requestedLevel
+	      const responseQuestionSetToken = response.data?.question_set_token || ''
+	      const responseGenerationSource = response.data?.generation_source || 'curated_fallback'
+	      const payloadSelectedQuestionIds = Array.isArray(response.data?.selectedQuestionIds)
         ? response.data.selectedQuestionIds
         : Array.isArray(response.data?.selected_question_ids)
           ? response.data.selected_question_ids
@@ -267,18 +336,24 @@ const AssessmentPage = () => {
         setShowIntroModal(true)
         return
       }
-      setQuestions(loadedQuestions)
-      setSelectedQuestionIds(normalizedSelectedQuestionIds)
-      setHasStarted(true)
+	      setQuestions(loadedQuestions)
+	      setSelectedQuestionIds(normalizedSelectedQuestionIds)
+	      setAssessmentLevel(responseLevel)
+	      setQuestionSetToken(responseQuestionSetToken)
+	      setGenerationSource(responseGenerationSource)
+	      setHasStarted(true)
       setShowIntroModal(false)
       setResumeDetected(false)
 
       persistProgress({
-        questions: loadedQuestions,
-        selectedQuestionIds: normalizedSelectedQuestionIds,
-        answers: {},
-        currentIndex: 0
-      })
+	        questions: loadedQuestions,
+	        selectedQuestionIds: normalizedSelectedQuestionIds,
+	        answers: {},
+	        currentIndex: 0,
+	        assessmentLevel: responseLevel,
+	        questionSetToken: responseQuestionSetToken,
+	        generationSource: responseGenerationSource
+	      })
     } catch (error) {
       setError('Failed to load assessment questions. Please try again later.')
     } finally {
@@ -314,11 +389,14 @@ const AssessmentPage = () => {
     }
   }
 
-  const handleSubmit = async () => {
+	  const handleSubmit = async () => {
     setIsSubmitting(true)
     setError('')
     try {
-      const payload = buildAssessmentSubmissionPayload(questions, answers, selectedQuestionIds)
+	      const payload = buildAssessmentSubmissionPayload(questions, answers, selectedQuestionIds, {
+	        assessmentLevel,
+	        questionSetToken
+	      })
       const response = await axios.post('/api/assessment/submit', payload)
       setResults(response.data)
       if (response.data?.saved) {
@@ -342,8 +420,9 @@ const AssessmentPage = () => {
     return ((currentQuestion + 1) / questions.length) * 100
   }
 
-  const progressValue = getProgressPercentage()
-  const progressDisplay = Math.round(progressValue)
+	  const progressValue = getProgressPercentage()
+	  const progressDisplay = Math.round(progressValue)
+	  const assessmentLevelLabel = getAssessmentLevelLabel(assessmentLevel)
 
   const getDomainColor = (domain) => {
     const colors = {
@@ -411,12 +490,17 @@ const AssessmentPage = () => {
               <h2 className="text-2xl font-bold mb-2">Overall Score</h2>
               <div className="text-4xl font-bold mb-2">{results.percentage}%</div>
               <p className="opacity-90">{results.total_score} out of {results.max_score} questions correct</p>
-              {results.score_band && (
-                <p className="mt-2 text-sm uppercase tracking-wide text-white/80">
-                  LitmusAI Level: {results.score_band}
-                </p>
-              )}
-            </div>
+	              {results.score_band && (
+	                <p className="mt-2 text-sm uppercase tracking-wide text-white/80">
+	                  LitmusAI Level: {results.score_band}
+	                </p>
+	              )}
+	              {(results.assessment_level || assessmentLevel) && (
+	                <p className="mt-2 text-sm text-white/80">
+	                  Questions tuned for: {getAssessmentLevelLabel(results.assessment_level || assessmentLevel)}
+	                </p>
+	              )}
+	            </div>
 
             {/* Domain Breakdown */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -560,9 +644,9 @@ const AssessmentPage = () => {
           )}
         </div>
 
-        {showIntroModal && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-gray-900/60 px-4">
-            <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8">
+	        {showIntroModal && (
+	          <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-gray-900/60 px-4 py-6 sm:items-center">
+	            <div className="max-h-[calc(100vh-3rem)] max-w-xl w-full overflow-y-auto bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
                   <Brain className="w-6 h-6 text-white" />
@@ -573,9 +657,9 @@ const AssessmentPage = () => {
                 </div>
               </div>
 
-              <p className="text-gray-700 mb-6">
-                This 15-question assessment evaluates your current AI proficiency across three key dimensions:
-              </p>
+	              <p className="text-gray-700 mb-6">
+	                This 15-question assessment evaluates your current AI proficiency across the skills that matter most at work.
+	              </p>
 
               <div className="space-y-4 mb-6">
                 <div>
@@ -592,9 +676,40 @@ const AssessmentPage = () => {
                 </div>
               </div>
 
-              <p className="text-sm text-gray-600 mb-6">
-                The test takes approximately 3-5 minutes to complete. Your results will provide a personalized AI proficiency score and tailored recommendations.
-              </p>
+	              <div className="mb-6">
+	                <p className="mb-3 text-sm font-semibold text-gray-900">
+	                  First, choose the level that feels closest to you.
+	                </p>
+	                <div className="grid gap-3">
+	                  {ASSESSMENT_LEVEL_OPTIONS.map(option => {
+	                    const isSelected = assessmentLevel === option.value
+	                    return (
+	                      <button
+	                        key={option.value}
+	                        type="button"
+	                        onClick={() => {
+	                          setAssessmentLevel(option.value)
+	                          setError('')
+	                        }}
+	                        aria-pressed={isSelected}
+	                        className={`rounded-xl border p-4 text-left transition-all duration-200 ${
+	                          isSelected
+	                            ? 'border-primary-600 bg-primary-50 shadow-sm'
+	                            : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-gray-50'
+	                        }`}
+	                        data-testid={`assessment-level-${option.value}`}
+	                      >
+	                        <span className="block font-semibold text-gray-900">{option.label}</span>
+	                        <span className="mt-1 block text-sm text-gray-600">{option.description}</span>
+	                      </button>
+	                    )
+	                  })}
+	                </div>
+	              </div>
+
+	              <p className="text-sm text-gray-600 mb-6">
+	                The test takes about 3-5 minutes. Your results will give you a practical AI readiness score and a course path matched to your next step.
+	              </p>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
                 <button
@@ -607,13 +722,13 @@ const AssessmentPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={startAssessment}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
-                  data-testid="assessment-start-button"
-                >
-                  Start the test
-                </button>
+	                  onClick={startAssessment}
+	                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+	                  disabled={loading || !assessmentLevel}
+	                  data-testid="assessment-start-button"
+	                >
+	                  {loading ? 'Preparing questions...' : 'Start the test'}
+	                </button>
               </div>
             </div>
           </div>
@@ -633,10 +748,19 @@ const AssessmentPage = () => {
 
 
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">LitmusAI Assessment</h1>
-          <p className="text-gray-600">Discover your AI readiness across all domains</p>
-        </div>
+	        <div className="text-center mb-8">
+	          <h1 className="text-3xl font-bold text-gray-900 mb-2">LitmusAI Assessment</h1>
+	          <p className="text-gray-600">
+	            {assessmentLevelLabel
+	              ? `${assessmentLevelLabel} question set across all AI readiness domains`
+	              : 'Discover your AI readiness across all domains'}
+	          </p>
+	          {generationSource && (
+	            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-500" data-testid="assessment-generation-source">
+	              {generationSource === 'openrouter' ? 'Generated question set' : 'Curated question set'}
+	            </p>
+	          )}
+	        </div>
 
         {/* Progress Bar */}
         <div className="mb-8">

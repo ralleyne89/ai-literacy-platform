@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { DEMO_FALLBACK_MODULE_DETAILS, DEMO_FALLBACK_MODULE_IDS } from '../data/demoFallback'
 import { normalizeVideoSource } from '../utils/videoUrls'
 
+const MODULE_LOAD_TIMEOUT_MS = 20000
+
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
@@ -19,16 +21,31 @@ const TrainingModulePage = () => {
   const [progress, setProgress] = useState(null)
 
   useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => {
+      controller.abort()
+    }, MODULE_LOAD_TIMEOUT_MS)
+
     const loadModule = async () => {
       try {
         setLoading(true)
         setError('')
 
-        const { data } = await axios.get(`/api/training/modules/${moduleId}`)
+        const { data } = await axios.get(`/api/training/modules/${moduleId}`, {
+          signal: controller.signal,
+        })
+        if (!isMounted) {
+          return
+        }
         const nextModule = data?.module || null
         setModule(nextModule)
         setProgress(nextModule?.progress || null)
       } catch {
+        if (!isMounted) {
+          return
+        }
+
         if (user?.id === 'demo-user' && DEMO_FALLBACK_MODULE_IDS.includes(moduleId)) {
           const fallback = DEMO_FALLBACK_MODULE_DETAILS[moduleId]
           if (fallback) {
@@ -38,15 +55,26 @@ const TrainingModulePage = () => {
           } else {
             setError('Unable to load this module right now. Please try again later.')
           }
+        } else if (controller.signal.aborted) {
+          setError('This module is taking longer than expected to load. Go back to the Training Hub and try again.')
         } else {
           setError('Unable to load this module right now. Please try again later.')
         }
       } finally {
-        setLoading(false)
+        window.clearTimeout(timeoutId)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     loadModule()
+
+    return () => {
+      isMounted = false
+      window.clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [moduleId, isAuthenticated, user?.id])
 
   const handleEnroll = async () => {

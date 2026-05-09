@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -23,6 +23,7 @@ import {
 import { motion, useReducedMotion } from 'framer-motion'
 import { HeroGeometric } from '@/components/ui/shape-landing-hero'
 import ClientFeedback from '@/components/ui/testimonial'
+import { gsap, useGSAP } from '@/utils/gsap'
 
 const reveal = {
   hidden: { opacity: 0, y: 36 },
@@ -67,62 +68,137 @@ const MetricPill = ({ icon: Icon, label, value }) => (
   </div>
 )
 
-const ProductPreview = () => (
-  <div className="glass-panel relative mx-auto max-w-xl overflow-hidden p-4 text-white lg:mx-0">
-    <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-white/5 to-secondary-500/10" />
-    <div className="relative rounded-[1.5rem] border border-white/10 bg-brand-navy/72 p-5 shadow-brand-lg">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-white">AI readiness dashboard</div>
-          <div className="text-xs text-white/50">Personal plan after assessment</div>
-        </div>
-        <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">
-          Live path
-        </span>
-      </div>
+const completeJourneyFeatures = [
+  {
+    icon: Target,
+    title: 'Assess AI readiness',
+    description: 'Benchmark core concepts, responsible use, prompting, and practical workplace judgment.',
+    color: 'text-primary-600',
+    glow: 'from-primary-500/16',
+  },
+  {
+    icon: GraduationCap,
+    title: 'Build with guided practice',
+    description: 'Role-specific modules turn AI concepts into real workflows, prompts, and review habits.',
+    color: 'text-secondary-600',
+    glow: 'from-secondary-500/16',
+  },
+  {
+    icon: Award,
+    title: 'Certify proficiency',
+    description: 'Validate practical skill with credentials designed to signal workplace-ready AI literacy.',
+    color: 'text-accent-orange',
+    glow: 'from-accent-orange/16',
+  },
+]
 
-      <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Readiness score</div>
-          <div className="mt-4 flex items-end gap-2">
-            <span className="text-6xl font-bold tracking-tight text-white">74</span>
-            <span className="pb-2 text-sm font-semibold text-emerald-200">+18 pts</span>
+const ProductPreview = () => {
+  const previewRef = useRef(null)
+
+  useGSAP(
+    () => {
+      const root = previewRef.current
+      const card = root?.querySelector('[data-product-preview-card]')
+
+      if (!root || !card || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return undefined
+      }
+
+      gsap.set(card, {
+        transformPerspective: 900,
+        transformOrigin: 'center',
+        willChange: 'transform',
+      })
+
+      const rotateXTo = gsap.quickTo(card, 'rotationX', { duration: 0.5, ease: 'power3.out' })
+      const rotateYTo = gsap.quickTo(card, 'rotationY', { duration: 0.5, ease: 'power3.out' })
+      const yTo = gsap.quickTo(card, 'y', { duration: 0.45, ease: 'power3.out' })
+
+      const handlePointerMove = (event) => {
+        const rect = card.getBoundingClientRect()
+        const x = (event.clientX - rect.left) / rect.width - 0.5
+        const y = (event.clientY - rect.top) / rect.height - 0.5
+
+        rotateXTo(y * -6)
+        rotateYTo(x * 7)
+        yTo(-4)
+      }
+
+      const resetCard = () => {
+        rotateXTo(0)
+        rotateYTo(0)
+        yTo(0)
+      }
+
+      root.addEventListener('pointermove', handlePointerMove)
+      root.addEventListener('pointerleave', resetCard)
+
+      return () => {
+        root.removeEventListener('pointermove', handlePointerMove)
+        root.removeEventListener('pointerleave', resetCard)
+        gsap.set(card, { clearProps: 'transform,willChange' })
+      }
+    },
+    { scope: previewRef }
+  )
+
+  return (
+    <div ref={previewRef} className="glass-panel relative mx-auto max-w-xl overflow-hidden p-4 text-white [perspective:900px] lg:mx-0">
+      <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-white/5 to-secondary-500/10" />
+      <div data-product-preview-card className="relative rounded-[1.5rem] border border-white/10 bg-brand-navy/72 p-5 shadow-brand-lg">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-white">AI readiness dashboard</div>
+            <div className="text-xs text-white/50">Personal plan after assessment</div>
           </div>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-            <motion.div
-              className="h-full rounded-full bg-gradient-primary"
-              initial={{ width: '0%' }}
-              whileInView={{ width: '74%' }}
-              viewport={{ once: true }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            />
-          </div>
+          <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">
+            Live path
+          </span>
         </div>
 
-        <div className="space-y-3">
-          {[
-            { label: 'Recommended module', value: 'Prompt Engineering Mastery', icon: BookOpen },
-            { label: 'Next skill gap', value: 'Evaluate AI output quality', icon: Target },
-            { label: 'Credential track', value: 'Workplace AI Proficiency', icon: Award },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-secondary-200">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div>
-                  <div className="text-xs text-white/45">{item.label}</div>
-                  <div className="text-sm font-semibold text-white">{item.value}</div>
+        <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/45">Readiness score</div>
+            <div className="mt-4 flex items-end gap-2">
+              <span className="text-6xl font-bold tracking-tight text-white">74</span>
+              <span className="pb-2 text-sm font-semibold text-emerald-200">+18 pts</span>
+            </div>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                className="h-full rounded-full bg-gradient-primary"
+                initial={{ width: '0%' }}
+                whileInView={{ width: '74%' }}
+                viewport={{ once: true }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { label: 'Recommended module', value: 'Prompt Engineering Mastery', icon: BookOpen },
+              { label: 'Next skill gap', value: 'Evaluate AI output quality', icon: Target },
+              { label: 'Credential track', value: 'Workplace AI Proficiency', icon: Award },
+            ].map((item) => {
+              const Icon = item.icon
+              return (
+                <div key={item.label} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-secondary-200">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-xs text-white/45">{item.label}</div>
+                    <div className="text-sm font-semibold text-white">{item.value}</div>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
-  </div>
-)
+  )
+}
 
 const LiteracyPlanSection = () => {
   const reduceMotion = useReducedMotion()
@@ -217,6 +293,7 @@ const LiteracyPlanSection = () => {
 
 const JourneySection = () => {
   const reduceMotion = useReducedMotion()
+  const journeyRef = useRef(null)
   const steps = [
     {
       icon: Target,
@@ -241,10 +318,43 @@ const JourneySection = () => {
     },
   ]
 
+  useGSAP(
+    () => {
+      const root = journeyRef.current
+      const line = root?.querySelector('[data-journey-line]')
+
+      if (!root || !line) return undefined
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        gsap.set(line, { scaleX: 1 })
+        return undefined
+      }
+
+      gsap.set(line, { scaleX: 0, transformOrigin: 'left center' })
+
+      const progressTween = gsap.to(line, {
+        scaleX: 1,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: root,
+          start: 'top 68%',
+          end: 'bottom 55%',
+          scrub: true,
+        },
+      })
+
+      return () => {
+        progressTween.scrollTrigger?.kill()
+        progressTween.kill()
+      }
+    },
+    { scope: journeyRef }
+  )
+
   return (
     <AnimatedSection className="relative overflow-hidden bg-brand-navy py-24 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(107,78,255,0.22),transparent_32%),radial-gradient(circle_at_80%_25%,rgba(0,210,255,0.16),transparent_30%)]" />
-      <div className="section-shell relative">
+      <div ref={journeyRef} className="section-shell relative">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
             <Zap className="h-3.5 w-3.5 text-secondary-300" />
@@ -259,12 +369,9 @@ const JourneySection = () => {
         </div>
 
         <div className="relative mt-14 grid gap-5 lg:grid-cols-3">
-          <motion.div
+          <div
+            data-journey-line
             className="absolute left-[16%] right-[16%] top-12 hidden h-px origin-left bg-gradient-to-r from-primary-400 via-secondary-400 to-emerald-300 lg:block"
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: reduceMotion ? 0 : 1.1, ease: 'easeOut' }}
           />
           {steps.map((step, index) => {
             const Icon = step.icon
@@ -300,6 +407,235 @@ const JourneySection = () => {
   )
 }
 
+const CompleteJourneySection = () => {
+  const sectionRef = useRef(null)
+
+  useGSAP(
+    () => {
+      const root = sectionRef.current
+      const path = root?.querySelector('[data-complete-journey-path]')
+      const orb = root?.querySelector('[data-complete-journey-orb]')
+      const cards = gsap.utils.toArray('[data-complete-journey-card]', root)
+      const glows = gsap.utils.toArray('[data-complete-journey-glow]', root)
+      const shells = gsap.utils.toArray('[data-complete-journey-shell]', root)
+
+      if (!root || !path || !orb || cards.length === 0) return undefined
+
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const compactLayout = window.matchMedia('(max-width: 767px)').matches
+
+      if (reduceMotion || compactLayout) {
+        gsap.set(path, { strokeDashoffset: 0 })
+        gsap.set(orb, { autoAlpha: 0 })
+        gsap.set(cards, { autoAlpha: 1, y: 0, scale: 1 })
+        gsap.set(glows, { autoAlpha: 0.36 })
+        return undefined
+      }
+
+      const pathLength = path.getTotalLength()
+      gsap.set(path, { strokeDasharray: pathLength, strokeDashoffset: pathLength })
+      gsap.set(orb, { autoAlpha: 1, xPercent: -50, yPercent: -50, transformOrigin: '50% 50%' })
+      gsap.set(cards, { autoAlpha: 0.78, y: 24, scale: 0.985, transformOrigin: 'center top' })
+      gsap.set(glows, { autoAlpha: 0 })
+
+      const timeline = gsap.timeline({
+        scrollTrigger: {
+          trigger: root,
+          start: 'top 72%',
+          end: 'bottom 46%',
+          scrub: true,
+        },
+      })
+
+      timeline
+        .to(path, { strokeDashoffset: 0, duration: 1, ease: 'none' }, 0)
+        .to(
+          orb,
+          {
+            duration: 1,
+            ease: 'none',
+            motionPath: {
+              path,
+              align: path,
+              alignOrigin: [0.5, 0.5],
+            },
+          },
+          0
+        )
+
+      cards.forEach((card, index) => {
+        const activateAt = 0.08 + index * 0.31
+        timeline
+          .to(card, { autoAlpha: 1, y: 0, scale: 1, duration: 0.18, ease: 'power2.out' }, activateAt)
+          .to(glows[index], { autoAlpha: 0.8, duration: 0.16, ease: 'power2.out' }, activateAt + 0.03)
+      })
+
+      const liftShell = (event) => {
+        const shell = event.currentTarget.querySelector('[data-complete-journey-shell]')
+        if (!shell) return
+        gsap.to(shell, {
+          y: -8,
+          scale: 1.012,
+          duration: 0.26,
+          ease: 'power3.out',
+          overwrite: 'auto',
+        })
+      }
+
+      const resetShell = (event) => {
+        const shell = event.currentTarget.querySelector('[data-complete-journey-shell]')
+        if (!shell) return
+        gsap.to(shell, {
+          y: 0,
+          scale: 1,
+          duration: 0.3,
+          ease: 'power3.out',
+          overwrite: 'auto',
+        })
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener('pointerenter', liftShell)
+        card.addEventListener('pointerleave', resetShell)
+        card.addEventListener('focus', liftShell)
+        card.addEventListener('blur', resetShell)
+      })
+
+      return () => {
+        cards.forEach((card) => {
+          card.removeEventListener('pointerenter', liftShell)
+          card.removeEventListener('pointerleave', resetShell)
+          card.removeEventListener('focus', liftShell)
+          card.removeEventListener('blur', resetShell)
+        })
+        timeline.scrollTrigger?.kill()
+        timeline.kill()
+        gsap.set(shells, { clearProps: 'transform' })
+      }
+    },
+    { scope: sectionRef }
+  )
+
+  return (
+    <AnimatedSection className="relative overflow-hidden bg-white py-20" delay={0.05}>
+      <div ref={sectionRef} className="section-shell relative">
+        <div className="absolute left-1/2 top-10 h-64 w-[52rem] max-w-[88vw] -translate-x-1/2 rounded-full bg-gradient-to-r from-primary-100/70 via-secondary-100/60 to-emerald-100/60 blur-3xl" />
+
+        <div className="relative mx-auto mb-14 max-w-3xl text-center">
+          <div className="eyebrow">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Complete system
+          </div>
+          <h2 className="mt-5 text-4xl font-bold text-slate-950 md:text-5xl">
+            The complete LitmusAI journey
+          </h2>
+          <p className="mt-5 text-lg leading-8 text-slate-600">
+            A connected path from curiosity to confidence, with measurable growth at every step.
+          </p>
+        </div>
+
+        <div className="relative">
+          <div className="relative mx-auto mb-7 hidden h-28 max-w-5xl md:block" aria-hidden="true">
+            <div className="absolute inset-x-10 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox="0 0 960 112"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="complete-journey-signal" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stopColor="#6B4EFF" />
+                  <stop offset="52%" stopColor="#00D2FF" />
+                  <stop offset="100%" stopColor="#34D399" />
+                </linearGradient>
+                <filter id="complete-journey-glow" x="-60%" y="-60%" width="220%" height="220%">
+                  <feGaussianBlur stdDeviation="7" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path
+                d="M112 58 C 238 18, 350 18, 480 58 S 716 98, 848 58"
+                fill="none"
+                stroke="rgba(15,23,42,0.1)"
+                strokeDasharray="10 14"
+                strokeLinecap="round"
+                strokeWidth="3"
+              />
+              <path
+                data-complete-journey-path
+                d="M112 58 C 238 18, 350 18, 480 58 S 716 98, 848 58"
+                fill="none"
+                stroke="url(#complete-journey-signal)"
+                strokeLinecap="round"
+                strokeWidth="4"
+              />
+              <g data-complete-journey-orb filter="url(#complete-journey-glow)">
+                <rect x="100" y="46" width="24" height="24" rx="7" fill="#08111F" />
+                <rect x="105" y="51" width="14" height="14" rx="4" fill="#8EEBFF" />
+              </g>
+            </svg>
+            {['Assess', 'Practice', 'Certify'].map((label, index) => (
+              <div
+                key={label}
+                className={`absolute top-1/2 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl border bg-white text-xs font-bold shadow-brand-sm ${
+                  index === 0
+                    ? 'left-[11.6%] border-primary-200 text-primary-600'
+                    : index === 1
+                      ? 'left-1/2 border-secondary-200 text-secondary-600'
+                      : 'left-[88.4%] border-orange-200 text-accent-orange'
+                }`}
+              >
+                0{index + 1}
+              </div>
+            ))}
+          </div>
+
+          <div className="relative z-10 grid gap-6 md:grid-cols-3">
+            {completeJourneyFeatures.map((feature, index) => {
+              const Icon = feature.icon
+              return (
+                <article
+                  key={feature.title}
+                  data-complete-journey-card
+                  tabIndex={0}
+                  className="group relative rounded-brand-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-4"
+                >
+                  <div
+                    data-complete-journey-shell
+                    className="relative h-full overflow-hidden rounded-brand-lg border border-slate-200/80 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] transition-colors duration-200 group-hover:border-primary-200"
+                  >
+                    <div data-complete-journey-glow className={`absolute inset-x-4 top-0 h-24 rounded-full bg-gradient-to-b ${feature.glow} to-transparent blur-2xl`} />
+                    <div className="absolute inset-0 rounded-brand-lg ring-1 ring-inset ring-white/70" />
+                    <div className="relative z-10">
+                      <div className="mb-8 flex items-start justify-between gap-4">
+                        <div className={`grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-slate-50 to-white shadow-brand-sm ring-1 ring-slate-200/70 ${feature.color}`}>
+                          <Icon className="h-7 w-7" />
+                        </div>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-400">
+                          0{index + 1}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-950">{feature.title}</h3>
+                      <p className="mt-3 leading-7 text-slate-600">{feature.description}</p>
+                      <div className="mt-6 flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${index === 0 ? 'bg-primary-500' : index === 1 ? 'bg-secondary-500' : 'bg-accent-orange'}`} />
+                        <span className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </AnimatedSection>
+  )
+}
+
 const Footer = () => {
   const year = new Date().getFullYear()
   const footerGroups = [
@@ -315,7 +651,6 @@ const Footer = () => {
     {
       title: 'Teams',
       links: [
-        { label: 'Enterprise', to: '/enterprise' },
         { label: 'Pricing', to: '/billing' },
       ],
     },
@@ -360,10 +695,11 @@ const Footer = () => {
         <div className="mt-12 grid gap-10 lg:grid-cols-[1.2fr_2fr]">
           <div>
             <Link to="/" className="inline-flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-primary shadow-brand-sm">
-                <Brain className="h-5 w-5 text-white" />
-              </span>
-              <span className="font-heading text-xl font-bold">LitmusAI</span>
+              <img
+                src="/generated/litmusai-logo-chatgpt-crop.png"
+                alt="LitmusAI"
+                className="h-11 w-auto object-contain"
+              />
             </Link>
             <p className="mt-5 max-w-sm leading-7 text-white/60">
               AI literacy training, assessment, and certification for people and teams who need practical capability they can use at work.
@@ -404,27 +740,6 @@ const Footer = () => {
 }
 
 const HomePage = () => {
-  const features = [
-    {
-      icon: Target,
-      title: 'Assess AI readiness',
-      description: 'Benchmark core concepts, responsible use, prompting, and practical workplace judgment.',
-      color: 'text-primary-600',
-    },
-    {
-      icon: GraduationCap,
-      title: 'Build with guided practice',
-      description: 'Role-specific modules turn AI concepts into real workflows, prompts, and review habits.',
-      color: 'text-secondary-600',
-    },
-    {
-      icon: Award,
-      title: 'Certify proficiency',
-      description: 'Validate practical skill with credentials designed to signal workplace-ready AI literacy.',
-      color: 'text-accent-orange',
-    },
-  ]
-
   return (
     <div className="min-h-screen bg-brand-mist">
       <HeroGeometric
@@ -449,38 +764,7 @@ const HomePage = () => {
 
       <LiteracyPlanSection />
       <JourneySection />
-
-      <AnimatedSection className="bg-white py-20" delay={0.05}>
-        <div className="section-shell">
-          <div className="mx-auto mb-14 max-w-3xl text-center">
-            <div className="eyebrow">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Complete system
-            </div>
-            <h2 className="mt-5 text-4xl font-bold text-slate-950 md:text-5xl">
-              The complete LitmusAI journey
-            </h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              A connected path from curiosity to confidence, with measurable growth at every step.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            {features.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <article key={feature.title} className="card">
-                  <div className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 ${feature.color}`}>
-                    <Icon className="h-7 w-7" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-950">{feature.title}</h3>
-                  <p className="mt-3 leading-7 text-slate-600">{feature.description}</p>
-                </article>
-              )
-            })}
-          </div>
-        </div>
-      </AnimatedSection>
+      <CompleteJourneySection />
 
       <AnimatedSection className="bg-brand-mist py-20" delay={0.1}>
         <div className="section-shell">
@@ -510,7 +794,7 @@ const HomePage = () => {
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link to="/assessment" className="btn-primary text-center">Start free AI assessment</Link>
-                <Link to="/enterprise" className="btn-outline text-center">Explore team options</Link>
+                <Link to="/billing" className="btn-outline text-center">Explore team options</Link>
               </div>
             </div>
 

@@ -26,7 +26,7 @@ LitmusAI deploys with this split:
 - `ALLOWED_ORIGINS=https://litmusai.netlify.app`
 - `STRIPE_SECRET_KEY=<stripe-secret>`
 - `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
-- `STRIPE_WEBHOOK_SECRET=<whsec_...>`
+- `STRIPE_WEBHOOK_SECRET=<stripe-webhook-secret>`
 - `STRIPE_PRICE_PREMIUM=<price_...>`
 - `STRIPE_PRICE_ENTERPRISE=<price_...>`
 

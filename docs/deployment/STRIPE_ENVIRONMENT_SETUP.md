@@ -8,7 +8,8 @@
 - `VITE_AUTH_MODE=supabase`
 - `VITE_SUPABASE_URL=<supabase-project-url>`
 - `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
-- `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
+
+Netlify should not hold Stripe secrets for the current production path. It only needs the frontend build variables above, and `VITE_API_URL` should point at the Supabase `platform-api` Edge Function.
 
 ### Supabase Edge Function Secrets
 
@@ -16,7 +17,7 @@
 - `SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
 - `STRIPE_SECRET_KEY=<stripe-secret>`
 - `STRIPE_PUBLISHABLE_KEY=<stripe-publishable>`
-- `STRIPE_WEBHOOK_SECRET=<whsec_...>`
+- `STRIPE_WEBHOOK_SECRET=<stripe-webhook-secret>`
 - `STRIPE_PRICE_PREMIUM=<price_...>`
 - `STRIPE_PRICE_ENTERPRISE=<price_...>`
 - `FRONTEND_URL=https://litmusai.netlify.app`

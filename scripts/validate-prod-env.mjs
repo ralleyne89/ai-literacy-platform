@@ -51,7 +51,7 @@ const legacyAuthPrefixes = ['VITE_AUTH0_', 'AUTH0_', 'VITE_CLERK_', 'CLERK_']
 const supabasePlatformApiPath = '/functions/v1/platform-api'
 const supabasePlatformApiExample = `https://<project-ref>.supabase.co${supabasePlatformApiPath}`
 const placeholderValues = new Set([
-  'pk_test_or_prod_replace_me',
+  'stripe-publishable-key-placeholder',
   'https://your-project.supabase.co',
   'sb_publishable_your-supabase-publishable-key',
   'your-supabase-anon-or-publishable-key',

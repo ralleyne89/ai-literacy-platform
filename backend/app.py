@@ -9,7 +9,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 
 from logging_config import configure_logging
-from models import TrainingModule, db
+from models import CertificationType, Lesson, TrainingModule, db
 from schema_readiness import (
     SchemaReadinessError,
     should_enforce_schema_readiness,
@@ -183,21 +183,24 @@ def _register_before_request_hooks(app: Flask):
                 return jsonify({'error': 'Application schema is not ready.'}), 503
             app.config['_schema_readiness_checked'] = True
 
-        if app.config.get('_training_seed_ensured'):
+        if app.config.get('_content_seed_ensured'):
             return
 
         environment = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
         if app.config.get('TESTING') or environment in ('production', 'prod'):
-            app.config['_training_seed_ensured'] = True
+            app.config['_content_seed_ensured'] = True
             return
 
         try:
             if TrainingModule.query.count() == 0:
                 seed_training_modules_fixture(force=False, silent=True)
+            if CertificationType.query.count() == 0:
+                seed_certification_types_fixture(force=False, silent=True)
+            seed_course_content_fixture(force=False, silent=True)
         except Exception:
-            pass
+            app.logger.exception('dev_content_seed_failed')
 
-        app.config['_training_seed_ensured'] = True
+        app.config['_content_seed_ensured'] = True
 
 
 def _enforce_startup_schema_readiness(app: Flask) -> None:
@@ -234,8 +237,13 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         environment = (os.getenv('FLASK_ENV') or os.getenv('ENV') or '').lower()
-        if environment not in ('production', 'prod') and TrainingModule.query.count() == 0:
-            seed_training_modules_fixture(force=False, silent=True)
+        if environment not in ('production', 'prod'):
+            if TrainingModule.query.count() == 0:
+                seed_training_modules_fixture(force=False, silent=True)
+            if CertificationType.query.count() == 0:
+                seed_certification_types_fixture(force=False, silent=True)
+            if Lesson.query.count() == 0:
+                seed_course_content_fixture(force=False, silent=True)
 
     port = int(os.getenv('PORT', 5001))
     debug_mode = os.getenv('FLASK_DEBUG', 'True').lower() in ('1', 'true', 'yes')

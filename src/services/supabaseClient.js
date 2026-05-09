@@ -10,6 +10,9 @@ const supabaseKey = String(
     import.meta.env.VITE_SUPABASE_ANON_KEY ||
     ''
 ).trim()
+const reviewEmail = String(import.meta.env.VITE_DEMO_REVIEW_EMAIL || '').trim().toLowerCase()
+const reviewFirstName = String(import.meta.env.VITE_DEMO_REVIEW_FIRST_NAME || '').trim()
+const reviewLastName = String(import.meta.env.VITE_DEMO_REVIEW_LAST_NAME || '').trim()
 
 const DEFAULT_STUB_SESSION = {
   access_token: 'demo',
@@ -30,11 +33,48 @@ const DEFAULT_STUB_SESSION = {
   },
 }
 
+const base64UrlEncode = (value) => {
+  if (!isBrowser) {
+    return ''
+  }
+
+  return window.btoa(unescape(encodeURIComponent(value)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+}
+
+const getStubUserMetadata = (email = '') => {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const isReviewUser = reviewEmail && normalizedEmail === reviewEmail
+
+  return {
+    first_name: isReviewUser && reviewFirstName ? reviewFirstName : DEFAULT_STUB_SESSION.user.user_metadata.first_name,
+    last_name: isReviewUser && reviewLastName ? reviewLastName : DEFAULT_STUB_SESSION.user.user_metadata.last_name,
+    name: isReviewUser && (reviewFirstName || reviewLastName)
+      ? `${reviewFirstName || 'Review'} ${reviewLastName || 'User'}`.trim()
+      : DEFAULT_STUB_SESSION.user.user_metadata.name,
+  }
+}
+
+const buildDemoAccessToken = (email, provider) => {
+  const payload = {
+    sub: 'demo-review',
+    email,
+    provider,
+    user_metadata: getStubUserMetadata(email),
+  }
+  const encoded = base64UrlEncode(JSON.stringify(payload))
+  return encoded ? `demo.${encoded}` : 'demo'
+}
+
 const buildStubSession = (email = DEFAULT_STUB_SESSION.user.email, provider = 'email') => ({
   ...DEFAULT_STUB_SESSION,
+  access_token: buildDemoAccessToken(email, provider),
   user: {
     ...DEFAULT_STUB_SESSION.user,
     email,
+    user_metadata: getStubUserMetadata(email),
     app_metadata: {
       provider,
     },
@@ -179,7 +219,12 @@ const createStubClient = () => ({
       }
 
       const state = readStubState()
-      const session = { ...DEFAULT_STUB_SESSION }
+      const session = reviewEmail
+        ? buildStubSession(reviewEmail, 'google')
+        : {
+            ...DEFAULT_STUB_SESSION,
+            access_token: 'demo',
+          }
       writeStubState({
         ...state,
         session,

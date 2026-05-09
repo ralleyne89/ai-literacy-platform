@@ -1,9 +1,12 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
-import AssessmentPage, { PENDING_ASSESSMENT_SUBMISSION_KEY } from './AssessmentPage'
+import AssessmentPage, {
+  ASSESSMENT_VERSION,
+  PENDING_ASSESSMENT_SUBMISSION_KEY
+} from './AssessmentPage'
 
 const mockAuthState = vi.hoisted(() => ({
   isAuthenticated: true,
@@ -39,6 +42,7 @@ const pendingPayload = {
   },
   selected_question_ids: ['q1'],
   selected_ids: ['q1'],
+  assessment_level: 'beginner',
 }
 
 const pendingResults = {
@@ -67,7 +71,7 @@ describe('AssessmentPage pending submission', () => {
     window.localStorage.setItem(
       PENDING_ASSESSMENT_SUBMISSION_KEY,
       JSON.stringify({
-        version: '2026-03-03-randomized-v1',
+	        version: ASSESSMENT_VERSION,
         payload: pendingPayload,
         results: pendingResults,
       })
@@ -92,5 +96,52 @@ describe('AssessmentPage pending submission', () => {
 
     expect(await screen.findByTestId('assessment-results-saved')).toBeInTheDocument()
     expect(window.localStorage.getItem(PENDING_ASSESSMENT_SUBMISSION_KEY)).toBeNull()
-  })
-})
+	  })
+
+	  it('requires a self-rated level before loading a tuned question set', async () => {
+	    const questions = Array.from({ length: 15 }, (_, index) => ({
+	      id: `q${index + 1}`,
+	      domain: 'AI Fundamentals',
+	      question_text: `Question ${index + 1}`,
+	      option_a: 'Option A',
+	      option_b: 'Option B',
+	      option_c: 'Option C',
+	      option_d: 'Option D',
+	    }))
+
+	    mockAxios.get.mockResolvedValue({
+	      data: {
+	        questions,
+	        selected_question_ids: questions.map(question => question.id),
+	        assessment_level: 'advanced',
+	        generation_source: 'openrouter',
+	        question_set_token: 'signed-token',
+	      },
+	    })
+
+	    render(
+	      <MemoryRouter>
+	        <AssessmentPage />
+	      </MemoryRouter>
+	    )
+
+	    const startButton = screen.getByTestId('assessment-start-button')
+	    expect(startButton).toBeDisabled()
+
+	    fireEvent.click(screen.getByTestId('assessment-level-advanced'))
+	    expect(startButton).not.toBeDisabled()
+
+	    fireEvent.click(startButton)
+
+	    await waitFor(() => {
+	      expect(mockAxios.get).toHaveBeenCalledWith('/api/assessment/questions', {
+	        params: {
+	          level: 'advanced',
+	        },
+	      })
+	    })
+
+	    expect(await screen.findByTestId('assessment-generation-source')).toHaveTextContent('Generated question set')
+	    expect(screen.getByText('Advanced question set across all AI readiness domains')).toBeInTheDocument()
+	  })
+	})

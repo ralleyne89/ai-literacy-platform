@@ -7,6 +7,7 @@
     "dev": "vite",
     "start": "vite",
     "validate:prod-env": "node scripts/validate-prod-env.mjs",
+    "eval:openrouter-models": "node scripts/evaluate-openrouter-assessment-models.mjs",
     "check:supabase-config": "node scripts/validate-prod-env.mjs",
     "check:auth-config": "npm run check:supabase-config",
     "build": "npm run validate:prod-env && vite build",
@@ -28,11 +29,13 @@
     "check:platform-api": "node scripts/check-platform-api.mjs"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@headlessui/react": "^1.7.17",
     "@supabase/supabase-js": "^2.49.8",
     "axios": "^1.6.2",
     "clsx": "^2.0.0",
     "framer-motion": "^12.23.22",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

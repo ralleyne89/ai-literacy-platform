@@ -78,6 +78,10 @@ create table if not exists public.assessment_result (
   rhetorical_score integer default 0,
   pedagogical_score integer default 0,
   domain_scores jsonb,
+  assessment_level text check (assessment_level is null or assessment_level in ('beginner', 'intermediate', 'advanced')),
+  generation_source text default 'curated_fallback' check (
+    generation_source is null or generation_source in ('curated_fallback', 'openrouter')
+  ),
   time_taken_minutes integer,
   recommendations text,
   completed_at timestamptz default now()
@@ -158,6 +162,7 @@ create index if not exists idx_user_email on public."user"(email);
 create index if not exists idx_user_stripe_customer_id on public."user"(stripe_customer_id);
 create index if not exists idx_assessment_result_user_id on public.assessment_result(user_id);
 create index if not exists idx_assessment_result_completed_at on public.assessment_result(completed_at desc);
+create index if not exists idx_assessment_result_assessment_level on public.assessment_result(assessment_level);
 create index if not exists idx_training_module_active on public.training_module(is_active);
 create index if not exists idx_user_progress_user_id on public.user_progress(user_id);
 create index if not exists idx_user_progress_module_id on public.user_progress(module_id);

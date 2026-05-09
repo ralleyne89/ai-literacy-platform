@@ -4,6 +4,7 @@ from models import User, db
 
 
 SUPABASE_PROVIDER = 'supabase'
+DEMO_PROVIDER = 'demo'
 SUPABASE_MANAGED_PASSWORD_MARKER = 'supabase_managed'
 
 
@@ -149,6 +150,16 @@ def _user_matches_identity(user, identity):
     return user.auth_provider == identity['provider'] and user.auth_subject == identity['subject']
 
 
+def _can_relink_user_to_identity(user, identity):
+    if user is None or identity is None:
+        return False
+    if not user.auth_provider:
+        return True
+    if _user_matches_identity(user, identity):
+        return True
+    return user.auth_provider == DEMO_PROVIDER and identity['provider'] == SUPABASE_PROVIDER
+
+
 def _find_user_by_identity(identity):
     if identity is None:
         return None
@@ -194,7 +205,7 @@ def resolve_user_from_claims(claims, create_if_missing=False):
 
     existing_user = _find_user_by_subject_id(identity) or User.query.filter_by(email=create_profile['email']).first()
     if existing_user is not None:
-        if existing_user.auth_provider and not _user_matches_identity(existing_user, identity):
+        if not _can_relink_user_to_identity(existing_user, identity):
             raise AuthIdentityConflictError(existing_user)
 
         _link_user_to_identity(existing_user, identity)
@@ -245,12 +256,12 @@ def sync_managed_user(claims, email, first_name, last_name, role=None, organizat
     user = _find_user_by_identity(identity)
     if user is None:
         user = _find_user_by_subject_id(identity)
-        if user is not None and user.auth_provider and not _user_matches_identity(user, identity):
+        if user is not None and not _can_relink_user_to_identity(user, identity):
             raise AuthIdentityConflictError(user)
 
     if user is None:
         user = User.query.filter_by(email=normalized_email).first()
-        if user is not None and user.auth_provider and not _user_matches_identity(user, identity):
+        if user is not None and not _can_relink_user_to_identity(user, identity):
             raise AuthIdentityConflictError(user)
 
     if user is None:

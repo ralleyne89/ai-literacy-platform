@@ -19,6 +19,26 @@ const DOMAINS = [
   'Strategic Understanding',
 ]
 
+const ASSESSMENT_LEVELS = ['beginner', 'intermediate', 'advanced'] as const
+type AssessmentLevel = typeof ASSESSMENT_LEVELS[number]
+
+const ASSESSMENT_LEVEL_LABELS: Record<AssessmentLevel, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+}
+
+const ASSESSMENT_LEVEL_DIFFICULTY: Record<AssessmentLevel, number> = {
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+}
+
+const GENERATION_SOURCE_CURATED = 'curated_fallback'
+const GENERATION_SOURCE_OPENROUTER = 'openrouter'
+const QUESTION_SET_TOKEN_VERSION = 1
+const QUESTION_SET_TOKEN_TTL_MS = 4 * 60 * 60 * 1000
+
 const TRACK_ALIASES: Record<string, string> = {
   general: 'General',
   sales: 'Sales',
@@ -418,6 +438,8 @@ const nowIso = () => new Date().toISOString()
 const env = (key: string, fallback = '') => Deno.env.get(key) || fallback
 const truthy = (value: unknown) => ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase())
 const stripTrailingSlash = (value: string) => String(value || '').trim().replace(/\/+$/, '')
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
 
 const corsHeaders = (req: Request) => {
   const configured = stripTrailingSlash(env('FRONTEND_URL') || env('CORS_ORIGIN'))
@@ -445,6 +467,17 @@ const jsonResponse = (req: Request, data: unknown, status = 200) =>
 
 const errorResponse = (req: Request, message: string, status = 500, extra: Record<string, unknown> = {}) =>
   jsonResponse(req, { error: message, ...extra }, status)
+
+const errorDetails = (error: unknown) => {
+  if (error instanceof Error) return error.message
+  if (!error || typeof error !== 'object') return String(error)
+  const record = error as Record<string, unknown>
+  return (
+    [record.message, record.details, record.hint, record.code]
+      .filter((value) => typeof value === 'string' && value.trim())
+      .join(' | ') || JSON.stringify(record)
+  )
+}
 
 const getAdminClient = () => {
   const supabaseUrl = env('SUPABASE_URL')
@@ -870,14 +903,42 @@ const groupQuestionsByDomain = () => {
 
 const shuffled = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5)
 
-const formatQuestion = (question: any) => {
+const isAssessmentLevel = (value: unknown): value is AssessmentLevel =>
+  ASSESSMENT_LEVELS.includes(String(value || '').trim().toLowerCase() as AssessmentLevel)
+
+const normalizeAssessmentLevel = (value: unknown): AssessmentLevel => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return isAssessmentLevel(normalized) ? normalized : 'beginner'
+}
+
+const getRequestedAssessmentLevel = (url: URL) => normalizeAssessmentLevel(url.searchParams.get('level'))
+
+const normalizeDomainName = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return DOMAINS.find((domain) => domain.toLowerCase() === normalized) || ''
+}
+
+const domainSlug = (domain: string) =>
+  domain.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'domain'
+
+const stripQuestionAnswer = (question: any) => ({
+  id: question.id,
+  domain: question.domain,
+  question_text: question.question_text,
+  option_a: question.option_a,
+  option_b: question.option_b,
+  option_c: question.option_c,
+  option_d: question.option_d,
+})
+
+const randomizeQuestionOptions = (question: any) => {
   const pairs = [
     ['A', question.option_a],
     ['B', question.option_b],
     ['C', question.option_c],
     ['D', question.option_d],
   ]
-  const originalCorrectText = Object.fromEntries(pairs)[question.correct_answer]
+  const originalCorrectText = Object.fromEntries(pairs)[String(question.correct_answer || '').toUpperCase()]
   const randomizedPairs = shuffled(pairs)
   const formatted = { ...question }
   randomizedPairs.forEach(([, text], index) => {
@@ -887,15 +948,7 @@ const formatQuestion = (question: any) => {
       formatted.correct_answer = letter
     }
   })
-  return {
-    id: formatted.id,
-    domain: formatted.domain,
-    question_text: formatted.question_text,
-    option_a: formatted.option_a,
-    option_b: formatted.option_b,
-    option_c: formatted.option_c,
-    option_d: formatted.option_d,
-  }
+  return formatted
 }
 
 const normalizeQuestionIdList = (value: unknown) => {
@@ -926,6 +979,408 @@ const resolveGradingQuestions = (answers: Record<string, unknown>, selectedIds: 
   }
   const answerQuestions = getQuestionsByIds(normalizeQuestionIdList(Object.keys(answers)))
   return answerQuestions.length ? answerQuestions : SAMPLE_QUESTIONS
+}
+
+const base64UrlEncode = (bytes: Uint8Array) => {
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+const base64UrlDecode = (value: string) => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '=')
+  const binary = atob(padded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
+}
+
+const importQuestionSetKey = async (secret: string) =>
+  crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  )
+
+const signQuestionSetPayload = async (payload: Record<string, unknown>) => {
+  const secret = env('ASSESSMENT_QUESTION_SET_SECRET').trim()
+  if (!secret) {
+    return ''
+  }
+  const encodedPayload = base64UrlEncode(textEncoder.encode(JSON.stringify(payload)))
+  const key = await importQuestionSetKey(secret)
+  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(encodedPayload))
+  return `${encodedPayload}.${base64UrlEncode(new Uint8Array(signature))}`
+}
+
+const bytesToHex = (bytes: Uint8Array) => Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+
+const questionAnswerHash = async (question: any, answerLetter: string, assessmentLevel: AssessmentLevel) => {
+  const secret = env('ASSESSMENT_QUESTION_SET_SECRET').trim()
+  if (!secret) {
+    return ''
+  }
+  const normalizedAnswerLetter = String(answerLetter || '').trim().toUpperCase()
+  const optionText = String(question?.[`option_${normalizedAnswerLetter.toLowerCase()}`] || '')
+  const message = [
+    'assessment-question-set-v1',
+    assessmentLevel,
+    String(question?.id || ''),
+    normalizedAnswerLetter,
+    optionText,
+  ].join('|')
+  const key = await importQuestionSetKey(secret)
+  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(message))
+  return bytesToHex(new Uint8Array(signature))
+}
+
+const buildTokenQuestion = async (question: any, assessmentLevel: AssessmentLevel) => {
+  const correctAnswer = String(question.correct_answer || '').trim().toUpperCase()
+  return {
+    ...stripQuestionAnswer(question),
+    explanation: String(question.explanation || '').trim(),
+    answer_hash: await questionAnswerHash(question, correctAnswer, assessmentLevel),
+  }
+}
+
+const sanitizeTokenQuestions = async (value: unknown, assessmentLevel: AssessmentLevel) => {
+  if (!Array.isArray(value) || value.length !== DOMAINS.length * QUESTIONS_PER_DOMAIN) {
+    return []
+  }
+  const seenIds = new Set<string>()
+  const counts = Object.fromEntries(DOMAINS.map((domain) => [domain, 0]))
+  const questions = []
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return []
+    }
+    const question = raw as Record<string, unknown>
+    const id = String(question.id || '').trim()
+    const domain = normalizeDomainName(question.domain)
+    const answerHash = String(question.answer_hash || '').trim()
+    const sanitized = {
+      id,
+      domain,
+      question_text: String(question.question_text || '').trim(),
+      option_a: String(question.option_a || '').trim(),
+      option_b: String(question.option_b || '').trim(),
+      option_c: String(question.option_c || '').trim(),
+      option_d: String(question.option_d || '').trim(),
+      correct_answer: '',
+      explanation: String(question.explanation || '').trim(),
+    }
+    const optionValues = [sanitized.option_a, sanitized.option_b, sanitized.option_c, sanitized.option_d]
+    const uniqueOptionValues = new Set(optionValues.map((option) => option.toLowerCase()))
+    if (
+      !id ||
+      seenIds.has(id) ||
+      !domain ||
+      !sanitized.question_text ||
+      optionValues.some((option) => !option) ||
+      uniqueOptionValues.size !== optionValues.length ||
+      !answerHash ||
+      !sanitized.explanation
+    ) {
+      return []
+    }
+
+    for (const answerLetter of ['A', 'B', 'C', 'D']) {
+      if (await questionAnswerHash(sanitized, answerLetter, assessmentLevel) === answerHash) {
+        sanitized.correct_answer = answerLetter
+        break
+      }
+    }
+    if (!sanitized.correct_answer) {
+      return []
+    }
+
+    seenIds.add(id)
+    counts[domain] += 1
+    questions.push(sanitized)
+  }
+
+  return DOMAINS.every((domain) => counts[domain] === QUESTIONS_PER_DOMAIN) ? questions : []
+}
+
+const verifyQuestionSetToken = async (token: unknown) => {
+  const rawToken = String(token || '').trim()
+  const secret = env('ASSESSMENT_QUESTION_SET_SECRET').trim()
+  if (!rawToken || !secret) {
+    return null
+  }
+
+  const [encodedPayload, encodedSignature, ...extra] = rawToken.split('.')
+  if (!encodedPayload || !encodedSignature || extra.length) {
+    return null
+  }
+
+  try {
+    const key = await importQuestionSetKey(secret)
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      base64UrlDecode(encodedSignature),
+      textEncoder.encode(encodedPayload)
+    )
+    if (!isValid) {
+      return null
+    }
+
+    const payload = JSON.parse(textDecoder.decode(base64UrlDecode(encodedPayload)))
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return null
+    }
+    if (payload.v !== QUESTION_SET_TOKEN_VERSION || payload.generation_source !== GENERATION_SOURCE_OPENROUTER) {
+      return null
+    }
+    if (!isAssessmentLevel(payload.assessment_level)) {
+      return null
+    }
+    const assessmentLevel = normalizeAssessmentLevel(payload.assessment_level)
+    if (Number(payload.expires_at || 0) < Date.now()) {
+      return null
+    }
+
+    const questions = await sanitizeTokenQuestions(payload.questions, assessmentLevel)
+    const selectedIds = normalizeQuestionIdList(payload.selected_question_ids)
+    if (
+      !questions.length ||
+      selectedIds.length !== questions.length ||
+      selectedIds.some((id, index) => id !== questions[index].id)
+    ) {
+      return null
+    }
+
+    return {
+      assessment_level: assessmentLevel,
+      generation_source: GENERATION_SOURCE_OPENROUTER,
+      selected_question_ids: selectedIds,
+      questions,
+    }
+  } catch {
+    return null
+  }
+}
+
+const sanitizeGeneratedQuestions = (value: unknown, assessmentLevel: AssessmentLevel) => {
+  if (!Array.isArray(value) || value.length !== DOMAINS.length * QUESTIONS_PER_DOMAIN) {
+    return []
+  }
+  const counts = Object.fromEntries(DOMAINS.map((domain) => [domain, 0]))
+  const questions = []
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return []
+    }
+    const question = raw as Record<string, unknown>
+    const domain = normalizeDomainName(question.domain)
+    const correctAnswer = String(question.correct_answer || '').trim().toUpperCase()
+    const sanitized = {
+      id: '',
+      domain,
+      question_text: String(question.question_text || '').trim(),
+      option_a: String(question.option_a || '').trim(),
+      option_b: String(question.option_b || '').trim(),
+      option_c: String(question.option_c || '').trim(),
+      option_d: String(question.option_d || '').trim(),
+      correct_answer: correctAnswer,
+      explanation: String(question.explanation || '').trim(),
+    }
+    const optionValues = [sanitized.option_a, sanitized.option_b, sanitized.option_c, sanitized.option_d]
+    const uniqueOptionValues = new Set(optionValues.map((option) => option.toLowerCase()))
+    if (
+      !domain ||
+      !sanitized.question_text ||
+      optionValues.some((option) => !option) ||
+      uniqueOptionValues.size !== optionValues.length ||
+      !['A', 'B', 'C', 'D'].includes(correctAnswer) ||
+      !sanitized.explanation
+    ) {
+      return []
+    }
+    counts[domain] += 1
+    sanitized.id = `gen-${assessmentLevel}-${domainSlug(domain)}-${counts[domain]}-${crypto.randomUUID().slice(0, 8)}`
+    questions.push(sanitized)
+  }
+
+  return DOMAINS.every((domain) => counts[domain] === QUESTIONS_PER_DOMAIN) ? questions : []
+}
+
+const openRouterQuestionSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    questions: {
+      type: 'array',
+      minItems: DOMAINS.length * QUESTIONS_PER_DOMAIN,
+      maxItems: DOMAINS.length * QUESTIONS_PER_DOMAIN,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          domain: { type: 'string', enum: DOMAINS },
+          question_text: { type: 'string', minLength: 24 },
+          option_a: { type: 'string', minLength: 1 },
+          option_b: { type: 'string', minLength: 1 },
+          option_c: { type: 'string', minLength: 1 },
+          option_d: { type: 'string', minLength: 1 },
+          correct_answer: { type: 'string', enum: ['A', 'B', 'C', 'D'] },
+          explanation: { type: 'string', minLength: 12 },
+        },
+        required: [
+          'domain',
+          'question_text',
+          'option_a',
+          'option_b',
+          'option_c',
+          'option_d',
+          'correct_answer',
+          'explanation',
+        ],
+      },
+    },
+  },
+  required: ['questions'],
+} as const
+
+const parseOpenRouterContent = (value: unknown) => {
+  if (!value) {
+    return null
+  }
+  if (typeof value === 'object') {
+    return value
+  }
+  if (typeof value !== 'string') {
+    return null
+  }
+  try {
+    return JSON.parse(value)
+  } catch {
+    const match = value.match(/\{[\s\S]*\}/)
+    if (!match) {
+      return null
+    }
+    try {
+      return JSON.parse(match[0])
+    } catch {
+      return null
+    }
+  }
+}
+
+const generateOpenRouterQuestionSet = async (assessmentLevel: AssessmentLevel) => {
+  const apiKey = env('OPENROUTER_API_KEY').trim()
+  const model = env('OPENROUTER_MODEL').trim()
+  const signingSecret = env('ASSESSMENT_QUESTION_SET_SECRET').trim()
+  if (!apiKey || !model || !signingSecret) {
+    return null
+  }
+
+  const baseUrl = stripTrailingSlash(env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'))
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      temperature: 0.35,
+      max_completion_tokens: 4500,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You create fair, workplace-oriented AI literacy multiple-choice assessments. Return only JSON that matches the provided schema.',
+        },
+        {
+          role: 'user',
+          content: [
+            `Generate exactly 15 ${ASSESSMENT_LEVEL_LABELS[assessmentLevel].toLowerCase()} AI literacy assessment questions.`,
+            `Use exactly these domains: ${DOMAINS.join('; ')}.`,
+            `Create exactly ${QUESTIONS_PER_DOMAIN} questions per domain.`,
+            'Every question needs four plausible options, exactly one correct answer, and a brief explanation.',
+            'Keep wording practical for adult workplace learners and do not repeat the same scenario.',
+          ].join(' '),
+        },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'assessment_question_set',
+          strict: true,
+          schema: openRouterQuestionSchema,
+        },
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`OpenRouter question generation failed with ${response.status}`)
+  }
+
+  const data = await response.json()
+  const parsed = parseOpenRouterContent(data?.choices?.[0]?.message?.content)
+  const generatedQuestions = sanitizeGeneratedQuestions((parsed as any)?.questions, assessmentLevel)
+  if (!generatedQuestions.length) {
+    return null
+  }
+
+  const randomizedQuestions = shuffled(generatedQuestions).map(randomizeQuestionOptions)
+  const selectedQuestionIds = randomizedQuestions.map((question) => question.id)
+  const tokenQuestions = await Promise.all(randomizedQuestions.map((question) => buildTokenQuestion(question, assessmentLevel)))
+  const token = await signQuestionSetPayload({
+    v: QUESTION_SET_TOKEN_VERSION,
+    assessment_level: assessmentLevel,
+    generation_source: GENERATION_SOURCE_OPENROUTER,
+    issued_at: Date.now(),
+    expires_at: Date.now() + QUESTION_SET_TOKEN_TTL_MS,
+    selected_question_ids: selectedQuestionIds,
+    questions: tokenQuestions,
+  })
+  if (!token) {
+    return null
+  }
+
+  return {
+    questions: randomizedQuestions.map(stripQuestionAnswer),
+    selected_question_ids: selectedQuestionIds,
+    question_set_token: token,
+    generation_source: GENERATION_SOURCE_OPENROUTER,
+  }
+}
+
+const buildCuratedQuestionSet = (assessmentLevel: AssessmentLevel) => {
+  const grouped = groupQuestionsByDomain()
+  const selected = DOMAINS.flatMap((domain) => {
+    const domainQuestions = [...(grouped.get(domain) || [])].sort((a, b) => Number(a.id) - Number(b.id))
+    if (assessmentLevel === 'beginner') {
+      return shuffled(domainQuestions.slice(0, QUESTIONS_PER_DOMAIN)).slice(0, QUESTIONS_PER_DOMAIN)
+    }
+    if (assessmentLevel === 'intermediate') {
+      return shuffled(domainQuestions.slice(1, 1 + QUESTIONS_PER_DOMAIN)).slice(0, QUESTIONS_PER_DOMAIN)
+    }
+    return shuffled(domainQuestions.slice(-QUESTIONS_PER_DOMAIN)).slice(0, QUESTIONS_PER_DOMAIN)
+  })
+  const randomizedQuestions = shuffled(selected).map(randomizeQuestionOptions)
+  return {
+    questions: randomizedQuestions.map(stripQuestionAnswer),
+    selected_question_ids: randomizedQuestions.map((question) => question.id),
+    generation_source: GENERATION_SOURCE_CURATED,
+    assessment_level: assessmentLevel,
+    total_questions: randomizedQuestions.length,
+    domains: DOMAINS,
+  }
 }
 
 const classifyScore = (totalCorrect: number) => {
@@ -959,9 +1414,12 @@ const assessmentDomainEntries = (assessment: any) => {
 
 const recommendedDifficulty = (assessment: any) => {
   const percentage = Number(assessment?.percentage || 0)
-  if (percentage < 50) return 1
-  if (percentage < 75) return 2
-  return 3
+  const scoreDifficulty = percentage < 50 ? 1 : percentage < 75 ? 2 : 3
+  if (!isAssessmentLevel(assessment?.assessment_level)) {
+    return scoreDifficulty
+  }
+  const levelDifficulty = ASSESSMENT_LEVEL_DIFFICULTY[normalizeAssessmentLevel(assessment.assessment_level)]
+  return Math.max(1, Math.min(3, Math.round(levelDifficulty * 0.6 + scoreDifficulty * 0.4)))
 }
 
 const certificationSourceDomains = (
@@ -1124,10 +1582,26 @@ const generateRecommendations = (
 
 const handleAssessment = async (ctx: ApiContext) => {
   if (ctx.routePath === '/api/assessment/questions' && ctx.req.method === 'GET') {
-    const grouped = groupQuestionsByDomain()
-    const selected = DOMAINS.flatMap((domain) => shuffled(grouped.get(domain) || []).slice(0, QUESTIONS_PER_DOMAIN))
-    const questions = shuffled(selected).map(formatQuestion)
-    return jsonResponse(ctx.req, { questions, total_questions: questions.length, domains: DOMAINS })
+    const requestedLevel = ctx.url.searchParams.get('level')
+    if (requestedLevel && !isAssessmentLevel(requestedLevel)) {
+      return errorResponse(ctx.req, 'Invalid assessment level', 400, { valid_levels: ASSESSMENT_LEVELS })
+    }
+    const assessmentLevel = getRequestedAssessmentLevel(ctx.url)
+    try {
+      const generated = await generateOpenRouterQuestionSet(assessmentLevel)
+      if (generated?.questions?.length === DOMAINS.length * QUESTIONS_PER_DOMAIN) {
+        return jsonResponse(ctx.req, {
+          ...generated,
+          assessment_level: assessmentLevel,
+          total_questions: generated.questions.length,
+          domains: DOMAINS,
+        })
+      }
+    } catch (error) {
+      console.warn('assessment_question_generation_failed', error)
+    }
+
+    return jsonResponse(ctx.req, buildCuratedQuestionSet(assessmentLevel))
   }
 
   if (ctx.routePath === '/api/assessment/submit' && ctx.req.method === 'POST') {
@@ -1141,10 +1615,27 @@ const handleAssessment = async (ctx: ApiContext) => {
       return errorResponse(ctx.req, 'Answers are required', 400)
     }
 
-    const selectedIds = normalizeQuestionIdList(
+    const requestedAssessmentLevel = body.assessment_level || body.assessmentLevel || body.level
+    if (requestedAssessmentLevel && !isAssessmentLevel(requestedAssessmentLevel)) {
+      return errorResponse(ctx.req, 'Invalid assessment level', 400, { valid_levels: ASSESSMENT_LEVELS })
+    }
+    let assessmentLevel = normalizeAssessmentLevel(requestedAssessmentLevel)
+    let generationSource = GENERATION_SOURCE_CURATED
+    let selectedIds = normalizeQuestionIdList(
       body.selected_question_ids || body.selectedQuestionIds || body.selected_ids || body.question_ids
     )
-    const selectedQuestions = resolveGradingQuestions(answers, selectedIds)
+    const rawQuestionSetToken = body.question_set_token || body.questionSetToken
+    const tokenPayload = await verifyQuestionSetToken(rawQuestionSetToken)
+    let selectedQuestions = resolveGradingQuestions(answers, selectedIds)
+    if (rawQuestionSetToken && !tokenPayload) {
+      return errorResponse(ctx.req, 'Question set token is invalid or expired', 400)
+    }
+    if (tokenPayload) {
+      assessmentLevel = tokenPayload.assessment_level
+      generationSource = tokenPayload.generation_source
+      selectedIds = tokenPayload.selected_question_ids
+      selectedQuestions = tokenPayload.questions
+    }
     const optionMap = body.option_map && typeof body.option_map === 'object' ? body.option_map : {}
     const domainScores = Object.fromEntries(DOMAINS.map((domain) => [domain, 0]))
     const domainTotals = Object.fromEntries(DOMAINS.map((domain) => [domain, 0]))
@@ -1199,10 +1690,14 @@ const handleAssessment = async (ctx: ApiContext) => {
         rhetorical_score: domainScoresPayload['Ethics & Critical Thinking'].score,
         pedagogical_score: domainScoresPayload['AI Impact & Applications'].score,
         domain_scores: domainScoresPayload,
+        assessment_level: assessmentLevel,
+        generation_source: generationSource,
         time_taken_minutes: Number(body.time_taken_minutes || 0),
         recommendations: JSON.stringify({
           insights: recommendations,
           strategic_score: domainScoresPayload['Strategic Understanding'].score,
+          assessment_level: assessmentLevel,
+          generation_source: generationSource,
         }),
         completed_at: nowIso(),
       })
@@ -1218,6 +1713,9 @@ const handleAssessment = async (ctx: ApiContext) => {
       domain_scores: domainScoresPayload,
       recommendations,
       detailed_results: detailedResults,
+      selected_question_ids: selectedIds,
+      assessment_level: assessmentLevel,
+      generation_source: generationSource,
       time_taken_minutes: Number(body.time_taken_minutes || 0),
       score_band: scoreBand,
       saved: Boolean(auth?.userId),
@@ -1233,7 +1731,7 @@ const handleAssessment = async (ctx: ApiContext) => {
       .order('completed_at', { ascending: false })
     if (error) throw error
 
-    const domainTotals = Object.fromEntries(DOMAINS.map((domain) => [domain, SAMPLE_QUESTIONS.filter((q) => q.domain === domain).length]))
+    const domainTotals = Object.fromEntries(DOMAINS.map((domain) => [domain, QUESTIONS_PER_DOMAIN]))
     const history = (data || []).map((result: any) => {
       const storedRecommendations = safeJsonParse(result.recommendations, {})
       const recommendations = Array.isArray(storedRecommendations)
@@ -1267,6 +1765,8 @@ const handleAssessment = async (ctx: ApiContext) => {
         percentage: result.percentage,
         score_band: classifyScore(result.total_score || 0),
         domain_scores,
+        assessment_level: normalizeAssessmentLevel(result.assessment_level || storedRecommendations.assessment_level),
+        generation_source: result.generation_source || storedRecommendations.generation_source || GENERATION_SOURCE_CURATED,
         time_taken_minutes: result.time_taken_minutes,
         completed_at: result.completed_at,
         recommendations,
@@ -1316,19 +1816,19 @@ const handleAssessment = async (ctx: ApiContext) => {
           1
         )
         return {
-          score: scoreData.score,
+          score: scoreData.score - (completedModuleIds.has(module.id) ? 18 : 0),
           recommendation: serializeCourseRecommendation(
             module,
             lessonCount,
             'Great starting point for workplace AI literacy',
-            recommendationPriority(scoreData.score),
+            recommendationPriority(scoreData.score - (completedModuleIds.has(module.id) ? 18 : 0)),
             0,
             {
               track: scoreData.track,
               source_domains: scoreData.source_domains,
               next_action_label: nextActionLabel(moduleMetadata, scoreData.certification_relevant),
               recommended_path: moduleMetadata.start_path,
-              confidence: recommendationConfidence(scoreData.score),
+              confidence: recommendationConfidence(scoreData.score - (completedModuleIds.has(module.id) ? 18 : 0)),
             }
           ),
         }
@@ -1342,6 +1842,7 @@ const handleAssessment = async (ctx: ApiContext) => {
       return jsonResponse(ctx.req, {
         recommendations: scoredRecommendations.slice(0, 6).map((entry) => entry.recommendation),
         message: 'Take an assessment to get personalized recommendations',
+        assessment_level: null,
       })
     }
 
@@ -1355,6 +1856,7 @@ const handleAssessment = async (ctx: ApiContext) => {
     const certificationDomains = certificationSourceDomains(latest.data, completedModuleIds, completedModulesCount)
     const weakDomainMap = new Map(weakDomains.map((entry) => [entry.domain, entry]))
     const idealDifficulty = recommendedDifficulty(latest.data)
+    const assessmentLevel = normalizeAssessmentLevel(latest.data.assessment_level)
 
     const scoredRecommendations = modules.map((module: any) => {
       const lessonCount = lessonCounts.get(module.id) || 0
@@ -1380,22 +1882,27 @@ const handleAssessment = async (ctx: ApiContext) => {
         reason = 'Supports certification readiness requirements'
       } else if (scoreData.track === profileTrack && profileTrack !== 'General') {
         reason = `Fits your ${profileTrack} workplace AI track`
+      } else if (assessmentLevel === 'advanced') {
+        reason = 'Matches your advanced self-rating with deeper applied practice'
+      } else if (assessmentLevel === 'beginner') {
+        reason = 'Keeps your next step approachable from your self-rating'
       }
+      const score = scoreData.score - (completedModuleIds.has(module.id) ? 18 : 0)
 
       return {
-        score: scoreData.score,
+        score,
         recommendation: serializeCourseRecommendation(
           module,
           lessonCount,
           reason,
-          recommendationPriority(scoreData.score),
+          recommendationPriority(score),
           skillGapPercentage,
           {
             track: scoreData.track,
             source_domains: scoreData.source_domains,
             next_action_label: nextActionLabel(moduleMetadata, scoreData.certification_relevant),
             recommended_path: moduleMetadata.start_path,
-            confidence: recommendationConfidence(scoreData.score),
+            confidence: recommendationConfidence(score),
           }
         ),
       }
@@ -1410,6 +1917,8 @@ const handleAssessment = async (ctx: ApiContext) => {
     return jsonResponse(ctx.req, {
       recommendations: scoredRecommendations.slice(0, 6).map((entry) => entry.recommendation),
       assessment_score: latest.data.percentage,
+      assessment_level: assessmentLevel,
+      ideal_difficulty: idealDifficulty,
       weak_domains: weakDomains.slice(0, 3).map((entry) => entry.domain),
       weak_domain_details: weakDomains.slice(0, 3),
     })
@@ -2591,7 +3100,7 @@ Deno.serve(async (req) => {
 
     console.error('platform-api failed', error)
     return errorResponse(req, 'Internal server error', 500, {
-      details: error instanceof Error ? error.message : String(error),
+      details: errorDetails(error),
     })
   }
 })

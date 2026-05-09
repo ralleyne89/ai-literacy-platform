@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LitmusAI">
+  <defs>
+    <linearGradient id="litmusai-mark" x1="10" y1="54" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6b4eff"/>
+      <stop offset="1" stop-color="#12c8f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#litmusai-mark)"/>
+  <path d="M32 14c-5.2 0-9.4 4.1-9.6 9.3-4.4 1.2-7.4 5.1-7.4 9.7 0 5.6 4.5 10.1 10.1 10.1h1.2v-4.3h-1.2c-3.2 0-5.8-2.6-5.8-5.8 0-2.9 2.1-5.3 4.9-5.7l2-.3.2-2c.3-3.8 3.5-6.7 7.3-6.7 3.9 0 7.2 3.1 7.4 7l.1 2.1 2.1.4c2.7.5 4.7 2.9 4.7 5.7 0 3.2-2.6 5.8-5.8 5.8h-1.5v4.3h1.5c5.6 0 10.1-4.5 10.1-10.1 0-4.5-3-8.5-7.2-9.7C44.6 18.3 39.1 14 32 14Z" fill="#fff"/>
+  <path d="M30 25h4v23h-4V25Zm-7 7h4v10h-4V32Zm14-3h4v13h-4V29Z" fill="#fff" opacity=".9"/>
+</svg>
