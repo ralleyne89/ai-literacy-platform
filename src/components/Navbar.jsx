@@ -23,6 +23,22 @@ const productNavigation = [
   { name: 'Pricing', href: '/billing', icon: CreditCard },
 ]
 
+const normalizeNavPath = (path) => {
+  if (typeof path !== 'string' || path.length === 0) return '/'
+  const normalizedPath = path.split(/[?#]/, 1)[0] || '/'
+  return normalizedPath.length > 1 ? normalizedPath.replace(/\/+$/, '') : normalizedPath
+}
+
+export const isNavPathActive = (currentPathname, targetPath) => {
+  const currentPath = normalizeNavPath(currentPathname)
+  const normalizedTarget = normalizeNavPath(targetPath)
+
+  return (
+    currentPath === normalizedTarget ||
+    (normalizedTarget !== '/' && currentPath.startsWith(`${normalizedTarget}/`))
+  )
+}
+
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -43,8 +59,23 @@ const Navbar = () => {
       const desktopNav = desktopNavRef.current
       const indicator = desktopIndicatorRef.current
 
+      const hideIndicator = (immediate = false) => {
+        if (!indicator) return
+
+        gsap.to(indicator, {
+          autoAlpha: 0,
+          duration: immediate || reduceMotion ? 0 : 0.18,
+          ease: 'power2.out',
+          overwrite: 'auto',
+        })
+      }
+
       const positionIndicator = (target, immediate = false) => {
-        if (!desktopNav || !indicator || !target) return
+        if (!desktopNav || !indicator || !target) {
+          hideIndicator(immediate)
+          return
+        }
+
         const navRect = desktopNav.getBoundingClientRect()
         const targetRect = target.getBoundingClientRect()
 
@@ -58,7 +89,7 @@ const Navbar = () => {
         })
       }
 
-      const activeLink = desktopLinks.find((link) => link.dataset.active === 'true') || desktopLinks[0]
+      const activeLink = desktopLinks.find((link) => link.dataset.active === 'true') || null
       positionIndicator(activeLink, true)
 
       const liftLink = (event) => {
@@ -74,14 +105,17 @@ const Navbar = () => {
       }
 
       const resetLink = (event) => {
-        if (reduceMotion) return
-        gsap.to(event.currentTarget, {
-          y: 0,
-          scale: 1,
-          duration: 0.28,
-          ease: 'power2.out',
-          overwrite: 'auto',
-        })
+        if (!reduceMotion) {
+          gsap.to(event.currentTarget, {
+            y: 0,
+            scale: 1,
+            duration: 0.28,
+            ease: 'power2.out',
+            overwrite: 'auto',
+          })
+        }
+
+        positionIndicator(activeLink)
       }
 
       const resetIndicator = () => positionIndicator(activeLink)
@@ -93,6 +127,7 @@ const Navbar = () => {
         link.addEventListener('blur', resetLink)
       })
       desktopNav?.addEventListener('pointerleave', resetIndicator)
+      window.addEventListener('resize', resetIndicator)
 
       if (!reduceMotion) {
         gsap.from('[data-brand-mark]', {
@@ -111,9 +146,10 @@ const Navbar = () => {
           link.removeEventListener('blur', resetLink)
         })
         desktopNav?.removeEventListener('pointerleave', resetIndicator)
+        window.removeEventListener('resize', resetIndicator)
       }
     },
-    { scope: navRef, dependencies: [location.pathname] }
+    { scope: navRef, dependencies: [location.pathname], revertOnUpdate: true }
   )
 
   useGSAP(
@@ -189,10 +225,7 @@ const Navbar = () => {
     { scope: navRef, dependencies: [isOpen] }
   )
 
-  const isActive = (path) => (
-    location.pathname === path ||
-    (path !== '/' && location.pathname.startsWith(`${path}/`))
-  )
+  const isActive = (path) => isNavPathActive(location.pathname, path)
 
   const closeMenus = useCallback(() => {
     setIsOpen(false)
@@ -282,6 +315,7 @@ const Navbar = () => {
                   className={navLinkClass(item.href)}
                   data-desktop-nav-link
                   data-active={isActive(item.href) ? 'true' : 'false'}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
                   onClick={closeMenus}
                 >
                   <Icon className="h-4 w-4" />
@@ -398,6 +432,8 @@ const Navbar = () => {
                     isActive(item.href) ? 'bg-primary-50 text-primary-700' : 'text-slate-700 hover:bg-slate-50'
                   }`}
                   data-mobile-menu-item
+                  data-active={isActive(item.href) ? 'true' : 'false'}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
                   tabIndex={isOpen ? undefined : -1}
                   onClick={closeMenus}
                 >
