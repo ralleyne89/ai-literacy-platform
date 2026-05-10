@@ -57,4 +57,49 @@
   .soft-panel {
     @apply rounded-brand-lg border border-slate-200 bg-white shadow-brand-md;
   }
+
+  .assessment-cockpit-bg {
+    background:
+      linear-gradient(rgba(8, 17, 31, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(8, 17, 31, 0.035) 1px, transparent 1px),
+      radial-gradient(circle at 12% 12%, rgba(107, 78, 255, 0.13), transparent 28%),
+      radial-gradient(circle at 88% 8%, rgba(0, 210, 255, 0.12), transparent 26%),
+      #f6faff;
+    background-size: 32px 32px, 32px 32px, auto, auto, auto;
+  }
+
+  .assessment-panel-grid {
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      radial-gradient(circle at 18% 18%, rgba(0, 210, 255, 0.18), transparent 34%),
+      linear-gradient(145deg, #08111f 0%, #101b2d 100%);
+    background-size: 28px 28px, 28px 28px, auto, auto;
+  }
+
+  .assessment-answer-card {
+    min-height: 4rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .assessment-answer-card {
+    min-height: 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .assessment-option-selected {
+    animation: assessment-option-confirm 180ms ease-out;
+  }
+}
+
+@keyframes assessment-option-confirm {
+  0% {
+    transform: scale(0.992);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
