@@ -132,6 +132,35 @@ def test_checkout_session_uses_authenticated_email(client, authenticated_user, m
     assert payload['url'] == 'https://stripe.example/checkout-authenticated'
 
 
+def test_checkout_session_failure_returns_clean_error(client, authenticated_user, monkeypatch):
+    token = authenticated_user['token']
+
+    monkeypatch.setenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+    monkeypatch.setenv('STRIPE_PRICE_PREMIUM', 'price_mock')
+
+    import routes.billing as billing_routes
+
+    def fail_checkout_session_create(**kwargs):  # noqa: ANN001
+        raise RuntimeError('Stripe test failure')
+
+    monkeypatch.setattr(
+        billing_routes,
+        '_create_stripe_checkout_session',
+        fail_checkout_session_create
+    )
+
+    response = client.post(
+        '/api/billing/checkout-session',
+        json={'plan': 'premium'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    assert response.status_code == 500
+    payload = response.get_json()
+    assert payload['error'] == 'Unable to start checkout with Stripe'
+    assert 'Stripe test failure' in payload['details']
+
+
 def test_checkout_session_complete_updates_subscription(client, authenticated_user, monkeypatch, app):
     token = authenticated_user['token']
     user_id = authenticated_user['id']

@@ -13,6 +13,17 @@ from seeders.course_content import seed_course_content
 from seeders.training import seed_training_modules
 
 
+@pytest.fixture(autouse=True)
+def deterministic_assessment_generation_env(monkeypatch):
+    for env_name in (
+        'OPENROUTER_API_KEY',
+        'OPENROUTER_MODEL',
+        'OPENROUTER_BASE_URL',
+        'ASSESSMENT_QUESTION_SET_SECRET',
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+
+
 class _FakeSigningKey:
     def __init__(self, key):
         self.key = key

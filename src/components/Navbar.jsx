@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Award,
   BookOpen,
-  Brain,
   ChevronDown,
   CreditCard,
   LayoutDashboard,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { gsap, useGSAP } from '../utils/gsap'
+import BrandMark from './BrandMark'
 
 const productNavigation = [
   { name: 'Assessment', href: '/assessment', icon: Target },
@@ -281,13 +281,15 @@ const Navbar = () => {
         <div className="flex items-center justify-between gap-4">
           <Link
             to="/"
-            className="group inline-flex items-center gap-3 rounded-2xl px-1 py-1 transition-colors duration-200"
+            className="group inline-flex items-center gap-2 rounded-2xl px-1 py-1 transition-colors duration-200"
             onClick={closeMenus}
           >
-            <span data-brand-mark className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-gradient-primary shadow-brand-sm ring-1 ring-white/80">
-              <span className="absolute inset-0 bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-              <Brain className="relative h-5 w-5 text-white" />
-            </span>
+            <BrandMark
+              decorative
+              data-brand-mark
+              className="relative grid h-10 w-10 place-items-center drop-shadow-[0_10px_22px_rgba(37,99,235,0.22)] transition-transform duration-200 group-hover:scale-105"
+              imgClassName="h-10 w-10 object-contain"
+            />
             <span className="leading-none">
               <span className="block font-heading text-lg font-bold tracking-tight text-slate-950">LitmusAI</span>
               <span className="hidden pt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:block">
@@ -397,9 +399,7 @@ const Navbar = () => {
                 className="pointer-events-none absolute left-2 right-12 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2 text-sm font-semibold text-slate-700 opacity-0"
                 aria-hidden="true"
               >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-primary text-white">
-                  <Brain className="h-3.5 w-3.5" />
-                </span>
+                <BrandMark decorative className="grid h-7 w-7 shrink-0 place-items-center" imgClassName="h-7 w-7 object-contain" />
                 <span className="truncate">LitmusAI menu</span>
               </span>
               <span className="absolute right-0 top-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-700">

@@ -23,6 +23,7 @@ import {
 import { motion, useReducedMotion } from 'framer-motion'
 import { HeroGeometric } from '@/components/ui/shape-landing-hero'
 import ClientFeedback from '@/components/ui/testimonial'
+import BrandMark from '@/components/BrandMark'
 import { gsap, useGSAP } from '@/utils/gsap'
 
 const reveal = {
@@ -694,12 +695,9 @@ const Footer = () => {
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[1.2fr_2fr]">
           <div>
-            <Link to="/" className="inline-flex items-center gap-3">
-              <img
-                src="/generated/litmusai-logo-chatgpt-crop.png"
-                alt="LitmusAI"
-                className="h-11 w-auto object-contain"
-              />
+            <Link to="/" className="inline-flex items-center gap-2">
+              <BrandMark decorative className="grid h-12 w-12 place-items-center" imgClassName="h-12 w-12 object-contain" />
+              <span className="font-heading text-xl font-bold text-white">LitmusAI</span>
             </Link>
             <p className="mt-5 max-w-sm leading-7 text-white/60">
               AI literacy training, assessment, and certification for people and teams who need practical capability they can use at work.
