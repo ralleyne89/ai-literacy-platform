@@ -3,7 +3,7 @@ import React from 'react'
 export const BRAND_MARK_SRC = '/brand/litmusai-mark.png'
 
 const BrandMark = ({
-  alt = 'LitmusAI mark',
+  alt = 'Litmus AI logo',
   className = '',
   decorative = false,
   imgClassName = 'h-full w-full object-contain',

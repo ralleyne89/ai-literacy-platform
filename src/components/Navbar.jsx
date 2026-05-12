@@ -291,7 +291,7 @@ const Navbar = () => {
               imgClassName="h-10 w-10 object-contain"
             />
             <span className="leading-none">
-              <span className="block font-heading text-lg font-bold tracking-tight text-slate-950">LitmusAI</span>
+              <span className="block font-heading text-lg font-bold tracking-tight text-slate-950">Litmus AI</span>
               <span className="hidden pt-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:block">
                 AI literacy platform
               </span>
@@ -400,7 +400,7 @@ const Navbar = () => {
                 aria-hidden="true"
               >
                 <BrandMark decorative className="grid h-7 w-7 shrink-0 place-items-center" imgClassName="h-7 w-7 object-contain" />
-                <span className="truncate">LitmusAI menu</span>
+                <span className="truncate">Litmus AI menu</span>
               </span>
               <span className="absolute right-0 top-0 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full text-slate-700">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true">

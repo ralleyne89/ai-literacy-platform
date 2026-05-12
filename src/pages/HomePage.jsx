@@ -695,9 +695,8 @@ const Footer = () => {
 
         <div className="mt-12 grid gap-10 lg:grid-cols-[1.2fr_2fr]">
           <div>
-            <Link to="/" className="inline-flex items-center gap-2">
+            <Link to="/" className="inline-flex items-center gap-2" aria-label="Litmus AI home">
               <BrandMark decorative className="grid h-12 w-12 place-items-center" imgClassName="h-12 w-12 object-contain" />
-              <span className="font-heading text-xl font-bold text-white">LitmusAI</span>
             </Link>
             <p className="mt-5 max-w-sm leading-7 text-white/60">
               AI literacy training, assessment, and certification for people and teams who need practical capability they can use at work.
