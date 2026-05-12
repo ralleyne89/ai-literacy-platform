@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, X, Brain, LogOut, ChevronDown } from 'lucide-react'
+import { Menu, X, LogOut, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import BrandMark from './BrandMark'
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -54,13 +55,13 @@ const Navbar = () => {
         <div className="flex h-14 items-center justify-between gap-5">
           <div className="flex items-center">
             <Link to="/" className="group inline-flex items-center gap-2.5">
-              <span className="relative grid h-8 w-8 place-items-center rounded-xl bg-gradient-primary shadow-sm ring-1 ring-white/60">
-                <span className="relative flex items-center justify-center">
-                  <Brain className="h-4 w-4 text-white" />
-                </span>
-              </span>
+              <BrandMark
+                decorative
+                className="relative grid h-8 w-8 place-items-center drop-shadow-[0_10px_22px_rgba(37,99,235,0.22)] transition-transform duration-200 group-hover:scale-105"
+                imgClassName="h-8 w-8 object-contain"
+              />
               <span className="leading-none">
-                <span className="block font-heading text-[1.06rem] tracking-tight text-slate-900">LitmusAI</span>
+                <span className="block font-heading text-[1.06rem] tracking-tight text-slate-900">Litmus AI</span>
                 <span className="hidden lg:block pt-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Assessment · Training · Certification
                 </span>
