@@ -49,4 +49,8 @@ npm run check:supabase-config
 npm run build
 ```
 
+For production-style local checks, set `ENFORCE_PROD_ENV=1` and pass the
+production `VITE_*` values in the command environment. The validator follows
+Vite's env-file precedence, so `.env.local` can still override `.env`.
+
 If you change release config in `netlify.toml` or `render.yaml`, run the Supabase config check and a production-style build before merging.

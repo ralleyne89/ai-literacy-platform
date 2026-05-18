@@ -4,6 +4,52 @@ const DIRECT_VIDEO_PATTERN = /\.(mp4|webm|ogg)(\?.*)?$/i
 const YOUTUBE_HOST_PATTERN = /(^|\.)youtube\.com$|(^|\.)youtube-nocookie\.com$/
 const VIMEO_HOST_PATTERN = /(^|\.)vimeo\.com$/
 
+const getStringValue = (value, fallback = '') => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || fallback
+  }
+
+  return fallback
+}
+
+const getTrainingItemModuleId = (item) =>
+  getStringValue(item?.id, getStringValue(item?.module_id, getStringValue(item?.moduleId)))
+
+const getTrainingItemContentType = (item) =>
+  getStringValue(item?.content_type, getStringValue(item?.metadata?.format)).toLowerCase()
+
+const getCurrentOrigin = () => {
+  if (globalThis?.location?.origin) {
+    return globalThis.location.origin
+  }
+
+  return 'https://litmusai.netlify.app'
+}
+
+export const normalizeInPlatformUrl = (value) => {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  try {
+    const currentOrigin = getCurrentOrigin()
+    const url = new URL(trimmed, currentOrigin)
+    if (url.origin !== currentOrigin) {
+      return ''
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`
+  } catch {
+    return ''
+  }
+}
+
 const getHttpUrl = (value) => {
   if (typeof value !== 'string') {
     return null
@@ -125,6 +171,11 @@ export const hasInternalLessons = (item) =>
   Boolean(item?.has_internal_lessons) &&
   !EXTERNAL_TRAINING_TYPES.has(String(item?.content_type || '').toLowerCase())
 
+export const isExternalTrainingItem = (item) =>
+  EXTERNAL_TRAINING_TYPES.has(getTrainingItemContentType(item)) ||
+  item?.routing?.is_external === true ||
+  item?.routing?.route_type === 'external_detail'
+
 export const getTrainingStartPath = (item) => {
   if (typeof item?.start_path === 'string' && item.start_path.startsWith('/training/modules/')) {
     return item.start_path
@@ -144,4 +195,18 @@ export const getTrainingStartPath = (item) => {
 
   const detailPath = `/training/modules/${item.id}`
   return hasInternalLessons(item) ? `${detailPath}/learn` : detailPath
+}
+
+export const isInPlatformTrainingRecommendation = (item) => {
+  if (!item || typeof item !== 'object') {
+    return false
+  }
+
+  const moduleId = getTrainingItemModuleId(item)
+  if (!moduleId || isExternalTrainingItem(item)) {
+    return false
+  }
+
+  const startPath = getTrainingStartPath({ ...item, id: moduleId })
+  return startPath.startsWith('/training/modules/') && !startPath.includes('://')
 }

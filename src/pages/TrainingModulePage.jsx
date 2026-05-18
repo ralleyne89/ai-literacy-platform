@@ -4,9 +4,29 @@ import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 import { DEMO_FALLBACK_MODULE_DETAILS, DEMO_FALLBACK_MODULE_IDS } from '../data/demoFallback'
-import { normalizeVideoSource } from '../utils/videoUrls'
+import { normalizeInPlatformUrl, normalizeVideoSource } from '../utils/videoUrls'
 
 const MODULE_LOAD_TIMEOUT_MS = 20000
+
+const normalizeInPlatformResources = (resources) => {
+  if (!Array.isArray(resources)) {
+    return []
+  }
+
+  return resources
+    .map((resource, index) => {
+      const url = normalizeInPlatformUrl(resource?.url)
+      if (!url) {
+        return null
+      }
+
+      return {
+        label: resource.label || resource.title || `Resource ${index + 1}`,
+        url,
+      }
+    })
+    .filter(Boolean)
+}
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
@@ -166,6 +186,7 @@ const TrainingModulePage = () => {
   }
 
   const { learning_objectives = [], content_sections = [], prerequisites = [], resources = [] } = module
+  const inPlatformResources = normalizeInPlatformResources(resources)
   const externalUrl = metadata.external_url || module.content_url
   const accessTier = metadata.access_tier?.replace(/\b\w/g, l => l.toUpperCase())
 
@@ -367,16 +388,14 @@ const TrainingModulePage = () => {
               </div>
             )}
 
-            {resources.length > 0 && (
+            {inPlatformResources.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">Resources</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {resources.map((resource, index) => (
+                  {inPlatformResources.map((resource, index) => (
                     <a
                       key={index}
                       href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-primary-600 hover:border-primary-200 hover:bg-primary-50"
                     >
                       <span>{resource.label}</span>

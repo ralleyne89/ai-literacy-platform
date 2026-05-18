@@ -88,7 +88,7 @@ describe('TrainingPage recommendations', () => {
     })
   })
 
-  it('uses safe recommendation links based on content type and internal lesson availability', async () => {
+  it('shows only in-platform recommendation links based on internal lesson availability', async () => {
     render(
       <MemoryRouter>
         <TrainingPage />
@@ -97,8 +97,7 @@ describe('TrainingPage recommendations', () => {
 
     expect(await screen.findByTestId('training-recommendation-module-internal-link'))
       .toHaveAttribute('href', '/training/modules/module-internal/learn')
-    expect(screen.getByTestId('training-recommendation-module-external-link'))
-      .toHaveAttribute('href', '/training/modules/module-external')
+    expect(screen.queryByTestId('training-recommendation-module-external-link')).not.toBeInTheDocument()
     expect(screen.getByTestId('training-recommendation-module-overview-link'))
       .toHaveAttribute('href', '/training/modules/module-overview')
   })

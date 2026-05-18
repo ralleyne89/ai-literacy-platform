@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, PlayCircle, BookOpen, ExternalLink } from 'lucide-react'
-import { normalizeVideoSource } from '../../utils/videoUrls'
+import { normalizeInPlatformUrl, normalizeVideoSource } from '../../utils/videoUrls'
 
 export { normalizeVideoSource }
 
@@ -8,8 +8,24 @@ const getVideoUrlFromContent = (content) =>
   content.video_url || content.embed_url || content.videoUrl || content.url || content.original_url || ''
 
 const getResourceUrl = (value) => {
-  const source = normalizeVideoSource(value)
-  return source ? source.originalUrl : ''
+  return normalizeInPlatformUrl(value)
+}
+
+const getSafeHttpUrl = (value) => {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(value.trim())
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return ''
+    }
+
+    return parsed.toString()
+  } catch {
+    return ''
+  }
 }
 
 const normalizeResources = (resources) => {
@@ -42,6 +58,12 @@ const VideoLesson = ({ lesson, onComplete }) => {
   const [isCompleted, setIsCompleted] = useState(lesson.progress?.status === 'completed')
   const content = lesson.content || {}
   const videoSource = normalizeVideoSource(getVideoUrlFromContent(content))
+  const videoTitle = content.video_title || ''
+  const creatorName = content.creator || ''
+  const creatorUrl = getSafeHttpUrl(content.creator_url)
+  const sourceUrl = getSafeHttpUrl(content.original_url) || videoSource?.originalUrl || ''
+  const durationMinutes = Number(content.duration_minutes) > 0 ? Number(content.duration_minutes) : null
+  const hasVideoMetadata = Boolean(videoTitle || creatorName || durationMinutes || sourceUrl || content.attribution)
   const keyPoints = Array.isArray(content.key_takeaways)
     ? content.key_takeaways
     : Array.isArray(content.key_points)
@@ -131,6 +153,54 @@ const VideoLesson = ({ lesson, onComplete }) => {
         </div>
       )}
 
+      {hasVideoMetadata && (
+        <div
+          className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm"
+          data-testid={`video-lesson-metadata-${lesson.id}`}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              {videoTitle && (
+                <p className="font-semibold text-gray-900">{videoTitle}</p>
+              )}
+              {(creatorName || durationMinutes) && (
+                <p className="mt-1">
+                  {creatorName && creatorUrl ? (
+                    <a
+                      href={creatorUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      {creatorName}
+                    </a>
+                  ) : creatorName ? (
+                    <span>{creatorName}</span>
+                  ) : null}
+                  {creatorName && durationMinutes ? <span> - </span> : null}
+                  {durationMinutes ? <span>{durationMinutes} min</span> : null}
+                </p>
+              )}
+            </div>
+            {sourceUrl && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 font-medium text-primary-600 hover:text-primary-700"
+                data-testid={`video-lesson-original-link-${lesson.id}`}
+              >
+                Source video
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+          </div>
+          {content.attribution && (
+            <p className="mt-3 text-xs text-gray-500">{content.attribution}</p>
+          )}
+        </div>
+      )}
+
       {/* Key Points */}
       {keyPoints.length > 0 && (
         <div className="card">
@@ -168,8 +238,6 @@ const VideoLesson = ({ lesson, onComplete }) => {
               <a
                 key={index}
                 href={resource.url}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="flex items-center gap-2 text-primary-600 hover:text-primary-700"
               >
                 <ExternalLink className="w-4 h-4" />

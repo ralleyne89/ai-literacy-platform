@@ -3,7 +3,7 @@ import { BarChart3, Clock, Award, BookOpen, Target, Lock, AlertCircle, PlayCircl
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
-import { getTrainingStartPath } from '../utils/videoUrls'
+import { getTrainingStartPath, isInPlatformTrainingRecommendation } from '../utils/videoUrls'
 
 const getStringValue = (value, fallback = '') => {
   if (typeof value === 'string') {
@@ -112,6 +112,11 @@ const normalizeRecommendationForDashboard = (recommendation, index, fallbackPref
     difficulty_level: normalizeDifficultyLevel(recommendation.difficulty_level),
     estimated_duration_minutes: duration,
     content_type: getStringValue(recommendation.content_type, 'module'),
+    content_url: getStringValue(recommendation.content_url, ''),
+    external_url: getStringValue(
+      recommendation.external_url,
+      getStringValue(recommendation.metadata?.external_url, '')
+    ),
     is_premium:
       recommendation.is_premium === true ||
       getStringValue(recommendation.is_premium) === 'true',
@@ -120,6 +125,9 @@ const normalizeRecommendationForDashboard = (recommendation, index, fallbackPref
     lesson_count: parseNumericValue(recommendation.lesson_count, 0),
     start_path: getStringValue(recommendation.start_path, ''),
     route_path: getStringValue(recommendation.route_path, ''),
+    metadata: recommendation.metadata && typeof recommendation.metadata === 'object'
+      ? recommendation.metadata
+      : {},
     routing: recommendation.routing && typeof recommendation.routing === 'object'
       ? recommendation.routing
       : null
@@ -135,6 +143,9 @@ const normalizeRecommendations = (recommendations, sourceTag = 'recommendation')
     .map((recommendation, index) => normalizeRecommendationForDashboard(recommendation, index, sourceTag))
     .filter(Boolean)
 }
+
+const getInPlatformCourseRecommendations = (recommendations) =>
+  recommendations.filter(isInPlatformTrainingRecommendation)
 
 const normalizeAssessmentRecord = (record) => {
   if (!record || typeof record !== 'object') {
@@ -237,6 +248,8 @@ const DashboardPage = () => {
         const assessmentHistoryRecommendations = latestHistoryAssessment
           ? normalizeRecommendations(latestHistoryAssessment.recommendations, 'assessment-history')
           : []
+        const inPlatformRecommendations = getInPlatformCourseRecommendations(recommendations)
+        const inPlatformHistoryRecommendations = getInPlatformCourseRecommendations(assessmentHistoryRecommendations)
 
         if (historyResult.status === 'fulfilled') {
           setAssessmentHistory(history)
@@ -252,10 +265,10 @@ const DashboardPage = () => {
           setTrainingSummary(null)
         }
 
-        if (recommendations.length > 0) {
-          setCourseRecommendations(recommendations)
-        } else if (assessmentHistoryRecommendations.length > 0) {
-          setCourseRecommendations(assessmentHistoryRecommendations)
+        if (inPlatformRecommendations.length > 0) {
+          setCourseRecommendations(inPlatformRecommendations)
+        } else if (inPlatformHistoryRecommendations.length > 0) {
+          setCourseRecommendations(inPlatformHistoryRecommendations)
         } else {
           setCourseRecommendations([])
         }

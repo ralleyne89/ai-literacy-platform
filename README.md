@@ -218,6 +218,10 @@ ENFORCE_PROD_ENV=1 \
 npm run build
 ```
 
+The validator reads env files in Vite's production order, so a local `.env.local`
+can override `.env` during this check. For release builds, pass the production
+values explicitly as shown above or remove local-only overrides first.
+
 ### Supabase API smoke check
 
 After deploying `platform-api`, validate the live API contract:

@@ -28,6 +28,22 @@ def is_playable_video_url(value):
     )
 
 
+PLACEHOLDER_VIDEO_MARKERS = [
+    'media.w3.org',
+    'interactive-examples.mdn.mozilla.net',
+    'flower.mp4',
+    'bunny',
+    'sintel',
+    'movie_300',
+]
+
+
+def assert_no_placeholder_video_url(value):
+    assert isinstance(value, str)
+    for marker in PLACEHOLDER_VIDEO_MARKERS:
+        assert marker not in value
+
+
 def test_training_progress_returns_summary_and_current_lesson_id(client, app, auth_headers):
     with app.app_context():
         user = create_user()
@@ -114,6 +130,10 @@ def test_training_modules_include_safe_routing_metadata(client):
     assert sales_module['lesson_count'] >= 1
     assert sales_module['has_internal_lessons'] is True
     assert sales_module['start_path'] == '/training/modules/module-ai-sales/learn'
+    assert sales_module['content_url'].startswith('https://www.youtube-nocookie.com/embed/')
+    assert_no_placeholder_video_url(sales_module['content_url'])
+    assert sales_module['metadata']['video_title']
+    assert sales_module['metadata']['attribution']
 
 
 def test_training_module_detail_returns_authenticated_progress(client, app, auth_headers):
@@ -161,6 +181,7 @@ def test_training_module_serializers_expose_lesson_and_routing_metadata(client):
     assert sales_module['learn_path'] == '/training/modules/module-ai-sales/learn'
     assert sales_module['route_path'] == sales_module['learn_path']
     assert sales_module['routing']['route_type'] == 'internal_lessons'
+    assert_no_placeholder_video_url(sales_module['content_url'])
 
     external_module = modules_by_id['module-google-ai-essentials']
     assert external_module['target_domains'] == ['AI Fundamentals', 'Practical Usage']
@@ -252,6 +273,11 @@ def test_course_video_lesson_returns_normalized_playable_url(client, app, auth_h
     payload = response.get_json()
     assert payload['content_type'] == 'video'
     assert is_playable_video_url(payload['content']['video_url'])
+    assert_no_placeholder_video_url(payload['content']['video_url'])
+    assert payload['content']['video_title']
+    assert payload['content']['creator']
+    assert payload['content']['original_url'].startswith('https://www.youtube.com/watch?v=')
+    assert payload['content']['attribution']
     assert payload['progress']['status'] == 'in_progress'
 
 
@@ -260,6 +286,7 @@ def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, 
         'module-ai-sales',
         'module-ethical-hr',
         'module-marketing-ai',
+        'module-ops-ai',
     ]
 
     with app.app_context():
@@ -276,6 +303,12 @@ def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, 
             for lesson in lessons:
                 content = json.loads(lesson.content)
                 assert is_playable_video_url(content['video_url'])
+                assert_no_placeholder_video_url(content['video_url'])
+                assert content['video_title']
+                assert content['creator']
+                assert content['original_url'].startswith('https://www.youtube.com/watch?v=')
+                assert content['attribution']
+                assert content['curation_note']
 
         sales_lesson = Lesson.query.filter_by(
             module_id='module-ai-sales',
@@ -292,12 +325,14 @@ def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, 
     assert lessons_payload['module']['lesson_count'] >= 1
     assert video_summary['has_video_url'] is True
     assert is_playable_video_url(video_summary['video_url'])
+    assert_no_placeholder_video_url(video_summary['video_url'])
 
     lesson_response = client.get(f'/api/course/lessons/{sales_lesson_id}', headers=headers)
     assert lesson_response.status_code == 200
     lesson_payload = lesson_response.get_json()
     assert lesson_payload['content_type'] == 'video'
     assert is_playable_video_url(lesson_payload['content']['video_url'])
+    assert_no_placeholder_video_url(lesson_payload['content']['video_url'])
 
 
 def test_seeded_workplace_track_modules_include_scenario_quizzes(client, app):

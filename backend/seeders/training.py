@@ -1,12 +1,20 @@
 import json
 
 from models import TrainingModule, db
+from seeders.curated_videos import get_curated_video, get_curated_video_url
 
-SALES_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/video/movie_300.mp4'
-HR_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/sintel/trailer.mp4'
-MARKETING_TRAINING_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-OPERATIONS_TRAINING_VIDEO_URL = 'https://media.w3.org/2010/05/bunny/trailer.mp4'
-PROMPT_TRAINING_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+SALES_TRAINING_VIDEO_URL = get_curated_video_url('module-ai-sales')
+HR_TRAINING_VIDEO_URL = get_curated_video_url('module-ethical-hr')
+MARKETING_TRAINING_VIDEO_URL = get_curated_video_url('module-marketing-ai')
+OPERATIONS_TRAINING_VIDEO_URL = get_curated_video_url('module-ops-ai')
+PROMPT_TRAINING_VIDEO_URL = get_curated_video_url('module-prompt-master')
+
+
+def _metadata_with_curated_video(module_id, metadata):
+    return {
+        **metadata,
+        **get_curated_video(module_id),
+    }
 
 DEFAULT_MODULES = [
     {
@@ -37,12 +45,12 @@ DEFAULT_MODULES = [
             {'title': 'Prompt Engineering for Sales Emails', 'summary': 'Framework and live demo for writing hyper-personalized outreach prompts.', 'duration_minutes': 14},
             {'title': 'Hands-on Lab: Build a Sales Playbook', 'summary': 'Guided exercise to build a multi-touch campaign using generative AI.', 'duration_minutes': 18}
         ],
-        'metadata': {
+        'metadata': _metadata_with_curated_video('module-ai-sales', {
             'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        },
+        }),
         'target_domains': ['Practical Usage', 'AI Impact & Applications']
     },
     {
@@ -73,12 +81,12 @@ DEFAULT_MODULES = [
             {'title': 'Mitigating Bias During Screening', 'summary': 'Human-in-the-loop review techniques and tooling recommendations.', 'duration_minutes': 20},
             {'title': 'Designing Transparent Employee Communication', 'summary': 'How to explain AI decisions to candidates and employees.', 'duration_minutes': 15}
         ],
-        'metadata': {
+        'metadata': _metadata_with_curated_video('module-ethical-hr', {
             'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        },
+        }),
         'target_domains': ['Ethics & Critical Thinking', 'AI Impact & Applications']
     },
     {
@@ -108,12 +116,12 @@ DEFAULT_MODULES = [
             {'title': 'Content Generation Systems', 'summary': 'Build a structured prompting system for multi-channel content.', 'duration_minutes': 18},
             {'title': 'Measurement & Iteration', 'summary': 'Instrument AI-assisted campaign dashboards for rapid iteration.', 'duration_minutes': 17}
         ],
-        'metadata': {
+        'metadata': _metadata_with_curated_video('module-marketing-ai', {
             'provider': 'LitmusAI Originals',
             'access_tier': 'enterprise',
             'format': 'video',
             'accreditation': 'Internal certificate of completion'
-        },
+        }),
         'target_domains': ['Practical Usage', 'Strategic Understanding']
     },
     {
@@ -143,12 +151,12 @@ DEFAULT_MODULES = [
             {'title': 'Designing Copilot Interfaces', 'summary': 'Key design patterns for conversational copilots in operations.', 'duration_minutes': 20},
             {'title': 'Governance and Monitoring', 'summary': 'Set success metrics and ongoing monitoring routines.', 'duration_minutes': 18}
         ],
-        'metadata': {
+        'metadata': _metadata_with_curated_video('module-ops-ai', {
             'provider': 'LitmusAI Originals',
             'access_tier': 'enterprise',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'
-        },
+        }),
         'target_domains': ['Strategic Understanding', 'AI Impact & Applications']
     },
     {
@@ -178,12 +186,12 @@ DEFAULT_MODULES = [
             {'title': 'Midjourney, GPT, and Claude Patterns', 'summary': 'Adapting prompts across creative, analytical, and strategic use cases.', 'duration_minutes': 16},
             {'title': 'Evaluation & Refinement Lab', 'summary': 'Hands-on exercises with scoring rubrics and rapid iteration cycles.', 'duration_minutes': 18}
         ],
-        'metadata': {
+        'metadata': _metadata_with_curated_video('module-prompt-master', {
             'provider': 'LitmusAI Originals',
             'access_tier': 'professional',
             'format': 'interactive',
             'accreditation': 'Internal certificate of completion'
-        },
+        }),
         'target_domains': ['Practical Usage', 'AI Fundamentals']
     },
     {

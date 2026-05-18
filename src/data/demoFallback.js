@@ -3,7 +3,16 @@
  * Used so training modules and video content still render for stakeholder demos.
  */
 
-const DEMO_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+import curatedVideoCatalog from '../../docs/course-content/curated-video-catalog.json'
+
+const getCuratedVideo = (moduleId) => curatedVideoCatalog.videos[moduleId] || {}
+
+const getCuratedVideoUrl = (moduleId) => getCuratedVideo(moduleId).video_url || ''
+
+const withCuratedMetadata = (moduleId, metadata = {}) => ({
+  ...metadata,
+  ...getCuratedVideo(moduleId),
+})
 
 export const DEMO_FALLBACK_MODULE_IDS = ['module-ai-fundamentals', 'module-prompt-basics', 'module-ethics-overview']
 
@@ -18,7 +27,7 @@ export const DEMO_FALLBACK_MODULES_LIST = [
     content_type: 'video',
     is_premium: false,
     learning_objectives: ['Understand key AI terms', 'Identify safe use cases', 'Apply basic prompt tips'],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-ai-fundamentals', { access_tier: 'free', format: 'video' })
   },
   {
     id: 'module-prompt-basics',
@@ -30,7 +39,7 @@ export const DEMO_FALLBACK_MODULES_LIST = [
     content_type: 'video',
     is_premium: false,
     learning_objectives: ['Structure effective prompts', 'Iterate on outputs', 'Avoid common pitfalls'],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-prompt-basics', { access_tier: 'free', format: 'video' })
   },
   {
     id: 'module-ethics-overview',
@@ -42,7 +51,7 @@ export const DEMO_FALLBACK_MODULES_LIST = [
     content_type: 'video',
     is_premium: false,
     learning_objectives: ['Recognize algorithmic bias', 'Apply human-in-the-loop checks', 'Explain AI decisions'],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-ethics-overview', { access_tier: 'free', format: 'video' })
   }
 ]
 
@@ -56,12 +65,12 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 1,
     estimated_duration_minutes: 30,
     content_type: 'video',
-    content_url: DEMO_VIDEO_URL,
+    content_url: getCuratedVideoUrl('module-ai-fundamentals'),
     learning_objectives: ['Understand key AI terms', 'Identify safe use cases', 'Apply basic prompt tips'],
     content_sections: [],
     prerequisites: [],
     resources: [],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-ai-fundamentals', { access_tier: 'free', format: 'video' })
   },
   'module-prompt-basics': {
     id: 'module-prompt-basics',
@@ -71,12 +80,12 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 2,
     estimated_duration_minutes: 45,
     content_type: 'video',
-    content_url: DEMO_VIDEO_URL,
+    content_url: getCuratedVideoUrl('module-prompt-basics'),
     learning_objectives: ['Structure effective prompts', 'Iterate on outputs', 'Avoid common pitfalls'],
     content_sections: [],
     prerequisites: [],
     resources: [],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-prompt-basics', { access_tier: 'free', format: 'video' })
   },
   'module-ethics-overview': {
     id: 'module-ethics-overview',
@@ -86,12 +95,12 @@ export const DEMO_FALLBACK_MODULE_DETAILS = {
     difficulty_level: 2,
     estimated_duration_minutes: 40,
     content_type: 'video',
-    content_url: DEMO_VIDEO_URL,
+    content_url: getCuratedVideoUrl('module-ethics-overview'),
     learning_objectives: ['Recognize algorithmic bias', 'Apply human-in-the-loop checks', 'Explain AI decisions'],
     content_sections: [],
     prerequisites: [],
     resources: [],
-    metadata: { access_tier: 'free', format: 'video' }
+    metadata: withCuratedMetadata('module-ethics-overview', { access_tier: 'free', format: 'video' })
   }
 }
 
@@ -142,7 +151,7 @@ export function getDemoModuleAndLessons(moduleId) {
     description: lessons[0].description,
     order_index: 0,
     content_type: 'video',
-    content: { video_url: moduleDetail.content_url },
+    content: getCuratedVideo(moduleId),
     estimated_duration_minutes: lessons[0].estimated_duration_minutes,
     is_required: true,
     progress: { status: 'not_started', time_spent_minutes: 0, quiz_score: null, quiz_attempts: 0, started_at: null, completed_at: null }

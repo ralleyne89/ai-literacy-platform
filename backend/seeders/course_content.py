@@ -19,6 +19,7 @@ from seeders.training import (
     OPERATIONS_TRAINING_VIDEO_URL,
     SALES_TRAINING_VIDEO_URL,
 )
+from seeders.curated_videos import get_curated_video
 from training_metadata import EXTERNAL_CONTENT_TYPES, normalize_content_type, normalize_video_embed_url
 
 
@@ -26,6 +27,21 @@ def build_single_video_lesson(module_data):
     video_url = normalize_video_embed_url(module_data.get('content_url'))
     if not video_url:
         return []
+
+    curated_video = get_curated_video(module_data.get('id'))
+    content_data = {
+        **curated_video,
+        'video_url': video_url,
+        'video_title': curated_video.get('video_title') or module_data['title'],
+        'summary': module_data.get('description') or curated_video.get('curation_note') or '',
+        'key_points': module_data.get('learning_objectives', [])[:5],
+        'key_takeaways': module_data.get('learning_objectives', [])[:5],
+        'resources': [
+            {'title': resource.get('label') or resource.get('title'), 'url': resource.get('url')}
+            for resource in module_data.get('resources', [])
+            if isinstance(resource, dict) and resource.get('url')
+        ],
+    }
 
     return [
         {
@@ -35,18 +51,7 @@ def build_single_video_lesson(module_data):
             'content_type': 'video',
             'estimated_duration_minutes': min(module_data.get('estimated_duration_minutes') or 30, 30),
             'is_required': True,
-            'content': json.dumps({
-                'video_url': video_url,
-                'video_title': module_data['title'],
-                'summary': module_data.get('description') or '',
-                'key_points': module_data.get('learning_objectives', [])[:5],
-                'key_takeaways': module_data.get('learning_objectives', [])[:5],
-                'resources': [
-                    {'title': resource.get('label') or resource.get('title'), 'url': resource.get('url')}
-                    for resource in module_data.get('resources', [])
-                    if isinstance(resource, dict) and resource.get('url')
-                ],
-            })
+            'content': json.dumps(content_data)
         }
     ]
 
@@ -441,6 +446,8 @@ AI_FUNDAMENTALS_INTRO_LESSONS = [
     }
 ]
 
+AI_FOUNDATIONS_VIDEO = get_curated_video('module-ai-fundamentals-intro')
+
 AI_FUNDAMENTALS_INTRO_LESSONS.append({
     'title': 'Video: AI Literacy Foundations',
     'description': 'A concise visual overview of modern AI, core concepts, and responsible use.',
@@ -449,8 +456,7 @@ AI_FUNDAMENTALS_INTRO_LESSONS.append({
     'estimated_duration_minutes': 12,
     'is_required': True,
     'content': json.dumps({
-        'video_url': 'https://www.youtube-nocookie.com/embed/_ZvnD73m40o',
-        'video_title': 'AI Literacy Foundations',
+        **AI_FOUNDATIONS_VIDEO,
         'summary': 'Use this video to connect the text lessons to a practical overview of how AI systems are used in real workflows.',
         'key_takeaways': [
             'AI literacy starts with clear mental models for what AI can and cannot do',
@@ -816,6 +822,8 @@ PROMPT_ENGINEERING_MASTERY_LESSONS = [
     }
 ]
 
+PROMPT_ENGINEERING_VIDEO = get_curated_video('module-prompt-master')
+
 PROMPT_ENGINEERING_MASTERY_LESSONS.append({
     'title': 'Video: Prompt Engineering in Practice',
     'description': 'Watch a practical walkthrough of prompt structure, examples, and iteration.',
@@ -824,8 +832,7 @@ PROMPT_ENGINEERING_MASTERY_LESSONS.append({
     'estimated_duration_minutes': 12,
     'is_required': True,
     'content': json.dumps({
-        'video_url': 'https://www.youtube-nocookie.com/embed/T9aRN5JkmL8',
-        'video_title': 'Prompt Engineering in Practice',
+        **PROMPT_ENGINEERING_VIDEO,
         'summary': 'This video reinforces the CRAFT framework and shows how prompt specificity changes output quality.',
         'key_takeaways': [
             'Examples help models match your desired format and style',
@@ -1067,7 +1074,15 @@ ELEMENTS_OF_AI_LESSONS = [
 ]
 
 
-def _video_lesson(title, description, video_url, key_points, duration_minutes=20):
+def _video_lesson(title, description, video_url, key_points, duration_minutes=20, video_metadata=None):
+    content = {
+        **(video_metadata or {}),
+        'video_url': video_url,
+        'key_points': key_points,
+        'key_takeaways': key_points,
+        'resources': [],
+    }
+
     return {
         'title': title,
         'description': description,
@@ -1075,11 +1090,7 @@ def _video_lesson(title, description, video_url, key_points, duration_minutes=20
         'content_type': 'video',
         'estimated_duration_minutes': duration_minutes,
         'is_required': True,
-        'content': json.dumps({
-            'video_url': video_url,
-            'key_points': key_points,
-            'resources': []
-        })
+        'content': json.dumps(content)
     }
 
 
@@ -1110,6 +1121,7 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Connect AI workflows to existing CRM stages'
             ],
             duration_minutes=18,
+            video_metadata=get_curated_video('module-ai-sales'),
         ),
         _quiz_lesson(
             'Sales AI Scenario Check',
@@ -1208,6 +1220,7 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Document policy and communication guardrails'
             ],
             duration_minutes=20,
+            video_metadata=get_curated_video('module-ethical-hr'),
         ),
         _quiz_lesson(
             'HR AI Governance Scenario Check',
@@ -1306,6 +1319,7 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Review AI output against brand and performance criteria'
             ],
             duration_minutes=22,
+            video_metadata=get_curated_video('module-marketing-ai'),
         ),
         _quiz_lesson(
             'Marketing AI Scenario Check',
@@ -1404,6 +1418,7 @@ INTERNAL_VIDEO_MODULE_LESSONS = {
                 'Measure cycle time, quality, and exception handling after launch'
             ],
             duration_minutes=22,
+            video_metadata=get_curated_video('module-ops-ai'),
         ),
         _quiz_lesson(
             'Operations AI Scenario Check',

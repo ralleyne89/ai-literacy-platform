@@ -1,31 +1,10 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import { loadEnv } from 'vite'
 
 const ROOT = process.cwd()
-const DOTENV_PATH = path.join(ROOT, '.env')
-
-const parseEnvFile = (filePath) => {
-  if (!fs.existsSync(filePath)) {
-    return {}
-  }
-
-  const result = {}
-  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/)
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) {
-      continue
-    }
-    const idx = trimmed.indexOf('=')
-    const key = trimmed.slice(0, idx).trim()
-    const rawValue = trimmed.slice(idx + 1).trim()
-    result[key] = rawValue
-  }
-  return result
-}
-
-const fileEnv = parseEnvFile(DOTENV_PATH)
-const getEnv = (key) => (process.env[key] ?? fileEnv[key] ?? '').trim()
+const VITE_MODE = process.env.VITE_MODE || process.env.VITE_BUILD_MODE || 'production'
+const fileEnv = loadEnv(VITE_MODE, ROOT, '')
+const effectiveEnv = { ...fileEnv, ...process.env }
+const getEnv = (key) => String(effectiveEnv[key] ?? '').trim()
 
 const isProductionBuild = (() => {
   const nodeEnv = (process.env.NODE_ENV || '').toLowerCase()
@@ -135,7 +114,7 @@ if (
 }
 
 for (const prefix of legacyAuthPrefixes) {
-  const matches = Object.keys({ ...process.env, ...fileEnv }).filter((key) => key.startsWith(prefix))
+  const matches = Object.keys(effectiveEnv).filter((key) => key.startsWith(prefix))
   if (matches.length > 0) {
     addWarning(
       `Legacy auth variables are still present: ${matches.join(', ')}. They are not used by the Supabase release path and should be removed from production environments.`

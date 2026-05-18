@@ -52,6 +52,26 @@ const externalModule = {
   },
 }
 
+const internalModule = {
+  id: 'module-ai-sales',
+  title: 'AI Fundamentals for Sales Teams',
+  description: 'A practical in-platform video module.',
+  content_type: 'video',
+  content_url: 'https://www.youtube-nocookie.com/embed/R8CepUwdZis',
+  role_specific: 'Sales',
+  estimated_duration_minutes: 45,
+  learning_objectives: ['Use AI in sales workflows'],
+  prerequisites: [],
+  resources: [
+    { label: 'Internal worksheet', url: '/training/modules/module-ai-sales/learn' },
+    { label: 'External worksheet', url: 'https://example.com/sales-template' },
+  ],
+  metadata: {
+    access_tier: 'free',
+    provider: 'LitmusAI',
+  },
+}
+
 describe('TrainingModulePage', () => {
   beforeEach(() => {
     mockAuthState.isAuthenticated = true
@@ -76,6 +96,21 @@ describe('TrainingModulePage', () => {
     expect(screen.queryByTestId('training-module-loading')).not.toBeInTheDocument()
     expect(screen.getByTestId('training-module-external-cta-link'))
       .toHaveAttribute('href', 'https://www.elementsofai.com/')
+  })
+
+  it('hides off-platform resource links for in-platform video modules', async () => {
+    mockAxios.get.mockResolvedValue({
+      data: {
+        module: internalModule,
+      },
+    })
+
+    renderModulePage()
+
+    expect(await screen.findByRole('heading', { name: 'AI Fundamentals for Sales Teams' })).toBeInTheDocument()
+    expect(screen.getByText('Internal worksheet').closest('a'))
+      .toHaveAttribute('href', '/training/modules/module-ai-sales/learn')
+    expect(screen.queryByText('External worksheet')).not.toBeInTheDocument()
   })
 
   it('stops showing the spinner when the module request hangs', async () => {

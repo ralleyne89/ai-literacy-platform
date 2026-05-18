@@ -15,6 +15,7 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:prod-env": "node --test scripts/validate-prod-env.test.mjs",
     "test:backend": "cd backend && venv/bin/python -m pytest -q tests",
     "test:all": "npm run lint && npm run typecheck && npm test && npm run test:backend && npm run build",
     "test:watch": "vitest",

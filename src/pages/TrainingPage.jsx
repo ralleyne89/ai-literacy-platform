@@ -4,6 +4,7 @@ import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalL
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 import { DEMO_FALLBACK_MODULES_LIST } from '../data/demoFallback'
+import { isInPlatformTrainingRecommendation } from '../utils/videoUrls'
 
 const DEMO_FALLBACK_MODULES = DEMO_FALLBACK_MODULES_LIST
 const EXTERNAL_CONTENT_TYPES = new Set(['external', 'partner', 'affiliate'])
@@ -132,7 +133,10 @@ const normalizeRecommendations = (recommendations) => {
     return []
   }
 
-  return recommendations.map(normalizeRecommendation).filter(Boolean)
+  return recommendations
+    .map(normalizeRecommendation)
+    .filter(Boolean)
+    .filter(isInPlatformTrainingRecommendation)
 }
 
 const getResumeModuleFromProgressMap = (progressMap) => {
