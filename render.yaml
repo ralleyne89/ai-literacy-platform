@@ -9,14 +9,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.18
-      - key: AUTH0_DOMAIN
-        value: litmusai.us.auth0.com
-      - key: AUTH0_CLIENT_ID
-        value: rJVPV5C28rl38LggrVvlKppZ19I8EIlj
-      - key: AUTH0_AUDIENCE
-        value: https://litmusai.us.auth0.com/api/v2/
-      - key: AUTH0_REDIRECT_URI
-        value: https://litmusai.netlify.app/auth/callback
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY
@@ -29,8 +27,6 @@ services:
         value: production
       - key: FLASK_DEBUG
         value: "0"
-      - key: SUPABASE_JWT_SECRET
-        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_PUBLISHABLE_KEY

@@ -4,6 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          ink: "#08111F",
+          navy: "#0B1220",
+          panel: "#101B2D",
+          mist: "#F6FAFF",
+          line: "#DDE7F3",
+          violet: "#6B4EFF",
+          cyan: "#00D2FF",
+          emerald: "#10B981",
+          orange: "#F97316",
+        },
         primary: {
           50: "#F4F2FF",
           100: "#EAE6FF",
@@ -42,6 +53,19 @@ export default {
         "gradient-secondary":
           "linear-gradient(135deg, #5A3CE6 0%, #4A2ECC 100%)",
         "gradient-hero": "linear-gradient(135deg, #6B4EFF 0%, #00D2FF 100%)",
+        "gradient-brand-radial":
+          "radial-gradient(circle at 20% 20%, rgba(107,78,255,0.26), transparent 34%), radial-gradient(circle at 80% 10%, rgba(0,210,255,0.22), transparent 30%), linear-gradient(135deg, #08111F 0%, #0B1220 52%, #101B2D 100%)",
+        "gradient-soft-panel":
+          "linear-gradient(135deg, rgba(244,242,255,0.95) 0%, rgba(230,251,255,0.92) 100%)",
+      },
+      boxShadow: {
+        "brand-sm": "0 12px 30px rgba(8,17,31,0.08)",
+        "brand-md": "0 24px 60px rgba(8,17,31,0.12)",
+        "brand-lg": "0 32px 90px rgba(8,17,31,0.16)",
+      },
+      borderRadius: {
+        brand: "1.5rem",
+        "brand-lg": "2rem",
       },
     },
   },

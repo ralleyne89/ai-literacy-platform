@@ -69,12 +69,17 @@ backend/instance/
 .coverage
 coverage/
 htmlcov/
+playwright-report/
+test-results/
 
 # Misc
 Thumbs.db
 
 # Local Netlify folder
 .netlify/
+
+# Supabase CLI local metadata
+supabase/.temp/
 
 # Deployment helper files with secrets (keep local only)
 render_env_vars.txt

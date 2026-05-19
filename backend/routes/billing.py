@@ -566,6 +566,8 @@ def create_checkout_session():
     if not email:
         return jsonify({'error': 'Verified account email is required to start checkout'}), 400
 
+    user_id = user.id
+
     success_url = _sanitize_frontend_redirect_url(
         request_data.get('success_url'),
         '/billing?success=true'

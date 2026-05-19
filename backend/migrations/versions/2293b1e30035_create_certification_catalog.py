@@ -28,15 +28,15 @@ def upgrade():
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
     )
 
-    op.add_column(CERT_TABLE, sa.Column('catalog_id', sa.String(length=64), nullable=True))
-    op.create_foreign_key(
-        'fk_certification_catalog',
-        CERT_TABLE,
-        CERT_TYPE_TABLE,
-        ['catalog_id'],
-        ['id'],
-        ondelete='SET NULL'
-    )
+    with op.batch_alter_table(CERT_TABLE, recreate='always') as batch_op:
+        batch_op.add_column(sa.Column('catalog_id', sa.String(length=64), nullable=True))
+        batch_op.create_foreign_key(
+            'fk_certification_catalog',
+            CERT_TYPE_TABLE,
+            ['catalog_id'],
+            ['id'],
+            ondelete='SET NULL'
+        )
 
     connection = op.get_bind()
     legacy_mapping = {
@@ -55,6 +55,7 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_constraint('fk_certification_catalog', CERT_TABLE, type_='foreignkey')
-    op.drop_column(CERT_TABLE, 'catalog_id')
+    with op.batch_alter_table(CERT_TABLE, recreate='always') as batch_op:
+        batch_op.drop_constraint('fk_certification_catalog', type_='foreignkey')
+        batch_op.drop_column('catalog_id')
     op.drop_table(CERT_TYPE_TABLE)

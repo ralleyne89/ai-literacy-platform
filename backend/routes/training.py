@@ -5,6 +5,7 @@ from logging_config import get_logger
 from datetime import datetime
 import json
 import uuid
+from training_metadata import build_module_metadata
 
 training_bp = Blueprint('training', __name__)
 logger = get_logger(__name__)
@@ -57,6 +58,7 @@ def serialize_module(module, include_details: bool = False):
         'metadata': metadata if isinstance(metadata, dict) else {},
         'access_tier': access_tier or 'free'
     }
+    data.update(build_module_metadata(module))
 
     if include_details:
         data.update({

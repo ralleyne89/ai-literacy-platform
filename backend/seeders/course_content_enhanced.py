@@ -12,6 +12,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import db, TrainingModule, Lesson
+from seeders.curated_videos import get_curated_video
+
+
+PROMPT_BASICS_VIDEO = get_curated_video('module-prompt-basics')
+PROMPT_ADVANCED_VIDEO = get_curated_video('module-prompt-master')
 
 # ENHANCED: Prompt Engineering Mastery - Professional Certification Level
 # Duration: ~6-8 hours | 10 lessons | Certification-ready
@@ -65,14 +70,7 @@ PROMPT_ENGINEERING_MASTERY_ENHANCED = [
         'estimated_duration_minutes': 25,
         'is_required': True,
         'content': json.dumps({
-            'video_url': 'https://www.youtube-nocookie.com/embed/_ZvnD73m40o',
-            'video_title': 'Prompt Engineering Tutorial - Master ChatGPT and LLM Responses',
-            'creator': 'freeCodeCamp.org',
-            'creator_url': 'https://www.youtube.com/@freecodecamp',
-            'duration_minutes': 9,
-            'license': 'CC BY-NC-SA (Educational use permitted)',
-            'original_url': 'https://www.youtube.com/watch?v=_ZvnD73m40o',
-            'attribution': '"Prompt Engineering Tutorial" by freeCodeCamp.org. Licensed under CC BY-NC-SA.',
+            **PROMPT_BASICS_VIDEO,
             'timestamps': [
                 {'time': '0:00', 'topic': 'Introduction to Prompt Engineering'},
                 {'time': '1:30', 'topic': 'Why Prompt Engineering Matters'},
@@ -282,14 +280,7 @@ PROMPT_ENGINEERING_MASTERY_ENHANCED = [
         'estimated_duration_minutes': 30,
         'is_required': True,
         'content': json.dumps({
-            'video_url': 'https://www.youtube-nocookie.com/embed/T9aRN5JkmL8',
-            'video_title': 'Advanced ChatGPT Prompt Engineering',
-            'creator': 'IBM Technology',
-            'creator_url': 'https://www.youtube.com/@IBMTechnology',
-            'duration_minutes': 12,
-            'license': 'Educational use permitted',
-            'original_url': 'https://www.youtube.com/watch?v=T9aRN5JkmL8',
-            'attribution': '"Advanced ChatGPT Prompt Engineering" by IBM Technology. Used with permission for educational purposes.',
+            **PROMPT_ADVANCED_VIDEO,
             'timestamps': [
                 {'time': '0:00', 'topic': 'Introduction to Advanced Techniques'},
                 {'time': '1:45', 'topic': 'Few-Shot Learning Explained'},
@@ -381,4 +372,3 @@ if __name__ == '__main__':
     
     with app.app_context():
         seed_enhanced_content(force=args.force)
-

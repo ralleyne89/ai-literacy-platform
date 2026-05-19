@@ -6,26 +6,22 @@ import path from 'node:path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiTarget = env.VITE_API_URL || 'http://localhost:5001'
-  const usePlaywrightAuth0Stub =
-    (env.PLAYWRIGHT_AUTH0_STUB || process.env.PLAYWRIGHT_AUTH0_STUB || '').trim() === '1'
 
   return {
     plugins: [react()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src'),
-        ...(usePlaywrightAuth0Stub
-          ? {
-              '@auth0/auth0-react': path.resolve(__dirname, 'src/test/auth0PlaywrightStub.jsx')
-            }
-          : {})
+        '@': path.resolve(__dirname, 'src')
       }
     },
     test: {
       environment: 'jsdom',
+      include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+      exclude: ['**/.worktrees/**', '**/e2e/**'],
       setupFiles: ['./src/test/setup.js']
     },
     server: {
+      port: 5173,
       proxy: {
         '/api': {
           target: apiTarget,

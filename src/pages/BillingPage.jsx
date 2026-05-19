@@ -1,60 +1,141 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 import { BILLING_ENDPOINTS } from '../config/apiEndpoints'
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRight,
+  BadgeCheck,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from 'lucide-react'
+
+const PLAN_ORDER = ['free', 'premium', 'enterprise']
 
 const formatCurrency = (amount, currency = 'usd') => {
   if (amount === null || typeof amount === 'undefined') {
-    return 'Contact'
+    return 'Custom'
   }
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),
-    minimumFractionDigits: 0
+    minimumFractionDigits: 0,
   })
 
   return formatter.format(amount)
 }
 
-const FALLBACK_PLANS = [
+export const FALLBACK_PLANS = [
   {
     id: 'free',
     name: 'Free',
-    description: 'Perfect for individuals exploring LitmusAI.',
+    description: 'Map your AI readiness and get a clear starting point.',
     amount: 0,
     currency: 'usd',
     billing_interval: 'month',
     features: [
-      'Access to assessments',
-      'Foundational training modules',
-      'Basic progress tracking'
+      'AI readiness assessment',
+      'Starter training modules',
+      'Basic progress tracking',
     ],
-    cta: 'You are on this plan',
+    cta: 'Start free assessment',
     is_free: true,
     checkout_enabled: true,
-    configured: true
+    configured: true,
   },
   {
     id: 'premium',
     name: 'Premium',
-    description: 'Unlock premium training, certifications, and analytics.',
+    description: 'For professionals who want guided training and certification.',
     amount: 49,
     currency: 'usd',
     billing_interval: 'month',
     features: [
-      'All Free features',
-      'Premium training catalog',
+      'Full training catalog',
       'Certification exam access',
-      'Email support'
+      'Role-based recommendations',
+      'Email support',
     ],
-    cta: 'Upgrade to Premium',
+    cta: 'Start Premium',
     is_free: false,
     checkout_enabled: true,
-    configured: true
-  }
+    configured: true,
+    recommended: true,
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    description: 'For teams rolling out AI standards across a department.',
+    amount: 99,
+    currency: 'usd',
+    billing_interval: 'month',
+    features: [
+      'Team learning paths',
+      'Advanced reporting',
+      'Dedicated customer success',
+      'SSO and licensing support',
+    ],
+    cta: 'Start Enterprise',
+    is_free: false,
+    checkout_enabled: true,
+    configured: true,
+  },
+]
+
+const PLAN_DESIGN = {
+  free: {
+    badge: 'Explore',
+    bestFor: 'Solo learners',
+    proof: 'Assess first, then train from the right level.',
+    accentClass: 'border-slate-200 bg-white',
+    icon: Sparkles,
+  },
+  premium: {
+    badge: 'Recommended',
+    bestFor: 'Career growth',
+    proof: 'Training, practice, and certification in one path.',
+    accentClass: 'border-emerald-300 bg-white shadow-[0_30px_90px_rgba(16,185,129,0.18)] ring-1 ring-emerald-200/70',
+    icon: BadgeCheck,
+  },
+  enterprise: {
+    badge: 'Teams',
+    bestFor: 'Departments',
+    proof: 'A cleaner rollout path for managers and team leads.',
+    accentClass: 'border-slate-900 bg-slate-950 text-white shadow-[0_30px_90px_rgba(15,23,42,0.22)]',
+    icon: Users,
+  },
+}
+
+const COMPARISON_ROWS = [
+  {
+    label: 'Assessment',
+    free: 'Readiness score',
+    premium: 'Score plus recommendations',
+    enterprise: 'Team readiness view',
+  },
+  {
+    label: 'Training',
+    free: 'Starter modules',
+    premium: 'Full catalog',
+    enterprise: 'Custom paths',
+  },
+  {
+    label: 'Certification',
+    free: 'Readiness preview',
+    premium: 'Exam access',
+    enterprise: 'Team certification support',
+  },
+  {
+    label: 'Support',
+    free: 'Self-guided',
+    premium: 'Email support',
+    enterprise: 'Dedicated success',
+  },
 ]
 
 const isHtmlPayload = (payload) => {
@@ -70,23 +151,6 @@ const buildSyntheticHttpError = (response, message = 'Invalid API response') => 
   const error = new Error(message)
   error.response = response
   return error
-}
-
-const getBillingApiFallbackMessage = (err) => {
-  if (!err?.response) {
-    return 'Unable to reach billing API. Displaying standard plan information instead.'
-  }
-
-  const data = err.response.data
-  if (isHtmlPayload(data)) {
-    return 'Billing API returned HTML instead of JSON. Displaying standard plan information instead.'
-  }
-
-  if (typeof data === 'object' && data !== null) {
-    return data.error || data.message || 'Unable to reach billing API. Displaying standard plan information instead.'
-  }
-
-  return 'Unable to reach billing API. Displaying standard plan information instead.'
 }
 
 const getBillingActionError = (err, fallbackMessage) => {
@@ -108,32 +172,87 @@ const getBillingActionError = (err, fallbackMessage) => {
   return fallbackMessage
 }
 
-const BillingPage = () => {
-  const { user, isAuthenticated } = useAuth()
-  const location = useLocation()
+const mergePlansWithFallback = (remotePlans = []) => {
+  const remoteById = new Map(
+    remotePlans
+      .filter(plan => plan?.id)
+      .map(plan => [plan.id, plan])
+  )
 
-  const [plans, setPlans] = useState([])
-  const [loading, setLoading] = useState(true)
+  const mergedPlans = PLAN_ORDER.map((planId) => {
+    const fallback = FALLBACK_PLANS.find(plan => plan.id === planId)
+    const remote = remoteById.get(planId)
+    if (!fallback && !remote) {
+      return null
+    }
+
+    return {
+      ...fallback,
+      ...remote,
+      features: Array.isArray(remote?.features) && remote.features.length > 0
+        ? remote.features
+        : fallback?.features || [],
+      cta: fallback?.cta || remote?.cta || 'Select plan',
+      recommended: fallback?.recommended || remote?.recommended || false,
+    }
+  }).filter(Boolean)
+
+  remotePlans.forEach((plan) => {
+    if (plan?.id && !PLAN_ORDER.includes(plan.id)) {
+      mergedPlans.push(plan)
+    }
+  })
+
+  return mergedPlans
+}
+
+const getPlanPriceLabel = (plan) => {
+  if (plan.id === 'enterprise' && plan.amount !== null && typeof plan.amount !== 'undefined') {
+    return `From ${formatCurrency(plan.amount, plan.currency)}`
+  }
+
+  return formatCurrency(plan.amount, plan.currency)
+}
+
+const getPlanIntervalLabel = (plan) => {
+  if (plan.is_free || plan.amount === null || typeof plan.amount === 'undefined') {
+    return ''
+  }
+
+  return `/ ${plan.billing_interval || 'month'}`
+}
+
+const buildBillingReturnState = (planId) => ({
+  pathname: '/billing',
+  search: planId ? `?plan=${encodeURIComponent(planId)}` : '',
+})
+
+const BillingPage = () => {
+  const { isAuthenticated } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const [plans, setPlans] = useState(FALLBACK_PLANS)
   const [checkoutPlan, setCheckoutPlan] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [subscription, setSubscription] = useState(null)
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [mockMode, setMockMode] = useState(false)
-  const [usingFallbackPlans, setUsingFallbackPlans] = useState(false)
   const [retryingPlans, setRetryingPlans] = useState(false)
   const [finalizingCheckout, setFinalizingCheckout] = useState(false)
 
+  const selectedPlanId = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('plan') || ''
+  }, [location.search])
+
   const queryMessages = useMemo(() => ({
-    success: 'Subscription activated successfully. Welcome aboard.',
-    canceled: 'Checkout canceled. You have not been charged.'
+    success: 'Your subscription is active.',
+    canceled: 'Checkout was canceled. You have not been charged.',
   }), [])
 
-  const fetchPlans = useCallback(async ({ showSpinner = true } = {}) => {
-    if (showSpinner) {
-      setLoading(true)
-    }
-
+  const fetchPlans = useCallback(async () => {
     try {
       const response = await axios.get(BILLING_ENDPOINTS.config)
       const payload = response?.data
@@ -142,21 +261,12 @@ const BillingPage = () => {
         throw buildSyntheticHttpError(response, 'Invalid billing payload')
       }
 
-      const remotePlans = Array.isArray(payload.plans) && payload.plans.length > 0 ? payload.plans : null
-      const filteredPlans = (remotePlans || FALLBACK_PLANS).filter(plan => plan.configured !== false)
-
-      setPlans(filteredPlans)
+      const remotePlans = Array.isArray(payload.plans) ? payload.plans : []
+      setPlans(mergePlansWithFallback(remotePlans))
       setMockMode(Boolean(payload.mock_mode))
-      setUsingFallbackPlans(false)
-    } catch (err) {
+    } catch {
       setPlans(FALLBACK_PLANS)
       setMockMode(false)
-      setUsingFallbackPlans(true)
-      setNotice(getBillingApiFallbackMessage(err))
-    } finally {
-      if (showSpinner) {
-        setLoading(false)
-      }
     }
   }, [])
 
@@ -210,7 +320,7 @@ const BillingPage = () => {
 
       try {
         const response = await axios.post(BILLING_ENDPOINTS.checkoutComplete, {
-          session_id: sessionId
+          session_id: sessionId,
         })
         const payload = response?.data
 
@@ -246,7 +356,7 @@ const BillingPage = () => {
   }, [fetchSubscription, isAuthenticated, location.search, queryMessages])
 
   useEffect(() => {
-    fetchPlans({ showSpinner: true })
+    fetchPlans()
   }, [fetchPlans])
 
   useEffect(() => {
@@ -255,14 +365,23 @@ const BillingPage = () => {
 
   const handleRetryPlans = async () => {
     setRetryingPlans(true)
-    setNotice('')
-    await fetchPlans({ showSpinner: false })
+    setError('')
+    await fetchPlans()
     setRetryingPlans(false)
+  }
+
+  const redirectToAuth = (planId) => {
+    navigate('/register', {
+      state: {
+        from: buildBillingReturnState(planId),
+      },
+    })
   }
 
   const handleCheckout = async (planId) => {
     if (!isAuthenticated) {
-      setError('Sign in before starting checkout so we can use your verified account identity.')
+      setError('')
+      redirectToAuth(planId)
       return
     }
 
@@ -279,7 +398,7 @@ const BillingPage = () => {
 
       window.location.href = payload.url
     } catch (err) {
-      setError(getBillingActionError(err, 'We could not start the checkout session.'))
+      setError(getBillingActionError(err, 'We could not start checkout.'))
       setCheckoutPlan('')
     }
   }
@@ -307,35 +426,46 @@ const BillingPage = () => {
   const renderPlanButton = (plan) => {
     if (plan.is_free) {
       return (
-        <button
-          type="button"
-          className="mt-8 w-full rounded-lg px-4 py-3 text-sm font-semibold bg-gray-200 text-gray-500 cursor-default"
-          disabled
+        <Link
+          to="/assessment"
+          className="mt-7 inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
         >
-          {plan.cta}
-        </button>
+          {plan.cta || 'Start free assessment'}
+        </Link>
       )
     }
 
-    const disabled = !plan.checkout_enabled || checkoutPlan === plan.id || !isAuthenticated
-    const label = plan.checkout_enabled
-      ? (
-        isAuthenticated
-          ? (mockMode && !plan.is_free ? `Simulate ${plan.name}` : plan.cta)
-          : 'Sign in to upgrade'
+    if (!plan.checkout_enabled) {
+      return (
+        <Link
+          to="/enterprise"
+          className={`mt-7 inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+            plan.id === 'enterprise'
+              ? 'bg-white text-slate-950 hover:bg-slate-100 focus-visible:ring-white'
+              : 'bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:ring-slate-950'
+          }`}
+        >
+          <span className="flex items-center gap-2">
+            Contact sales
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
       )
-      : 'Contact sales'
+    }
+
     const redirectingLabel = mockMode ? 'Opening sandbox...' : 'Redirecting...'
+    const disabled = checkoutPlan === plan.id
+    const buttonLabel = mockMode ? `Simulate ${plan.name}` : plan.cta || `Start ${plan.name}`
 
     return (
       <button
         type="button"
         onClick={() => handleCheckout(plan.id)}
-        className={`mt-8 w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors duration-200 ${
-          disabled
-            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            : 'bg-primary-600 text-white hover:bg-primary-700'
-        }`}
+        className={`mt-7 inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
+          plan.id === 'enterprise'
+            ? 'bg-white text-slate-950 hover:bg-slate-100 focus-visible:ring-white'
+            : 'bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)] hover:-translate-y-0.5 hover:bg-slate-800 focus-visible:ring-slate-950'
+        } ${disabled ? 'cursor-not-allowed opacity-60 hover:translate-y-0' : ''}`}
         disabled={disabled}
       >
         {checkoutPlan === plan.id ? (
@@ -344,176 +474,244 @@ const BillingPage = () => {
             {redirectingLabel}
           </span>
         ) : (
-          label
+          <span className="flex items-center gap-2">
+            {buttonLabel}
+            <ArrowRight className="h-4 w-4" />
+          </span>
         )}
       </button>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Choose the plan that fits your team</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Access assessments for free, or upgrade instantly to unlock the full LitmusAI experience.
-            Plans are billed monthly and you can cancel anytime.
-          </p>
+    <main className="min-h-screen overflow-hidden bg-[#f6f8fb] text-slate-950">
+      <section className="relative border-b border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f7fafc_100%)] px-4 py-14 sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.14),transparent_32%),radial-gradient(circle_at_76%_18%,rgba(249,115,22,0.12),transparent_28%)]" />
+        <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-end">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 shadow-sm">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Pricing
+            </div>
+            <h1 className="max-w-4xl text-4xl font-black leading-[1.02] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
+              Pick the plan that matches your AI rollout.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+              Start with the free assessment, then upgrade when you need the training catalog,
+              certification access, or a team rollout plan.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold text-slate-700">
+              {['Prices are visible before sign-in', 'Monthly plans', 'Cancel anytime'].map((item) => (
+                <span key={item} className="rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-[0_26px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+              What changes when you upgrade
+            </p>
+            <div className="mt-5 grid gap-3">
+              {[
+                ['Train', 'Move from a score to a guided learning path.'],
+                ['Practice', 'Use lessons and scenarios tied to your role.'],
+                ['Certify', 'Prove readiness when your skills are ready.'],
+              ].map(([label, copy]) => (
+                <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="font-semibold text-slate-950">{label}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{copy}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+      </section>
 
-        {subscription?.has_subscription && (
-          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-semibold text-blue-900">
-                    Active Subscription: {subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}
-                  </p>
-                  <p className="text-xs text-blue-700">
-                    Status: {subscription.status} • ${subscription.amount}/{subscription.interval}
-                  </p>
+      <section className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          {(subscription?.has_subscription || finalizingCheckout || notice || error) && (
+            <div className="mb-8 grid gap-3">
+              {subscription?.has_subscription && (
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-900">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700" />
+                      <div>
+                        <p className="text-sm font-semibold">
+                          Active subscription: {subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-800">
+                          Status: {subscription.status} | {formatCurrency(subscription.amount)}/{subscription.interval}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleManageSubscription}
+                      disabled={loadingPortal}
+                      className="inline-flex min-h-[42px] items-center justify-center rounded-2xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-60"
+                    >
+                      {loadingPortal ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading...
+                        </span>
+                      ) : (
+                        'Manage subscription'
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleManageSubscription}
-                disabled={loadingPortal}
-                className="px-4 py-2 text-sm font-semibold text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
-              >
-                {loadingPortal ? (
-                  <span className="flex items-center gap-2">
+              )}
+
+              {finalizingCheckout && (
+                <div className="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700 shadow-sm">
+                  <span className="flex items-center gap-3">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading...
+                    Finalizing your subscription.
                   </span>
-                ) : (
-                  'Manage Subscription'
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {finalizingCheckout && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 flex items-center gap-3">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Finalizing your subscription and syncing it to your account...</span>
-          </div>
-        )}
-
-        {notice && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-3">
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="flex-1">{notice}</span>
-            {usingFallbackPlans && (
-              <button
-                type="button"
-                onClick={handleRetryPlans}
-                disabled={retryingPlans}
-                className="rounded-md border border-emerald-300 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-              >
-                {retryingPlans ? 'Retrying...' : 'Retry API'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            {error}
-          </div>
-        )}
-
-        {isAuthenticated ? (
-          <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-gray-200 bg-white p-4">
-            <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-2">
-              Verified billing email
-            </label>
-            <input
-              id="checkout-email"
-              type="email"
-              autoComplete="email"
-              value={user?.email || ''}
-              readOnly
-              className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-gray-700"
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Checkout receipts and subscription notices use the verified email on your signed-in account.
-            </p>
-          </div>
-        ) : (
-          <div className="mb-8 max-w-3xl mx-auto rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            <p className="font-medium">Sign in before upgrading.</p>
-            <p className="mt-1">
-              Paid checkout is tied to your verified account identity so the backend can securely sync your subscription.
-            </p>
-            <div className="mt-3 flex gap-3">
-              <Link to="/login" className="rounded-md bg-primary-600 px-3 py-2 text-white font-semibold hover:bg-primary-700">
-                Sign in
-              </Link>
-              <Link to="/register" className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100">
-                Create account
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-            {[0, 1].map((i) => (
-              <div key={i} className="card animate-pulse">
-                <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-5/6 mb-6"></div>
-                <div className="space-y-3">
-                  {[0, 1, 2, 3].map((j) => (
-                    <div key={j} className="h-3 bg-gray-200 rounded"></div>
-                  ))}
                 </div>
-                <div className="mt-8 h-10 bg-gray-200 rounded"></div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-            {plans.map((plan) => (
-              <div key={plan.id} className="card flex flex-col">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-900">{plan.name}</h2>
-                  <p className="text-gray-600 mt-2">{plan.description}</p>
+              )}
+
+              {notice && (
+                <div className="rounded-3xl border border-emerald-200 bg-white px-5 py-4 text-sm text-emerald-800 shadow-sm">
+                  <span className="flex items-center gap-3">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {notice}
+                  </span>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex flex-col gap-3 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="flex items-center gap-3">
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRetryPlans}
+                    disabled={retryingPlans}
+                    className="w-fit rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 disabled:opacity-60"
+                  >
+                    {retryingPlans ? 'Checking...' : 'Check plans'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid gap-5 lg:grid-cols-3">
+            {plans.map((plan) => {
+              const design = PLAN_DESIGN[plan.id] || PLAN_DESIGN.free
+              const PlanIcon = design.icon
+              const isEnterprise = plan.id === 'enterprise'
+              const isSelected = selectedPlanId === plan.id
+
+              return (
+                <article
+                  key={plan.id}
+                  className={`relative flex min-h-[560px] flex-col rounded-[2rem] border p-6 transition duration-200 hover:-translate-y-1 ${design.accentClass} ${
+                    isSelected ? 'outline outline-2 outline-offset-4 outline-emerald-400' : ''
+                  }`}
+                >
+                  {plan.recommended && (
+                    <div className="absolute right-5 top-5 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-white">
+                      Recommended
+                    </div>
+                  )}
+
+                  <div className={`grid h-12 w-12 place-items-center rounded-2xl ${isEnterprise ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-950'}`}>
+                    <PlanIcon className="h-5 w-5" />
+                  </div>
                   <div className="mt-6">
-                    <span className="text-4xl font-bold text-gray-900">
-                      {formatCurrency(plan.amount, plan.currency)}
-                    </span>
-                    {!plan.is_free && plan.amount !== null && (
-                      <span className="text-gray-500"> / {plan.billing_interval || 'month'}</span>
-                    )}
+                    <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${isEnterprise ? 'text-slate-300' : 'text-slate-500'}`}>
+                      {design.badge}
+                    </p>
+                    <h2 className={`mt-3 text-2xl font-black ${isEnterprise ? 'text-white' : 'text-slate-950'}`}>
+                      {plan.name}
+                    </h2>
+                    <p className={`mt-3 min-h-[56px] text-sm leading-6 ${isEnterprise ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {plan.description}
+                    </p>
                   </div>
-                </div>
 
-                <ul className="space-y-3 flex-1">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-primary-500"></span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                {plan.status_message && (
-                  <div className="mt-6 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
-                    {plan.status_message}
+                  <div className="mt-7">
+                    <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
+                      <span className={`text-4xl font-black tracking-tight ${isEnterprise ? 'text-white' : 'text-slate-950'}`}>
+                        {getPlanPriceLabel(plan)}
+                      </span>
+                      {getPlanIntervalLabel(plan) && (
+                        <span className={`pb-1 text-sm font-medium ${isEnterprise ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {getPlanIntervalLabel(plan)}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`mt-3 rounded-2xl px-4 py-3 text-sm ${isEnterprise ? 'bg-white/10 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
+                      <span className="font-semibold">Best for:</span> {design.bestFor}
+                    </p>
                   </div>
-                )}
 
-                {renderPlanButton(plan)}
-              </div>
-            ))}
+                  <ul className="mt-7 flex-1 space-y-3">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className={`flex items-start gap-3 text-sm leading-6 ${isEnterprise ? 'text-slate-200' : 'text-slate-700'}`}>
+                        <CheckCircle2 className={`mt-0.5 h-4 w-4 flex-none ${isEnterprise ? 'text-emerald-300' : 'text-emerald-600'}`} />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className={`mt-7 min-h-[48px] text-sm leading-6 ${isEnterprise ? 'text-slate-300' : 'text-slate-500'}`}>
+                    {design.proof}
+                  </p>
+
+                  {renderPlanButton(plan)}
+                </article>
+              )
+            })}
           </div>
-        )}
-      </div>
-    </div>
+
+          <div className="mt-10 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_26px_80px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">Quick comparison</p>
+                <h2 className="mt-2 text-2xl font-black text-slate-950">See what each plan changes.</h2>
+              </div>
+              <p className="max-w-xl text-sm leading-6 text-slate-600">
+                Free is enough to understand your gaps. Premium is the cleanest path to learning and certification.
+                Enterprise adds team structure.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {COMPARISON_ROWS.map((row) => (
+                <div key={row.label} className="grid gap-3 rounded-2xl bg-slate-50 p-4 md:grid-cols-[0.85fr_1fr_1fr_1fr] md:items-center">
+                  <p className="text-sm font-bold text-slate-950">{row.label}</p>
+                  <p className="text-sm text-slate-600">{row.free}</p>
+                  <p className="text-sm font-semibold text-slate-800">{row.premium}</p>
+                  <p className="text-sm text-slate-600">{row.enterprise}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-4 rounded-[2rem] border border-slate-200 bg-[#111827] p-5 text-white md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-emerald-300">Still deciding?</p>
+              <p className="mt-2 text-lg font-bold">Take the free assessment first, then come back with a clearer answer.</p>
+            </div>
+            <Link
+              to="/assessment"
+              className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
+              Start assessment
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
   )
 }
 

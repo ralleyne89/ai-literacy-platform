@@ -1,136 +1,120 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { clearStoredAuthReturnTo, getStoredAuthReturnTo } from '../config/authRoutes'
+import {
+  clearStoredAuthReturnTo,
+  getStoredAuthReturnTo,
+  normalizeOAuthProviderError,
+} from '../config/authRoutes'
 import { useAuth } from '../contexts/AuthContext'
 
-const buildCallbackFailureState = (result, fallback = '') => {
-  if (!result) {
-    return {
-      code: 'auth_callback_failed',
-      error: fallback || 'Unable to complete sign-in.',
-      details: ''
-    }
-  }
-
-  if (typeof result === 'object') {
-    return {
-      code: result.code || 'auth_callback_failed',
-      error: result.error || result.message || fallback || 'Unable to complete sign-in.',
-      details: result.details || ''
-    }
-  }
-
-  return {
-    code: 'auth_callback_failed',
-    error: String(result) || fallback || 'Unable to complete sign-in.',
-    details: ''
-  }
+const readAuthError = (location) => {
+  const params = new URLSearchParams(location.search || '')
+  const hashParams = new URLSearchParams(String(location.hash || '').replace(/^#/, ''))
+  return (
+    params.get('error_description') ||
+    params.get('error') ||
+    hashParams.get('error_description') ||
+    hashParams.get('error') ||
+    ''
+  )
 }
 
-const isAuthResultSuccessful = (value) => value === true || (value && value.success === true)
+const readAuthCode = (location) => {
+  const params = new URLSearchParams(location.search || '')
+  return params.get('code') || ''
+}
 
 const AuthCallback = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { syncBackendAfterLogin, loading, isAuthenticated } = useAuth()
-  const [statusMessage, setStatusMessage] = useState('Checking your account…')
-  const [errorMessage, setErrorMessage] = useState('')
+  const { exchangeOAuthCodeForSession, isAuthenticated, loading } = useAuth()
+  const [message, setMessage] = useState('Finishing secure sign-in...')
+  const hasHandledCallback = useRef(false)
   const returnTo = location.state?.returnTo || getStoredAuthReturnTo() || '/dashboard'
 
   useEffect(() => {
-    let isActive = true
-    let redirectTimeoutId
-
-    const finalize = async () => {
-      if (loading) {
-        return
-      }
-
-      if (isAuthenticated) {
-        clearStoredAuthReturnTo()
-        navigate(returnTo, { replace: true })
-        return
-      }
-
-      const syncResult = await syncBackendAfterLogin?.()
-
-      if (!isActive) {
-        return
-      }
-
-      if (isAuthResultSuccessful(syncResult)) {
-        clearStoredAuthReturnTo()
-        navigate(returnTo, { replace: true })
-        return
-      }
-
-      const failure = buildCallbackFailureState(syncResult, 'Unable to complete sign-in.')
-      setErrorMessage(`Sign-in could not be completed: ${failure.error}`)
-      setStatusMessage('Redirecting to sign in...')
-      clearStoredAuthReturnTo()
-      redirectTimeoutId = setTimeout(() => {
-        if (!isActive) {
-          return
-        }
-        navigate('/login', {
-          replace: true,
-          state: {
-            from: { pathname: returnTo },
-            authError: failure
-          }
-        })
-      }, 1500)
+    if (hasHandledCallback.current) {
+      return
     }
 
-    finalize().catch((err) => {
-      if (!isActive) {
-        return
-      }
-
-      console.error('Auth callback failed:', err)
-      setErrorMessage('Unable to finalize sign-in. Please try again from the login page.')
-      setStatusMessage('Redirecting to sign in...')
-      clearStoredAuthReturnTo()
-      const failure = buildCallbackFailureState(
-        err,
-        'Unable to finalize sign-in. Please try again from the login page.'
+    const authError = readAuthError(location)
+    if (authError) {
+      const normalizedError = normalizeOAuthProviderError(
+        authError,
+        'Unable to complete Google sign-in.',
+        'google'
       )
-      redirectTimeoutId = setTimeout(() => {
-        if (!isActive) {
+      hasHandledCallback.current = true
+      clearStoredAuthReturnTo()
+      navigate('/login', {
+        replace: true,
+        state: {
+          from: { pathname: returnTo },
+          authError: {
+            code: normalizedError.code,
+            error: normalizedError.error,
+          },
+        },
+      })
+      return
+    }
+
+    const authCode = readAuthCode(location)
+    if (authCode) {
+      hasHandledCallback.current = true
+      setMessage('Confirming your Supabase session...')
+
+      exchangeOAuthCodeForSession(authCode).then((result) => {
+        clearStoredAuthReturnTo()
+
+        if (result.success) {
+          navigate(returnTo, { replace: true })
           return
         }
+
         navigate('/login', {
           replace: true,
           state: {
             from: { pathname: returnTo },
-            authError: failure
-          }
+            authError: {
+              code: result.code || 'supabase_callback_failed',
+              error: result.error || 'Unable to complete sign-in. Please try again.',
+            },
+          },
         })
-      }, 1500)
-    })
-
-    return () => {
-      isActive = false
-      if (redirectTimeoutId) {
-        clearTimeout(redirectTimeoutId)
-      }
+      })
+      return
     }
-  }, [
-    returnTo,
-    isAuthenticated,
-    loading,
-    navigate,
-    syncBackendAfterLogin
-  ])
 
-  useEffect(() => {
-    setStatusMessage(loading ? 'Checking your account…' : 'Finishing sign-in…')
-  }, [loading])
+    if (loading) {
+      return
+    }
+
+    hasHandledCallback.current = true
+    clearStoredAuthReturnTo()
+
+    if (isAuthenticated) {
+      navigate(returnTo, { replace: true })
+      return
+    }
+
+    navigate('/login', {
+      replace: true,
+      state: {
+        from: { pathname: returnTo },
+        authError: {
+          code: 'missing_supabase_callback',
+          error: 'No Supabase sign-in session was found. Please sign in again.',
+        },
+      },
+    })
+  }, [exchangeOAuthCodeForSession, isAuthenticated, loading, location, navigate, returnTo])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="rounded-xl bg-white shadow-sm border border-gray-200 px-6 py-8 text-center">
-        <p className="text-gray-700 font-medium">{errorMessage || statusMessage}</p>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <div className="rounded-lg bg-white shadow-sm border border-slate-200 px-6 py-8 text-center">
+        <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-primary-600" />
+        <p className="text-slate-700 font-medium">{message}</p>
       </div>
     </div>
   )

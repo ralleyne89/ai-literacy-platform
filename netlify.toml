@@ -13,20 +13,23 @@
   SECRETS_SCAN_ENABLED = "false"
 
 [context.production.environment]
-  VITE_API_URL = "https://ai-literacy-platform.onrender.com"
-  VITE_AUTH_MODE = "auth0"
-  # Frontend Auth0 build-time values for the Netlify app.
-  # Keep the backend runtime AUTH0_* values aligned to the same tenant,
-  # client ID, audience, and redirect URI in Render/backend env settings.
-  # Flask can fall back to VITE_AUTH0_* locally, but deployed auth should not
-  # treat those frontend variables as the backend source of truth.
-  VITE_AUTH0_DOMAIN = "https://litmusai.us.auth0.com"
-  VITE_AUTH0_CLIENT_ID = "rJVPV5C28rl38LggrVvlKppZ19I8EIlj"
-  VITE_AUTH0_AUDIENCE = "https://litmusai.us.auth0.com/api/v2/"
-  VITE_AUTH0_REDIRECT_URI = "https://litmusai.netlify.app/auth/callback"
+  VITE_AUTH_MODE = "supabase"
+  # In production, VITE_API_URL should point at the same-origin Netlify API proxy:
+  # https://litmusai.netlify.app
+  # Set BACKEND_API_URL in Netlify to the Supabase Edge Function URL:
+  # https://<project-ref>.supabase.co/functions/v1/platform-api
+  # Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Netlify environment variables.
+  # Do not hard-code tenant-specific Supabase keys in this file.
 
-# Billing routes and Stripe webhook callbacks are canonical on the backend API at `VITE_API_URL`.
-# Legacy Netlify billing functions proxy to the backend and are not a second source of truth.
+# Browser-facing API routes are proxied through Netlify so auth/profile calls stay same-origin.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/platform-api/:splat"
+  status = 200
+
+# Billing routes and Stripe webhook callbacks are canonical on the Supabase Edge Function API at `BACKEND_API_URL`.
+# Legacy Netlify billing functions are retained only for old deployments and should not be the source of truth.
+# Netlify continues to auto-deploy from `main` once the branch is merged.
 # SPA fallback - must be last
 [[redirects]]
   from = "/*"

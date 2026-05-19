@@ -2,6 +2,221 @@
 
 import { TimelineContent } from '@/components/ui/timeline-animation'
 
+type FeedbackCard = {
+  quote: string
+  source: string
+  scope: string
+  metric: string
+  label: string
+  accent: string
+  secondary: string
+  variant: 'bars' | 'path' | 'nodes' | 'rings' | 'stack' | 'pulse'
+  featured?: boolean
+}
+
+const feedbackCards: FeedbackCard[] = [
+  {
+    quote: 'The assessment gave our team a shared language for AI readiness. Within two weeks, managers knew exactly which skills to build next.',
+    source: 'Learning and development leader',
+    scope: 'Mid-market operations team',
+    metric: '2 wk',
+    label: 'readiness baseline',
+    accent: '#5B5CFF',
+    secondary: '#11BCEB',
+    variant: 'bars',
+    featured: true
+  },
+  {
+    quote: 'The training clicked because it was tied to real workflows. People left with prompts, review habits, and automation ideas they could use the same day.',
+    source: 'Revenue enablement lead',
+    scope: 'Customer-facing team',
+    metric: '38%',
+    label: 'faster draft cycles',
+    accent: '#0EA5E9',
+    secondary: '#34D399',
+    variant: 'path'
+  },
+  {
+    quote: 'LitmusAI helped us move from curiosity to measurable adoption. The recommendations made next steps clear without overwhelming the team.',
+    source: 'Transformation program owner',
+    scope: 'Cross-functional pilot',
+    metric: '4.7',
+    label: 'learner confidence',
+    accent: '#2563EB',
+    secondary: '#A78BFA',
+    variant: 'nodes'
+  },
+  {
+    quote: 'The certification path is practical. It gave us a lightweight way to validate capability without turning AI training into a long academic program.',
+    source: 'People operations director',
+    scope: 'Policy and hiring teams',
+    metric: '91%',
+    label: 'completion intent',
+    accent: '#7C3AED',
+    secondary: '#F472B6',
+    variant: 'rings'
+  },
+  {
+    quote: 'The dashboard finally made progress visible. We could see assessment history, suggested modules, and training momentum in one place.',
+    source: 'AI program coordinator',
+    scope: 'Internal enablement cohort',
+    metric: '1 view',
+    label: 'team progress',
+    accent: '#0891B2',
+    secondary: '#6366F1',
+    variant: 'stack'
+  },
+  {
+    quote: 'The biggest shift was confidence. Teams stopped asking whether they should use AI and started asking how to use it responsibly.',
+    source: 'Operations excellence manager',
+    scope: 'Process improvement group',
+    metric: '+52',
+    label: 'readiness lift',
+    accent: '#16A34A',
+    secondary: '#22D3EE',
+    variant: 'pulse',
+    featured: true
+  }
+]
+
+function GeneratedSignalImage({ card }: { card: FeedbackCard }) {
+  const isDark = card.featured
+
+  return (
+    <div
+      className={`relative h-28 overflow-hidden rounded-lg border ${
+        isDark ? 'border-white/15 bg-white/10' : 'border-slate-200 bg-white/80'
+      }`}
+      aria-hidden="true"
+    >
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 240 112" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`${card.variant}-glow`} x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor={card.accent} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={card.secondary} stopOpacity="0.9" />
+          </linearGradient>
+          <radialGradient id={`${card.variant}-wash`} cx="70%" cy="12%" r="72%">
+            <stop offset="0%" stopColor={card.secondary} stopOpacity={isDark ? '0.34' : '0.24'} />
+            <stop offset="100%" stopColor={card.accent} stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="240" height="112" fill={`url(#${card.variant}-wash)`} />
+        <path
+          d="M0 82 C42 60 61 96 101 70 C145 42 176 58 240 26"
+          fill="none"
+          stroke={isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.10)'}
+          strokeWidth="18"
+          strokeLinecap="round"
+        />
+
+        {card.variant === 'bars' && (
+          <>
+            {[44, 66, 38, 78, 56].map((height, index) => (
+              <rect
+                key={height}
+                x={28 + index * 28}
+                y={92 - height}
+                width="14"
+                height={height}
+                rx="7"
+                fill={`url(#${card.variant}-glow)`}
+                opacity={0.45 + index * 0.1}
+              />
+            ))}
+          </>
+        )}
+
+        {card.variant === 'path' && (
+          <>
+            <path
+              d="M25 78 C54 48 72 68 95 42 C120 14 148 42 172 28 C195 14 211 22 224 10"
+              fill="none"
+              stroke={`url(#${card.variant}-glow)`}
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+            {[25, 95, 172, 224].map((x, index) => (
+              <circle key={x} cx={x} cy={[78, 42, 28, 10][index]} r="6" fill="white" opacity="0.92" />
+            ))}
+          </>
+        )}
+
+        {card.variant === 'nodes' && (
+          <>
+            {[42, 92, 146, 198].map((x, index) => (
+              <circle
+                key={x}
+                cx={x}
+                cy={[36, 76, 32, 68][index]}
+                r={index === 2 ? 18 : 14}
+                fill={`url(#${card.variant}-glow)`}
+                opacity={index === 2 ? '0.95' : '0.62'}
+              />
+            ))}
+            <path d="M42 36 L92 76 L146 32 L198 68" stroke="white" strokeOpacity="0.45" strokeWidth="3" fill="none" />
+          </>
+        )}
+
+        {card.variant === 'rings' && (
+          <>
+            {[24, 40, 56].map((radius, index) => (
+              <circle
+                key={radius}
+                cx="142"
+                cy="56"
+                r={radius}
+                fill="none"
+                stroke={`url(#${card.variant}-glow)`}
+                strokeWidth="8"
+                opacity={0.78 - index * 0.18}
+              />
+            ))}
+            <circle cx="142" cy="56" r="12" fill="white" />
+          </>
+        )}
+
+        {card.variant === 'stack' && (
+          <>
+            {[0, 1, 2].map((index) => (
+              <rect
+                key={index}
+                x={42 + index * 18}
+                y={26 + index * 14}
+                width="116"
+                height="36"
+                rx="12"
+                fill={`url(#${card.variant}-glow)`}
+                opacity={0.9 - index * 0.18}
+              />
+            ))}
+          </>
+        )}
+
+        {card.variant === 'pulse' && (
+          <>
+            <path
+              d="M20 62 H55 L70 38 L92 88 L118 20 L138 62 H220"
+              fill="none"
+              stroke={`url(#${card.variant}-glow)`}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="118" cy="20" r="7" fill="white" />
+          </>
+        )}
+      </svg>
+
+      <div className="absolute bottom-3 left-3">
+        <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{card.metric}</div>
+        <div className={`text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
+          {card.label}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ClientFeedback() {
   const revealVariants = {
     visible: (i: number) => ({
@@ -9,211 +224,65 @@ function ClientFeedback() {
       opacity: 1,
       filter: 'blur(0px)',
       transition: {
-        delay: i * 0.4,
+        delay: i * 0.12,
         duration: 0.5
       }
     }),
     hidden: {
       filter: 'blur(10px)',
-      y: -20,
+      y: 18,
       opacity: 0
     }
   }
 
   return (
     <main className="w-full bg-white">
-      <section className="relative container mx-auto h-full rounded-lg bg-white py-14 text-black">
-        <article className="mx-auto max-w-screen-md space-y-2 text-center">
+      <section className="relative mx-auto max-w-7xl px-4 py-16 text-slate-950 sm:px-6 lg:px-8">
+        <article className="mx-auto max-w-3xl space-y-3 text-center">
           <TimelineContent
             as="h1"
-            className="text-3xl xl:text-4xl"
+            className="text-3xl font-bold tracking-tight text-slate-950 xl:text-4xl"
             animationNum={0}
             customVariants={revealVariants}
-            style={{fontWeight: 700}}
           >
-            What our customers think of the LitmusAI experience
+            Proof from real AI enablement work
           </TimelineContent>
           <TimelineContent
             as="p"
-            className="mx-auto text-gray-500"
+            className="mx-auto text-base text-slate-600"
             animationNum={1}
             customVariants={revealVariants}
           >
-            Hear how Litmus AI clients describe our impact on their upskilling journey.
+            Anonymous feedback from teams using LitmusAI to benchmark readiness, build practical skills, and certify progress.
           </TimelineContent>
         </article>
 
-        <div className="flex w-full flex-col gap-2 px-4 pb-4 pt-10 lg:grid lg:grid-cols-3 lg:gap-2 lg:px-10 lg:py-10">
-          <div className="flex h-full flex-col gap-2 md:flex lg:flex-col lg:gap-0 lg:space-y-2">
+        <div className="grid gap-4 pt-10 md:grid-cols-2 lg:grid-cols-3">
+          {feedbackCards.map((card, index) => (
             <TimelineContent
-              animationNum={0}
+              key={card.source}
+              animationNum={index + 2}
               customVariants={revealVariants}
-              className="relative flex flex-[6] flex-col justify-between overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white lg:flex-[7]"
+              className={`flex min-h-[310px] flex-col justify-between rounded-lg border p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl ${
+                card.featured
+                  ? 'border-slate-800 bg-slate-950 text-white shadow-slate-950/10'
+                  : 'border-slate-200 bg-white text-slate-950'
+              }`}
             >
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:50px_56px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-              <article className="relative mt-auto space-y-4">
-                <p className="text-sm leading-relaxed md:text-base">
-                  LitmusAI has been a game-changer for us. Their service is top-notch and the team is incredibly responsive.”
+              <article className="flex h-full flex-col justify-between gap-5">
+                <GeneratedSignalImage card={card} />
+                <p className={`text-base leading-relaxed ${card.featured ? 'text-white/90' : 'text-slate-700'}`}>
+                  "{card.quote}"
                 </p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Guillermo Rauch</h2>
-                    <p className="text-xs text-white/70 md:text-sm">CEO, Enigma</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=687&auto=format&fit=crop"
-                    alt="Portrait of Guillermo Rauch"
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
+                <div>
+                  <h2 className={`text-sm font-semibold ${card.featured ? 'text-white' : 'text-slate-950'}`}>
+                    {card.source}
+                  </h2>
+                  <p className={`text-sm ${card.featured ? 'text-white/60' : 'text-slate-500'}`}>{card.scope}</p>
                 </div>
               </article>
             </TimelineContent>
-
-            <TimelineContent
-              animationNum={1}
-              customVariants={revealVariants}
-              className="flex flex-[4] flex-col justify-between rounded-lg border border-gray-200 bg-blue-600 p-5 text-white lg:flex-[3] lg:shrink-0 lg:h-fit"
-            >
-              <article className="mt-auto space-y-4">
-                <p>
-                  “We&apos;ve seen incredible results with LitmusAI. Their expertise and dedication keep us ahead.”
-                </p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Rika Shinoda</h2>
-                    <p className="text-xs md:text-sm">CEO, Kintsugi</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1512485694743-9c9538b4e6e0?q=80&w=687&auto=format&fit=crop"
-                    alt="Portrait of Rika Shinoda"
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-          </div>
-
-          <div className="flex h-full flex-col gap-2 md:flex lg:flex-col lg:gap-0 lg:space-y-2">
-            <TimelineContent
-              animationNum={2}
-              customVariants={revealVariants}
-              className="flex flex-col justify-between rounded-lg border border-gray-200 bg-[#111111] p-5 text-white"
-            >
-              <article className="mt-auto space-y-4">
-                <p className="text-sm md:text-base">
-                  “Their team is highly professional, and their innovative solutions have transformed the way we operate.”
-                </p>
-                <div className="flex items-end justify-between pt-2">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Reacher</h2>
-                    <p className="text-xs text-white/70 md:text-sm">CEO, OdeaoLabs</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1566753323558-f4e0952af115?q=80&w=1021&auto=format&fit=crop"
-                    alt="Portrait of Reacher"
-                    className="h-12 w-12 rounded-xl object-cover md:h-16 md:w-16"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-
-            <TimelineContent
-              animationNum={3}
-              customVariants={revealVariants}
-              className="flex flex-col justify-between rounded-lg border border-gray-200 bg-[#111111] p-5 text-white"
-            >
-              <article className="mt-auto space-y-4">
-                <p className="text-sm md:text-base">
-                  “We&apos;re extremely satisfied with LitmusAI. Their expertise and dedication have exceeded expectations.”
-                </p>
-                <div className="flex items-end justify-between pt-2">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">John</h2>
-                    <p className="text-xs text-white/70 md:text-sm">CEO, Labsbo</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1615109398623-88346a601842?q=80&w=687&auto=format&fit=crop"
-                    alt="Portrait of John"
-                    className="h-12 w-12 rounded-xl object-cover md:h-16 md:w-16"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-
-            <TimelineContent
-              animationNum={4}
-              customVariants={revealVariants}
-              className="flex flex-col justify-between rounded-lg border border-gray-200 bg-[#111111] p-5 text-white"
-            >
-              <article className="mt-auto space-y-4">
-                <p className="text-sm md:text-base">
-                  “Their customer support is exceptional. They&apos;re always available, incredibly helpful, and proactive.”
-                </p>
-                <div className="flex items-end justify-between pt-2">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Steven Sunny</h2>
-                    <p className="text-xs text-white/70 md:text-sm">CEO, Boxefi</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1740102074295-c13fae3e4f8a?q=80&w=687&auto=format&fit=crop"
-                    alt="Portrait of Steven Sunny"
-                    className="h-12 w-12 rounded-xl object-cover md:h-16 md:w-16"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-          </div>
-
-          <div className="flex h-full flex-col gap-2 md:flex lg:flex-col lg:gap-0 lg:space-y-2">
-            <TimelineContent
-              animationNum={5}
-              customVariants={revealVariants}
-              className="flex flex-[4] flex-col justify-between rounded-lg border border-gray-200 bg-blue-600 p-5 text-white lg:flex-[3]"
-            >
-              <article className="mt-auto space-y-4">
-                <p>LitmusAI has been a key partner in our growth journey.”</p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Guillermo Rauch</h2>
-                    <p className="text-xs md:text-sm">CEO, OdeaoLabs</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1563237023-b1e970526dcb?q=80&w=765&auto=format&fit=crop"
-                    alt="Portrait of Guillermo Rauch"
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-
-            <TimelineContent
-              animationNum={6}
-              customVariants={revealVariants}
-              className="relative flex flex-[6] flex-col justify-between overflow-hidden rounded-lg border border-gray-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white lg:flex-[7]"
-            >
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:50px_56px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
-              <article className="relative mt-auto space-y-4">
-                <p>
-                  LitmusAI has been a true game-changer for us. Their exceptional service and deep expertise have made a significant impact on our business.”
-                </p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold md:text-xl text-white">Paul Brauch</h2>
-                    <p className="text-xs text-white/70 md:text-sm">CTO, Spectrum</p>
-                  </div>
-                  <img
-                    src="https://images.unsplash.com/photo-1590086782957-93c06ef21604?q=80&w=687&auto=format&fit=crop"
-                    alt="Portrait of Paul Brauch"
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-                </div>
-              </article>
-            </TimelineContent>
-          </div>
-        </div>
-
-        <div className="absolute bottom-4 z-[2] h-16 w-[90%] border-b-2 border-[#e6e6e6] left-[5%] md:left-0 md:w-full">
-          <div className="relative mx-auto h-full w-full border-gray-300 before:absolute before:-left-2 before:-bottom-2 before:h-4 before:w-4 before:border before:border-gray-300 before:bg-white before:shadow-sm after:absolute after:-right-2 after:-bottom-2 after:h-4 after:w-4 after:border after:border-gray-300 after:bg-white after:shadow-sm" />
+          ))}
         </div>
       </section>
     </main>

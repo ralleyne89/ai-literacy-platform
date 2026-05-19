@@ -6,7 +6,6 @@ import './index.css'
 import { API_BASE_URL, isConfiguredApiLocalhost } from './config/apiEndpoints'
 
 console.info('[boot] Configured API base:', API_BASE_URL || '(unset)')
-console.info('[boot] Configured auth mode:', import.meta.env.VITE_AUTH_MODE || '(unset)')
 
 if (API_BASE_URL) {
   axios.defaults.baseURL = API_BASE_URL

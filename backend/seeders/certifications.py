@@ -7,7 +7,7 @@ CERTIFICATION_TYPES = [
         'description': 'Validates comprehensive AI literacy across all domains with practical application skills.',
         'requirements': [
             'Complete AI readiness assessment with 70% or higher',
-            'Complete at least 3 role-specific training modules',
+            'Complete at least 3 training modules from your recommended workplace path',
             'Pass certification exam with 80% or higher'
         ],
         'estimated_time': '2-3 weeks',
@@ -26,7 +26,7 @@ CERTIFICATION_TYPES = [
         'description': 'Entry-level certification for basic AI literacy and understanding.',
         'requirements': [
             'Complete AI readiness assessment',
-            'Complete AI Fundamentals training module'
+            'Complete Introduction to AI Fundamentals (module-ai-fundamentals-intro)'
         ],
         'estimated_time': '1 week',
         'skills_validated': [
@@ -42,8 +42,8 @@ CERTIFICATION_TYPES = [
         'title': 'AI Ethics Specialist',
         'description': 'Specialized certification focusing on ethical AI implementation and governance.',
         'requirements': [
-            'Complete ethical AI training modules',
-            'Pass ethics-focused assessment',
+            'Complete Ethical AI in HR Practices (module-ethical-hr)',
+            'Score 3/3 in Ethics & Critical Thinking on the AI readiness assessment',
             'Complete case study project'
         ],
         'estimated_time': '3-4 weeks',

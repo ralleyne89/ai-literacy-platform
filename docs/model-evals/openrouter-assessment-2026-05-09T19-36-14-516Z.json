@@ -1,0 +1,981 @@
+{
+  "generated_at": "2026-05-09T19:21:00.901Z",
+  "dry_run": false,
+  "base_url": "https://openrouter.ai/api/v1",
+  "has_openrouter_key": true,
+  "levels": [
+    "beginner",
+    "intermediate",
+    "advanced"
+  ],
+  "candidates": [
+    {
+      "requested_id": "openai/gpt-4o-mini",
+      "found": true,
+      "metadata": {
+        "id": "openai/gpt-4o-mini",
+        "name": "OpenAI: GPT-4o-mini",
+        "context_length": 128000,
+        "input_per_million_tokens": 0.15,
+        "output_per_million_tokens": 0.6,
+        "supported_parameters": [
+          "frequency_penalty",
+          "logit_bias",
+          "logprobs",
+          "max_completion_tokens",
+          "max_tokens",
+          "presence_penalty",
+          "response_format",
+          "seed",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "top_logprobs",
+          "top_p",
+          "web_search_options"
+        ]
+      },
+      "supports_json_schema": true,
+      "supports_response_format": true
+    },
+    {
+      "requested_id": "openai/gpt-5-nano",
+      "found": true,
+      "metadata": {
+        "id": "openai/gpt-5-nano",
+        "name": "OpenAI: GPT-5 Nano",
+        "context_length": 400000,
+        "input_per_million_tokens": 0.05,
+        "output_per_million_tokens": 0.4,
+        "supported_parameters": [
+          "include_reasoning",
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "seed",
+          "structured_outputs",
+          "tool_choice",
+          "tools"
+        ]
+      },
+      "supports_json_schema": true,
+      "supports_response_format": true
+    },
+    {
+      "requested_id": "openai/gpt-5-mini",
+      "found": true,
+      "metadata": {
+        "id": "openai/gpt-5-mini",
+        "name": "OpenAI: GPT-5 Mini",
+        "context_length": 400000,
+        "input_per_million_tokens": 0.25,
+        "output_per_million_tokens": 2,
+        "supported_parameters": [
+          "include_reasoning",
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "seed",
+          "structured_outputs",
+          "tool_choice",
+          "tools"
+        ]
+      },
+      "supports_json_schema": true,
+      "supports_response_format": true
+    },
+    {
+      "requested_id": "deepseek/deepseek-v4-flash",
+      "found": true,
+      "metadata": {
+        "id": "deepseek/deepseek-v4-flash",
+        "name": "DeepSeek: DeepSeek V4 Flash",
+        "context_length": 1048576,
+        "input_per_million_tokens": 0.14,
+        "output_per_million_tokens": 0.28,
+        "supported_parameters": [
+          "frequency_penalty",
+          "include_reasoning",
+          "logit_bias",
+          "logprobs",
+          "max_tokens",
+          "min_p",
+          "presence_penalty",
+          "reasoning",
+          "repetition_penalty",
+          "response_format",
+          "seed",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "top_k",
+          "top_logprobs",
+          "top_p"
+        ]
+      },
+      "supports_json_schema": true,
+      "supports_response_format": true
+    },
+    {
+      "requested_id": "qwen/qwen3-235b-a22b-2507",
+      "found": true,
+      "metadata": {
+        "id": "qwen/qwen3-235b-a22b-2507",
+        "name": "Qwen: Qwen3 235B A22B Instruct 2507",
+        "context_length": 262144,
+        "input_per_million_tokens": 0.071,
+        "output_per_million_tokens": 0.1,
+        "supported_parameters": [
+          "frequency_penalty",
+          "logit_bias",
+          "logprobs",
+          "max_tokens",
+          "min_p",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "seed",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tool_choice",
+          "tools",
+          "top_k",
+          "top_logprobs",
+          "top_p"
+        ]
+      },
+      "supports_json_schema": true,
+      "supports_response_format": true
+    }
+  ],
+  "results": [
+    {
+      "model": "openai/gpt-4o-mini",
+      "level": "beginner",
+      "ok": true,
+      "elapsed_ms": 618,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 307,
+        "completion_tokens": 1261,
+        "total_tokens": 1568,
+        "cost": 0.00080265,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00080265,
+          "upstream_inference_prompt_cost": 0.00004605,
+          "upstream_inference_completions_cost": 0.0007566
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 90,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 10,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "What does AI stand for?",
+        "correct_answer": "A",
+        "explanation": "AI stands for Artificial Intelligence, which refers to computer systems designed to perform tasks that typically require human intelligence."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-4o-mini",
+      "level": "intermediate",
+      "ok": true,
+      "elapsed_ms": 10027,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 306,
+        "completion_tokens": 1498,
+        "total_tokens": 1804,
+        "cost": 0.0009447,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0009447,
+          "upstream_inference_prompt_cost": 0.0000459,
+          "upstream_inference_completions_cost": 0.0008988
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 92,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 12,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "What is the primary function of machine learning in AI systems?",
+        "correct_answer": "A",
+        "explanation": "Machine learning allows AI systems to analyze data, learn from it, and make predictions or decisions based on that learning."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-4o-mini",
+      "level": "advanced",
+      "ok": true,
+      "elapsed_ms": 1171,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 307,
+        "completion_tokens": 1481,
+        "total_tokens": 1788,
+        "cost": 0.00093465,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00093465,
+          "upstream_inference_prompt_cost": 0.00004605,
+          "upstream_inference_completions_cost": 0.0008886
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 86,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 10,
+        "explanation_score": 10,
+        "level_fit": 6,
+        "notes": [
+          "Advanced set may need more governance, evaluation, or implementation depth."
+        ]
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "What is the primary purpose of a neural network in AI?",
+        "correct_answer": "B",
+        "explanation": "Neural networks are designed to simulate the way the human brain processes information, allowing them to learn from data."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-nano",
+      "level": "beginner",
+      "ok": false,
+      "elapsed_ms": 375,
+      "finish_reason": "length",
+      "native_finish_reason": "max_output_tokens",
+      "usage": {
+        "prompt_tokens": 301,
+        "completion_tokens": 4480,
+        "total_tokens": 4781,
+        "cost": 0.00180705,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00180705,
+          "upstream_inference_prompt_cost": 0.00001505,
+          "upstream_inference_completions_cost": 0.001792
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4480,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 0,
+        "structural": 0,
+        "diversity": 0,
+        "level_fit": 0,
+        "workplace_relevance": 0,
+        "notes": [
+          "No valid question set accepted by sanitizer."
+        ]
+      },
+      "sample_question": null,
+      "validation": {
+        "parsed_json": false,
+        "accepted_questions": 0,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-nano",
+      "level": "intermediate",
+      "ok": false,
+      "elapsed_ms": 529,
+      "finish_reason": "length",
+      "native_finish_reason": "max_output_tokens",
+      "usage": {
+        "prompt_tokens": 300,
+        "completion_tokens": 4480,
+        "total_tokens": 4780,
+        "cost": 0.001807,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.001807,
+          "upstream_inference_prompt_cost": 0.000015,
+          "upstream_inference_completions_cost": 0.001792
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4480,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 0,
+        "structural": 0,
+        "diversity": 0,
+        "level_fit": 0,
+        "workplace_relevance": 0,
+        "notes": [
+          "No valid question set accepted by sanitizer."
+        ]
+      },
+      "sample_question": null,
+      "validation": {
+        "parsed_json": false,
+        "accepted_questions": 0,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-nano",
+      "level": "advanced",
+      "ok": false,
+      "elapsed_ms": 434,
+      "finish_reason": "length",
+      "native_finish_reason": "max_output_tokens",
+      "usage": {
+        "prompt_tokens": 301,
+        "completion_tokens": 4480,
+        "total_tokens": 4781,
+        "cost": 0.00180705,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00180705,
+          "upstream_inference_prompt_cost": 0.00001505,
+          "upstream_inference_completions_cost": 0.001792
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4480,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 0,
+        "structural": 0,
+        "diversity": 0,
+        "level_fit": 0,
+        "workplace_relevance": 0,
+        "notes": [
+          "No valid question set accepted by sanitizer."
+        ]
+      },
+      "sample_question": null,
+      "validation": {
+        "parsed_json": false,
+        "accepted_questions": 0,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-mini",
+      "level": "beginner",
+      "ok": true,
+      "elapsed_ms": 588,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "usage": {
+        "prompt_tokens": 301,
+        "completion_tokens": 2193,
+        "total_tokens": 2494,
+        "cost": 0.00446125,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00446125,
+          "upstream_inference_prompt_cost": 0.00007525,
+          "upstream_inference_completions_cost": 0.004386
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 384,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 100,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 20,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "You use an AI tool that summarizes meeting notes. Which statement best describes a known limitation of such AI summaries in the workplace?",
+        "correct_answer": "A",
+        "explanation": "AI summaries can omit context or generate incorrect details; human review is still needed."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-mini",
+      "level": "intermediate",
+      "ok": true,
+      "elapsed_ms": 407,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "usage": {
+        "prompt_tokens": 300,
+        "completion_tokens": 3733,
+        "total_tokens": 4033,
+        "cost": 0.007541,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.007541,
+          "upstream_inference_prompt_cost": 0.000075,
+          "upstream_inference_completions_cost": 0.007466
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1088,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 98,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 18,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "Your team is building a credit scoring model for small business loans. You can choose a high-performing black-box model or a slightly less accurate but interpretable model. Given regulatory scrutiny and customer disputes, which approach is most appropriate?",
+        "correct_answer": "B",
+        "explanation": "For regulated, high-stakes decisions, interpretability and the ability to explain outcomes are crucial for compliance and fairness, even at some cost to raw accuracy."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "openai/gpt-5-mini",
+      "level": "advanced",
+      "ok": true,
+      "elapsed_ms": 268,
+      "finish_reason": "stop",
+      "native_finish_reason": "completed",
+      "usage": {
+        "prompt_tokens": 301,
+        "completion_tokens": 3707,
+        "total_tokens": 4008,
+        "cost": 0.00748925,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00748925,
+          "upstream_inference_prompt_cost": 0.00007525,
+          "upstream_inference_completions_cost": 0.007414
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1280,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 94,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 14,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "A recently deployed classification model shows 98% accuracy on the training set but 65% on validation and production data. Which immediate technical change is most likely to reduce this performance gap without collecting more data?",
+        "correct_answer": "B",
+        "explanation": "High training vs low validation accuracy indicates overfitting; increasing regularization or simplifying the model reduces overfitting without requiring new data."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "level": "beginner",
+      "ok": true,
+      "elapsed_ms": 124,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 166,
+        "completion_tokens": 1874,
+        "total_tokens": 2040,
+        "cost": 0.00054796,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00054796,
+          "upstream_inference_prompt_cost": 0.00002324,
+          "upstream_inference_completions_cost": 0.00052472
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 94,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 14,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "What is artificial intelligence (AI) in simple terms?",
+        "correct_answer": "A",
+        "explanation": "AI refers to systems that can learn from data and make decisions, not just follow pre-programmed rules."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "level": "intermediate",
+      "ok": true,
+      "elapsed_ms": 1124,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 167,
+        "completion_tokens": 4578,
+        "total_tokens": 4745,
+        "cost": 0.00130522,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00130522,
+          "upstream_inference_prompt_cost": 0.00002338,
+          "upstream_inference_completions_cost": 0.00128184
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2056,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 96,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 16,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "Your team wants to predict which customers are likely to cancel their subscription next month. You have historical data with known churn outcomes. Which machine learning approach is most appropriate?",
+        "correct_answer": "B",
+        "explanation": "Supervised learning uses labeled data to learn a mapping from inputs to outputs, making it suitable for predicting a known target variable like customer churn."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "level": "advanced",
+      "ok": true,
+      "elapsed_ms": 357,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 166,
+        "completion_tokens": 2079,
+        "total_tokens": 2245,
+        "cost": 0.00060536,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00060536,
+          "upstream_inference_prompt_cost": 0.00002324,
+          "upstream_inference_completions_cost": 0.00058212
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 94,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 18,
+        "explanation_score": 10,
+        "level_fit": 6,
+        "notes": [
+          "Advanced set may need more governance, evaluation, or implementation depth."
+        ]
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "A project manager is told that a machine learning model has 'high bias.' What does this imply about the model's performance?",
+        "correct_answer": "B",
+        "explanation": "High bias means the model oversimplifies the problem, often underfitting by missing relevant patterns."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "qwen/qwen3-235b-a22b-2507",
+      "level": "beginner",
+      "ok": true,
+      "elapsed_ms": 292,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 179,
+        "completion_tokens": 1910,
+        "total_tokens": 2089,
+        "cost": 0.0002089,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0002089,
+          "upstream_inference_prompt_cost": 0.0000179,
+          "upstream_inference_completions_cost": 0.000191
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 100,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 20,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "How does artificial intelligence typically make decisions?",
+        "correct_answer": "B",
+        "explanation": "AI works by recognizing patterns in large amounts of data, then using those patterns to make predictions or decisions without being explicitly programmed for each task."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "qwen/qwen3-235b-a22b-2507",
+      "level": "intermediate",
+      "ok": true,
+      "elapsed_ms": 342,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 177,
+        "completion_tokens": 2076,
+        "total_tokens": 2253,
+        "cost": 0.000220167,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.000220167,
+          "upstream_inference_prompt_cost": 0.000012567,
+          "upstream_inference_completions_cost": 0.0002076
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 100,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 20,
+        "explanation_score": 10,
+        "level_fit": 10,
+        "notes": []
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "A team is deciding whether to use a rule-based system or a machine learning model to classify customer support emails. What is the key advantage of machine learning in this scenario?",
+        "correct_answer": "B",
+        "explanation": "Machine learning models can learn from data and adapt to new patterns over time, unlike rigid rule-based systems that require manual updates."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    },
+    {
+      "model": "qwen/qwen3-235b-a22b-2507",
+      "level": "advanced",
+      "ok": true,
+      "elapsed_ms": 289,
+      "finish_reason": "stop",
+      "native_finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 178,
+        "completion_tokens": 1804,
+        "total_tokens": 1982,
+        "cost": 0.000193038,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.000193038,
+          "upstream_inference_prompt_cost": 0.000012638,
+          "upstream_inference_completions_cost": 0.0001804
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "score": {
+        "total": 96,
+        "structural": 40,
+        "diversity": 20,
+        "workplace_relevance": 20,
+        "explanation_score": 10,
+        "level_fit": 6,
+        "notes": [
+          "Advanced set may need more governance, evaluation, or implementation depth."
+        ]
+      },
+      "sample_question": {
+        "domain": "AI Fundamentals",
+        "question_text": "A company is evaluating whether to use a rule-based system or a machine learning model to predict customer support ticket resolution times. What is the primary advantage of using a machine learning model in this context?",
+        "correct_answer": "C",
+        "explanation": "Machine learning models excel at identifying patterns in data without being explicitly programmed with rules, making them suitable for tasks like prediction where relationships are complex and non-linear."
+      },
+      "validation": {
+        "parsed_json": true,
+        "accepted_questions": 15,
+        "expected_questions": 15
+      }
+    }
+  ],
+  "summary": [
+    {
+      "model": "qwen/qwen3-235b-a22b-2507",
+      "success_rate": 1,
+      "average_score": 99,
+      "average_elapsed_ms": 308,
+      "usage": {
+        "prompt_tokens": 534,
+        "completion_tokens": 5790,
+        "total_tokens": 6324,
+        "cost": 0.000622105
+      }
+    },
+    {
+      "model": "openai/gpt-5-mini",
+      "success_rate": 1,
+      "average_score": 97,
+      "average_elapsed_ms": 421,
+      "usage": {
+        "prompt_tokens": 902,
+        "completion_tokens": 9633,
+        "total_tokens": 10535,
+        "cost": 0.0194915
+      }
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash",
+      "success_rate": 1,
+      "average_score": 95,
+      "average_elapsed_ms": 535,
+      "usage": {
+        "prompt_tokens": 499,
+        "completion_tokens": 8531,
+        "total_tokens": 9030,
+        "cost": 0.00245854
+      }
+    },
+    {
+      "model": "openai/gpt-4o-mini",
+      "success_rate": 1,
+      "average_score": 89,
+      "average_elapsed_ms": 3939,
+      "usage": {
+        "prompt_tokens": 920,
+        "completion_tokens": 4240,
+        "total_tokens": 5160,
+        "cost": 0.002682
+      }
+    },
+    {
+      "model": "openai/gpt-5-nano",
+      "success_rate": 0,
+      "average_score": 0,
+      "average_elapsed_ms": 446,
+      "usage": {
+        "prompt_tokens": 902,
+        "completion_tokens": 13440,
+        "total_tokens": 14342,
+        "cost": 0.0054211
+      }
+    }
+  ]
+}

@@ -1,8 +1,143 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp, PlayCircle } from 'lucide-react'
+import { Play, Clock, Users, CheckCircle, Lock, AlertCircle, Activity, ExternalLink, Building2, TrendingUp, PlayCircle, Sparkles, Target, ArrowRight } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { DEMO_FALLBACK_MODULES_LIST } from '../data/demoFallback'
+import { isInPlatformTrainingRecommendation } from '../utils/videoUrls'
+
+const DEMO_FALLBACK_MODULES = DEMO_FALLBACK_MODULES_LIST
+const EXTERNAL_CONTENT_TYPES = new Set(['external', 'partner', 'affiliate'])
+
+const getStringValue = (value, fallback = '') => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || fallback
+  }
+
+  return fallback
+}
+
+const parseNumericValue = (value, fallback = null) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
+  return fallback
+}
+
+const normalizeContentType = (value, fallback = 'video') =>
+  getStringValue(value, fallback).toLowerCase()
+
+const isExternalContentType = (value) =>
+  EXTERNAL_CONTENT_TYPES.has(normalizeContentType(value, ''))
+
+const hasInternalLessons = (item = {}) => {
+  const explicitValue = item.has_internal_lessons ?? item.hasInternalLessons
+  if (explicitValue === true || explicitValue === 'true') {
+    return true
+  }
+  if (explicitValue === false || explicitValue === 'false') {
+    return false
+  }
+
+  const lessonCount = parseNumericValue(
+    item.lesson_count,
+    parseNumericValue(item.total_lessons, parseNumericValue(item.lessons_count, null))
+  )
+
+  return lessonCount !== null ? lessonCount > 0 : false
+}
+
+const getSafeTrainingModulePath = (item = {}, { preferLearn = false } = {}) => {
+  const moduleId = getStringValue(item.id, getStringValue(item.module_id, getStringValue(item.moduleId)))
+  if (!moduleId) {
+    return '/training'
+  }
+
+  if (isExternalContentType(item.content_type)) {
+    return `/training/modules/${moduleId}`
+  }
+
+  if (preferLearn && hasInternalLessons(item)) {
+    return `/training/modules/${moduleId}/learn`
+  }
+
+  return `/training/modules/${moduleId}`
+}
+
+const normalizeDifficultyLevel = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string') {
+    const level = value.trim().toLowerCase()
+    if (level === 'beginner') {
+      return 1
+    }
+    if (level === 'intermediate') {
+      return 2
+    }
+    if (level === 'advanced' || level === 'expert') {
+      return 3
+    }
+    const parsed = Number(level)
+    return Number.isNaN(parsed) ? value.trim() : parsed
+  }
+
+  return value
+}
+
+const normalizeRecommendation = (recommendation, index) => {
+  if (!recommendation || typeof recommendation !== 'object') {
+    return null
+  }
+
+  const metadata = recommendation.metadata || {}
+  const explicitHasInternalLessons = recommendation.has_internal_lessons ?? recommendation.hasInternalLessons
+  const id = getStringValue(
+    recommendation.id,
+    getStringValue(recommendation.module_id, getStringValue(recommendation.moduleId, `recommendation-${index}`))
+  )
+
+  return {
+    ...recommendation,
+    id,
+    title: getStringValue(recommendation.title, getStringValue(recommendation.name, `Recommendation ${index + 1}`)),
+    description: getStringValue(
+      recommendation.description,
+      getStringValue(recommendation.summary, 'Recommended next step based on your assessment.')
+    ),
+    reason: getStringValue(recommendation.reason, getStringValue(recommendation.action)),
+    content_type: normalizeContentType(recommendation.content_type || metadata.format || 'module', 'module'),
+    difficulty_level: normalizeDifficultyLevel(recommendation.difficulty_level),
+    estimated_duration_minutes: parseNumericValue(
+      recommendation.estimated_duration_minutes,
+      parseNumericValue(recommendation.duration_minutes, parseNumericValue(recommendation.duration, null))
+    ),
+    priority: getStringValue(recommendation.priority, 'low'),
+    has_internal_lessons: explicitHasInternalLessons,
+    role_specific: getStringValue(recommendation.role_specific),
+    is_premium: recommendation.is_premium === true || getStringValue(recommendation.is_premium) === 'true'
+  }
+}
+
+const normalizeRecommendations = (recommendations) => {
+  if (!Array.isArray(recommendations)) {
+    return []
+  }
+
+  return recommendations
+    .map(normalizeRecommendation)
+    .filter(Boolean)
+    .filter(isInPlatformTrainingRecommendation)
+}
 
 const getResumeModuleFromProgressMap = (progressMap) => {
   return Object.values(progressMap)
@@ -21,8 +156,12 @@ const TrainingPage = () => {
   const [progressMap, setProgressMap] = useState({})
   const [error, setError] = useState('')
   const [resumeModule, setResumeModule] = useState(null)
+  const [recommendations, setRecommendations] = useState([])
+  const [recommendationsMessage, setRecommendationsMessage] = useState('')
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false)
+  const [recommendationContext, setRecommendationContext] = useState({})
 
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const roles = ['All', 'Sales', 'HR', 'Marketing', 'Operations', 'General']
   const selectedRoleQuery = useMemo(() => {
@@ -62,34 +201,85 @@ const TrainingPage = () => {
           setResumeModule(null)
         }
       } catch {
-        setError('Failed to load training modules. Please try again later.')
+        if (user?.id === 'demo-user') {
+          setModules(DEMO_FALLBACK_MODULES)
+          setError('')
+        } else {
+          setError('Failed to load training modules. Please try again later.')
+        }
       } finally {
         setLoading(false)
       }
     }
 
     fetchModules()
-  }, [selectedRoleQuery, isAuthenticated])
+  }, [selectedRoleQuery, isAuthenticated, user?.id])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchRecommendations = async () => {
+      if (!isAuthenticated) {
+        setRecommendations([])
+        setRecommendationsMessage('')
+        setRecommendationContext({})
+        setRecommendationsLoading(false)
+        return
+      }
+
+      try {
+        setRecommendationsLoading(true)
+        setRecommendationsMessage('')
+
+        const response = await axios.get('/api/assessment/recommendations')
+        if (!isMounted) {
+          return
+        }
+
+	        setRecommendations(normalizeRecommendations(response?.data?.recommendations))
+	        setRecommendationsMessage(getStringValue(response?.data?.message))
+	        setRecommendationContext({
+	          assessmentLevel: getStringValue(response?.data?.assessment_level),
+	          assessmentScore: response?.data?.assessment_score,
+	          weakDomains: Array.isArray(response?.data?.weak_domains) ? response.data.weak_domains : []
+	        })
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        if (user?.id === 'demo-user') {
+          setRecommendations(
+            DEMO_FALLBACK_MODULES.slice(0, 3).map((module, index) => ({
+              ...module,
+              reason: index === 0 ? 'Great starting point for AI literacy' : 'Recommended for continued learning',
+              priority: index === 0 ? 'high' : 'medium',
+              has_internal_lessons: false
+            }))
+          )
+	          setRecommendationsMessage('')
+	          setRecommendationContext({})
+	        } else {
+	          setRecommendations([])
+	          setRecommendationsMessage('Take or retake the assessment to refresh your course recommendations.')
+	          setRecommendationContext({})
+	        }
+      } finally {
+        if (isMounted) {
+          setRecommendationsLoading(false)
+        }
+      }
+    }
+
+    fetchRecommendations()
+
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated, user?.id])
 
   const normaliseDifficultyLevel = (level) => {
-    if (typeof level === 'number') {
-      return level
-    }
-    if (typeof level === 'string') {
-      const parsed = Number(level)
-      if (!Number.isNaN(parsed)) {
-        return parsed
-      }
-      const lookup = {
-        beginner: 1,
-        intermediate: 2,
-        advanced: 3,
-        expert: 4,
-        master: 5
-      }
-      return lookup[level.toLowerCase()] || level
-    }
-    return level
+    return normalizeDifficultyLevel(level)
   }
 
   const getDifficultyColor = (level) => {
@@ -147,14 +337,26 @@ const TrainingPage = () => {
     return texts[normalised] || 'Unknown'
   }
 
+  const getAssessmentLevelText = (level) => {
+    const normalized = String(level || '').trim().toLowerCase()
+    if (!normalized) {
+      return ''
+    }
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  }
+
   const getContentTypeIcon = (type) => {
     switch (type) {
       case 'video':
+      case 'module':
         return <Play className="w-5 h-5" />
       case 'interactive':
         return <Users className="w-5 h-5" />
       case 'exercise':
         return <CheckCircle className="w-5 h-5" />
+      case 'text':
+      case 'reading':
+        return <Target className="w-5 h-5" />
       case 'external':
         return <ExternalLink className="w-5 h-5" />
       case 'partner':
@@ -220,6 +422,128 @@ const TrainingPage = () => {
           </div>
         )}
 
+        {isAuthenticated && (
+          <section className="mb-10" data-testid="training-recommendations-section">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-white/80 px-3 py-1 text-xs font-semibold text-primary-700 shadow-sm">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Personalized path
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Recommended for your AI readiness</h2>
+	                <p className="mt-1 max-w-2xl text-sm text-gray-600">
+	                  Based on your latest assessment, start with the courses most likely to strengthen your next skill gap.
+	                </p>
+	                {recommendationContext.assessmentLevel && (
+	                  <p className="mt-2 text-sm font-medium text-primary-700" data-testid="training-recommendations-context">
+	                    Tuned from your {getAssessmentLevelText(recommendationContext.assessmentLevel)} assessment
+	                    {typeof recommendationContext.assessmentScore === 'number'
+	                      ? ` at ${Math.round(recommendationContext.assessmentScore)}%`
+	                      : ''}
+	                    .
+	                  </p>
+	                )}
+	              </div>
+              <Link to="/assessment" className="text-sm font-semibold text-primary-600 hover:text-primary-700">
+                Refresh assessment
+              </Link>
+            </div>
+
+            {recommendationsLoading ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="mb-4 h-4 w-2/3 animate-pulse rounded bg-gray-200" />
+                    <div className="mb-2 h-3 w-full animate-pulse rounded bg-gray-200" />
+                    <div className="h-3 w-3/4 animate-pulse rounded bg-gray-200" />
+                  </div>
+                ))}
+              </div>
+            ) : recommendations.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                {recommendations.slice(0, 3).map((recommendation) => {
+                  const recommendationPath = getSafeTrainingModulePath(recommendation, { preferLearn: true })
+                  const contentType = normalizeContentType(recommendation.content_type, 'module')
+                  const shouldOpenLessons = recommendationPath.endsWith('/learn')
+                  const ctaLabel = isExternalContentType(contentType)
+                    ? 'View details'
+                    : shouldOpenLessons
+                      ? 'Start lessons'
+                      : 'View module'
+
+                  return (
+                    <div
+                      key={recommendation.id}
+                      className="flex min-h-[230px] flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-primary-200 hover:shadow-md"
+                      data-testid={`training-recommendation-${recommendation.id}`}
+                    >
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 text-primary-600">
+                          {getContentTypeIcon(contentType)}
+                          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            {contentType}
+                          </span>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          recommendation.priority === 'high'
+                            ? 'bg-red-50 text-red-700'
+                            : recommendation.priority === 'medium'
+                              ? 'bg-yellow-50 text-yellow-700'
+                              : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {recommendation.priority}
+                        </span>
+                      </div>
+
+                      <h3 className="mb-2 text-lg font-semibold leading-snug text-gray-900">
+                        {recommendation.title}
+                      </h3>
+                      <p className="line-clamp-3 text-sm text-gray-600">
+                        {recommendation.description}
+                      </p>
+
+                      {recommendation.reason && (
+                        <p className="mt-3 text-sm font-medium text-primary-700">
+                          {recommendation.reason}
+                        </p>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+                        {recommendation.estimated_duration_minutes !== null && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {recommendation.estimated_duration_minutes} min
+                          </span>
+                        )}
+                        {recommendation.difficulty_level && (
+                          <span className={`rounded-full px-2.5 py-1 font-medium ${getDifficultyColor(recommendation.difficulty_level)}`}>
+                            {getDifficultyText(recommendation.difficulty_level)}
+                          </span>
+                        )}
+                      </div>
+
+                      <Link
+                        to={recommendationPath}
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-slate-800"
+                        data-testid={`training-recommendation-${recommendation.id}-link`}
+                      >
+                        {ctaLabel}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-white/70 px-5 py-6 text-center">
+                <p className="text-sm font-medium text-gray-700">
+                  {recommendationsMessage || 'Complete an assessment to unlock your personalized course path.'}
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
         {error && (
           <div className="max-w-3xl mx-auto mb-8">
             <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -254,8 +578,9 @@ const TrainingPage = () => {
             const estimatedDuration = module.estimated_duration_minutes ?? 0
             const difficultyLevel = module.difficulty_level
             const rawContentType = module.content_type || metadata.format || 'video'
-            const contentType = typeof rawContentType === 'string' ? rawContentType.toLowerCase() : 'video'
+            const contentType = normalizeContentType(rawContentType, 'video')
             const isPremium = Boolean(module.is_premium || (metadata.access_tier && metadata.access_tier !== 'free'))
+            const progressBadge = getProgressBadge(module)
 
             return (
               <div key={module.id} className="card hover:shadow-lg transition-shadow duration-200 flex flex-col">
@@ -266,7 +591,7 @@ const TrainingPage = () => {
                     </div>
                     <span className="text-sm text-gray-600 capitalize">{contentType}</span>
                   </div>
-                  {isPremium && !['external', 'partner', 'affiliate'].includes(contentType) && (
+                  {isPremium && !isExternalContentType(contentType) && (
                     <div className="flex items-center space-x-1 text-yellow-600">
                       <Lock className="w-4 h-4" />
                       <span className="text-xs font-medium">Premium</span>
@@ -274,9 +599,9 @@ const TrainingPage = () => {
                   )}
                 </div>
 
-                {getProgressBadge(module) && (
+                {progressBadge && (
                   <div className="mb-3">
-                    {getProgressBadge(module)}
+                    {progressBadge}
                   </div>
                 )}
 
@@ -324,14 +649,14 @@ const TrainingPage = () => {
                 </div>
 
                 <Link
-                  to={`/training/modules/${module.id}`}
+                  to={getSafeTrainingModulePath(module)}
                   className={`mt-auto w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold transition-all duration-200 ${
                     isPremium
                       ? 'bg-gradient-secondary text-white hover:shadow-lg transform hover:-translate-y-0.5'
                       : 'btn-primary'
                   }`}
                 >
-                  {['external', 'partner', 'affiliate'].includes(contentType)
+                  {isExternalContentType(contentType)
                     ? metadata.cta_text || 'View details'
                     : progressMap[module.id]?.status === 'completed'
                       ? 'Review Module'

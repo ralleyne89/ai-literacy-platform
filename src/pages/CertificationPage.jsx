@@ -46,6 +46,7 @@ const CertificationPage = () => {
   const location = useLocation()
   const [availableCerts, setAvailableCerts] = useState([])
   const [earnedCerts, setEarnedCerts] = useState([])
+  const [catalogMessage, setCatalogMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('available')
   const [error, setError] = useState('')
@@ -73,13 +74,16 @@ const CertificationPage = () => {
       try {
         const parsedAvailable = parseCertificationsPayload(availableResult.value)
         setAvailableCerts(parsedAvailable)
+        setCatalogMessage(availableResult.value?.data?.message || '')
         availableLoaded = true
       } catch (parseError) {
         setAvailableCerts([])
+        setCatalogMessage('')
         setError(getApiErrorMessage(parseError, 'Failed to load certification catalog.'))
       }
     } else {
       setAvailableCerts([])
+      setCatalogMessage('')
       setError(getApiErrorMessage(availableResult.reason, 'Failed to load certification catalog.'))
     }
 
@@ -332,97 +336,107 @@ const CertificationPage = () => {
         </div>
 
         {activeTab === 'available' && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {availableCerts.map(cert => (
-              <div key={cert.id} className="card hover:shadow-lg transition-shadow duration-200">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <Award className="w-6 h-6 text-primary-600" />
-                    <span className="text-sm text-gray-600">Certificate</span>
-                  </div>
-                  {cert.is_premium && (
-                    <div className="bg-gradient-secondary text-white px-2 py-1 rounded-full text-xs font-medium">
-                      Premium
+          availableCerts.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="certification-available-grid">
+              {availableCerts.map(cert => (
+                <div key={cert.id} className="card hover:shadow-lg transition-shadow duration-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <Award className="w-6 h-6 text-primary-600" />
+                      <span className="text-sm text-gray-600">Certificate</span>
                     </div>
-                  )}
-                </div>
-
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{cert.title}</h3>
-                <p className="text-gray-600 mb-4">{cert.description}</p>
-
-                <div className="flex items-center space-x-2 mb-4 text-sm text-gray-600">
-                  <Clock className="w-4 h-4" />
-                  <span>Estimated time: {cert.estimated_time}</span>
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Requirements:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    {(cert.requirements || []).map((req, index) => (
-                      <li key={index} className="flex items-start space-x-2">
-                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Skills Validated:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {(cert.skills_validated || []).slice(0, 3).map((skill, index) => (
-                      <span key={index} className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full">
-                        {skill}
-                      </span>
-                    ))}
-                    {(cert.skills_validated || []).length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{cert.skills_validated.length - 3} more
-                      </span>
+                    {cert.is_premium && (
+                      <div className="bg-gradient-secondary text-white px-2 py-1 rounded-full text-xs font-medium">
+                        Premium
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {Array.isArray(cert.missing_requirements) && cert.missing_requirements.length > 0 && (
-                  <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                    <p className="font-semibold mb-1">Not ready yet:</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                      {cert.missing_requirements.map((item, index) => (
-                        <li key={index}>{item}</li>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{cert.title}</h3>
+                  <p className="text-gray-600 mb-4">{cert.description}</p>
+
+                  <div className="flex items-center space-x-2 mb-4 text-sm text-gray-600">
+                    <Clock className="w-4 h-4" />
+                    <span>Estimated time: {cert.estimated_time}</span>
+                  </div>
+
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Requirements:</h4>
+                    <ul className="text-sm text-gray-600 space-y-1">
+                      {(cert.requirements || []).map((req, index) => (
+                        <li key={index} className="flex items-start space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span>{req}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
-                )}
 
-                <button
-                  onClick={() => handleApply(cert)}
-                  disabled={!cert.eligible || applyingId === cert.id || !isAuthenticated}
-                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
-                    !cert.eligible || !isAuthenticated
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : cert.is_premium
-                        ? 'bg-gradient-secondary text-white hover:shadow-lg transform hover:-translate-y-0.5'
-                        : 'btn-primary'
-                  }`}
-                >
-                  {applyingId === cert.id ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Applying...
-                    </span>
-                  ) : isAuthenticated ? (
-                    cert.eligible
-                      ? cert.is_premium
-                        ? 'Apply for Certification'
-                        : 'Start Free Certification'
-                      : 'Requirements Not Met'
-                  ) : (
-                    'Sign in to apply'
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Skills Validated:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(cert.skills_validated || []).slice(0, 3).map((skill, index) => (
+                        <span key={index} className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full">
+                          {skill}
+                        </span>
+                      ))}
+                      {(cert.skills_validated || []).length > 3 && (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          +{cert.skills_validated.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {Array.isArray(cert.missing_requirements) && cert.missing_requirements.length > 0 && (
+                    <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                      <p className="font-semibold mb-1">Not ready yet:</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        {cert.missing_requirements.map((item, index) => (
+                          <li key={index}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                </button>
-              </div>
-            ))}
-          </div>
+
+                  <button
+                    onClick={() => handleApply(cert)}
+                    disabled={!cert.eligible || applyingId === cert.id || !isAuthenticated}
+                    className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
+                      !cert.eligible || !isAuthenticated
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : cert.is_premium
+                          ? 'bg-gradient-secondary text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                          : 'btn-primary'
+                    }`}
+                  >
+                    {applyingId === cert.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Applying...
+                      </span>
+                    ) : isAuthenticated ? (
+                      cert.eligible
+                        ? cert.is_premium
+                          ? 'Apply for Certification'
+                          : 'Start Free Certification'
+                        : 'Requirements Not Met'
+                    ) : (
+                      'Sign in to apply'
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12" data-testid="certification-empty-catalog">
+              <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No certifications available yet</h3>
+              <p className="text-gray-600">
+                {catalogMessage || 'Certification paths will appear here once the catalog is configured.'}
+              </p>
+            </div>
+          )
         )}
 
         {activeTab === 'earned' && (

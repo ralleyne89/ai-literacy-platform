@@ -3,11 +3,35 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Play, Clock, CheckCircle, AlertCircle, BookOpen, Activity, ExternalLink, Loader2 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { DEMO_FALLBACK_MODULE_DETAILS, DEMO_FALLBACK_MODULE_IDS } from '../data/demoFallback'
+import { normalizeInPlatformUrl, normalizeVideoSource } from '../utils/videoUrls'
+
+const MODULE_LOAD_TIMEOUT_MS = 20000
+
+const normalizeInPlatformResources = (resources) => {
+  if (!Array.isArray(resources)) {
+    return []
+  }
+
+  return resources
+    .map((resource, index) => {
+      const url = normalizeInPlatformUrl(resource?.url)
+      if (!url) {
+        return null
+      }
+
+      return {
+        label: resource.label || resource.title || `Resource ${index + 1}`,
+        url,
+      }
+    })
+    .filter(Boolean)
+}
 
 const TrainingModulePage = () => {
   const { moduleId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   const [module, setModule] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -17,28 +41,65 @@ const TrainingModulePage = () => {
   const [progress, setProgress] = useState(null)
 
   useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => {
+      controller.abort()
+    }, MODULE_LOAD_TIMEOUT_MS)
+
     const loadModule = async () => {
       try {
         setLoading(true)
         setError('')
 
-        const { data } = await axios.get(`/api/training/modules/${moduleId}`)
+        const { data } = await axios.get(`/api/training/modules/${moduleId}`, {
+          signal: controller.signal,
+        })
+        if (!isMounted) {
+          return
+        }
         const nextModule = data?.module || null
         setModule(nextModule)
         setProgress(nextModule?.progress || null)
       } catch {
-        setError('Unable to load this module right now. Please try again later.')
+        if (!isMounted) {
+          return
+        }
+
+        if (user?.id === 'demo-user' && DEMO_FALLBACK_MODULE_IDS.includes(moduleId)) {
+          const fallback = DEMO_FALLBACK_MODULE_DETAILS[moduleId]
+          if (fallback) {
+            setModule(fallback)
+            setProgress(null)
+            setError('')
+          } else {
+            setError('Unable to load this module right now. Please try again later.')
+          }
+        } else if (controller.signal.aborted) {
+          setError('This module is taking longer than expected to load. Go back to the Training Hub and try again.')
+        } else {
+          setError('Unable to load this module right now. Please try again later.')
+        }
       } finally {
-        setLoading(false)
+        window.clearTimeout(timeoutId)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     loadModule()
-  }, [moduleId, isAuthenticated])
+
+    return () => {
+      isMounted = false
+      window.clearTimeout(timeoutId)
+      controller.abort()
+    }
+  }, [moduleId, isAuthenticated, user?.id])
 
   const handleEnroll = async () => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/training/modules/${moduleId}` } })
+      navigate('/login', { state: { from: { pathname: `/training/modules/${moduleId}` } } })
       return
     }
 
@@ -76,18 +137,12 @@ const TrainingModulePage = () => {
   const isCompleted = progress?.status === 'completed'
   const metadata = module?.metadata || {}
 
-  const watchUrl = useMemo(() => {
+  const watchSource = useMemo(() => {
     if (!module?.content_url) return null
     if (module.content_type && ['external', 'partner', 'affiliate'].includes(module.content_type)) {
       return null
     }
-    if (module.content_url.includes('youtube.com') && !module.content_url.includes('/embed/')) {
-      const videoId = module.content_url.split('v=')[1]?.split('&')[0]
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`
-      }
-    }
-    return module.content_url
+    return normalizeVideoSource(module.content_url)
   }, [module?.content_type, module?.content_url])
 
   if (loading) {
@@ -131,6 +186,7 @@ const TrainingModulePage = () => {
   }
 
   const { learning_objectives = [], content_sections = [], prerequisites = [], resources = [] } = module
+  const inPlatformResources = normalizeInPlatformResources(resources)
   const externalUrl = metadata.external_url || module.content_url
   const accessTier = metadata.access_tier?.replace(/\b\w/g, l => l.toUpperCase())
 
@@ -148,16 +204,28 @@ const TrainingModulePage = () => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {watchUrl ? (
+          {watchSource?.type === 'iframe' ? (
             <div className="relative w-full overflow-hidden" style={{ paddingTop: '56.25%' }}>
               <iframe
-                src={watchUrl}
+                src={watchSource.src}
                 title={module.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 h-full w-full"
                 data-testid={`training-module-iframe-${moduleId}`}
               />
+            </div>
+          ) : watchSource?.type === 'video' ? (
+            <div className="aspect-video bg-gray-900">
+              <video
+                src={watchSource.src}
+                title={module.title}
+                controls
+                className="h-full w-full"
+                data-testid={`training-module-video-${moduleId}`}
+              >
+                Your browser does not support embedded video.
+              </video>
             </div>
           ) : (
             <div className="bg-gray-900 py-16 text-center text-white">
@@ -209,7 +277,7 @@ const TrainingModulePage = () => {
                   </Link>
                 ) : !isAuthenticated && !['external', 'partner', 'affiliate'].includes(module.content_type) ? (
                   <button
-                    onClick={() => navigate('/login', { state: { from: `/training/modules/${moduleId}` } })}
+                    onClick={() => navigate('/login', { state: { from: { pathname: `/training/modules/${moduleId}` } } })}
                     className="btn-primary"
                   data-testid="training-module-login-button"
                   >
@@ -320,16 +388,14 @@ const TrainingModulePage = () => {
               </div>
             )}
 
-            {resources.length > 0 && (
+            {inPlatformResources.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3">Resources</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {resources.map((resource, index) => (
+                  {inPlatformResources.map((resource, index) => (
                     <a
                       key={index}
                       href={resource.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-primary-600 hover:border-primary-200 hover:bg-primary-50"
                     >
                       <span>{resource.label}</span>

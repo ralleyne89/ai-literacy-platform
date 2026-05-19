@@ -3,6 +3,7 @@ import { BarChart3, Clock, Award, BookOpen, Target, Lock, AlertCircle, PlayCircl
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { getTrainingStartPath, isInPlatformTrainingRecommendation } from '../utils/videoUrls'
 
 const getStringValue = (value, fallback = '') => {
   if (typeof value === 'string') {
@@ -51,7 +52,7 @@ const normalizeDifficultyLevel = (value) => {
 const normalizeRecommendationForDashboard = (recommendation, index, fallbackPrefix = 'recommendation') => {
   if (typeof recommendation === 'string') {
     return {
-      id: `${fallbackPrefix}-${index}`,
+      id: '',
       title: recommendation,
       description: getStringValue(
         recommendation,
@@ -62,7 +63,12 @@ const normalizeRecommendationForDashboard = (recommendation, index, fallbackPref
       estimated_duration_minutes: null,
       content_type: 'module',
       is_premium: false,
-      priority: 'low'
+      priority: 'low',
+      has_internal_lessons: false,
+      lesson_count: 0,
+      start_path: '',
+      route_path: '',
+      routing: null
     }
   }
 
@@ -106,10 +112,25 @@ const normalizeRecommendationForDashboard = (recommendation, index, fallbackPref
     difficulty_level: normalizeDifficultyLevel(recommendation.difficulty_level),
     estimated_duration_minutes: duration,
     content_type: getStringValue(recommendation.content_type, 'module'),
+    content_url: getStringValue(recommendation.content_url, ''),
+    external_url: getStringValue(
+      recommendation.external_url,
+      getStringValue(recommendation.metadata?.external_url, '')
+    ),
     is_premium:
       recommendation.is_premium === true ||
       getStringValue(recommendation.is_premium) === 'true',
-    priority: getStringValue(recommendation.priority, 'low')
+    priority: getStringValue(recommendation.priority, 'low'),
+    has_internal_lessons: Boolean(recommendation.has_internal_lessons),
+    lesson_count: parseNumericValue(recommendation.lesson_count, 0),
+    start_path: getStringValue(recommendation.start_path, ''),
+    route_path: getStringValue(recommendation.route_path, ''),
+    metadata: recommendation.metadata && typeof recommendation.metadata === 'object'
+      ? recommendation.metadata
+      : {},
+    routing: recommendation.routing && typeof recommendation.routing === 'object'
+      ? recommendation.routing
+      : null
   }
 }
 
@@ -122,6 +143,9 @@ const normalizeRecommendations = (recommendations, sourceTag = 'recommendation')
     .map((recommendation, index) => normalizeRecommendationForDashboard(recommendation, index, sourceTag))
     .filter(Boolean)
 }
+
+const getInPlatformCourseRecommendations = (recommendations) =>
+  recommendations.filter(isInPlatformTrainingRecommendation)
 
 const normalizeAssessmentRecord = (record) => {
   if (!record || typeof record !== 'object') {
@@ -224,6 +248,8 @@ const DashboardPage = () => {
         const assessmentHistoryRecommendations = latestHistoryAssessment
           ? normalizeRecommendations(latestHistoryAssessment.recommendations, 'assessment-history')
           : []
+        const inPlatformRecommendations = getInPlatformCourseRecommendations(recommendations)
+        const inPlatformHistoryRecommendations = getInPlatformCourseRecommendations(assessmentHistoryRecommendations)
 
         if (historyResult.status === 'fulfilled') {
           setAssessmentHistory(history)
@@ -239,16 +265,17 @@ const DashboardPage = () => {
           setTrainingSummary(null)
         }
 
-        if (recommendations.length > 0) {
-          setCourseRecommendations(recommendations)
-        } else if (assessmentHistoryRecommendations.length > 0) {
-          setCourseRecommendations(assessmentHistoryRecommendations)
+        if (inPlatformRecommendations.length > 0) {
+          setCourseRecommendations(inPlatformRecommendations)
+        } else if (inPlatformHistoryRecommendations.length > 0) {
+          setCourseRecommendations(inPlatformHistoryRecommendations)
         } else {
           setCourseRecommendations([])
         }
 
         const allFailed = [historyResult, progressResult, recommendationsResult].every(r => r.status === 'rejected')
-        if (allFailed) {
+        const isDemoUser = user?.id === 'demo-user'
+        if (allFailed && !isDemoUser) {
           setError('Unable to load dashboard data right now. Please refresh and try again.')
         }
       } finally {
@@ -499,8 +526,8 @@ const DashboardPage = () => {
             </p>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courseRecommendations.slice(0, 6).map((course) => (
-                <div key={course.id} className="border border-gray-200 rounded-lg p-5 hover:border-primary-300 hover:shadow-md transition-all duration-200">
+              {courseRecommendations.slice(0, 6).map((course, index) => (
+                <div key={course.id || `${course.title}-${index}`} className="border border-gray-200 rounded-lg p-5 hover:border-primary-300 hover:shadow-md transition-all duration-200">
                   {course.priority === 'high' && (
                     <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 mb-3">
                       High Priority
@@ -540,10 +567,10 @@ const DashboardPage = () => {
                   </div>
 
                   <Link
-                    to={course.id ? `/training/modules/${course.id}/learn` : '/training'}
+                    to={getTrainingStartPath(course)}
                     className="block w-full text-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium"
                   >
-                    {course.id ? 'Start Learning' : 'Browse Courses'}
+                    {course.has_internal_lessons ? 'Start Learning' : 'View Module'}
                   </Link>
                 </div>
               ))}

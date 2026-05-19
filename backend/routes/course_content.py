@@ -6,6 +6,7 @@ Handles lesson viewing, progress tracking, and quiz submissions
 from flask import Blueprint, jsonify, request, g
 from models import db, TrainingModule, Lesson, LessonProgress, UserProgress
 from routes.auth import supabase_jwt_required, get_supabase_identity
+from training_metadata import build_module_metadata, normalize_video_embed_url
 import structlog
 import json
 from datetime import datetime
@@ -24,6 +25,29 @@ def serialize_lesson_progress(progress):
         'started_at': progress.started_at.isoformat() if progress.started_at else None,
         'completed_at': progress.completed_at.isoformat() if progress.completed_at else None,
     }
+
+
+def normalize_lesson_content(lesson):
+    try:
+        content_data = json.loads(lesson.content) if lesson.content else {}
+    except (TypeError, ValueError):
+        content_data = {}
+    if not isinstance(content_data, dict):
+        return {}
+
+    if lesson.content_type == 'video':
+        video_url = (
+            content_data.get('video_url') or
+            content_data.get('embed_url') or
+            content_data.get('url') or
+            content_data.get('videoUrl') or
+            lesson.module.content_url
+        )
+        normalized_url = normalize_video_embed_url(video_url)
+        if normalized_url:
+            content_data['video_url'] = normalized_url
+
+    return content_data
 
 
 def serialize_module_progress(module_progress, lessons, progress_map):
@@ -112,6 +136,7 @@ def get_module_lessons(module_id):
         lessons_data = []
         for lesson in lessons:
             progress = progress_map.get(lesson.id)
+            video_content = normalize_lesson_content(lesson) if lesson.content_type == 'video' else {}
             
             lessons_data.append({
                 'id': lesson.id,
@@ -124,7 +149,9 @@ def get_module_lessons(module_id):
                 'status': progress.status if progress else 'not_started',
                 'time_spent_minutes': progress.time_spent_minutes if progress else 0,
                 'quiz_score': progress.quiz_score if progress else None,
-                'completed_at': progress.completed_at.isoformat() if progress and progress.completed_at else None
+                'completed_at': progress.completed_at.isoformat() if progress and progress.completed_at else None,
+                'has_video_url': bool(video_content.get('video_url')),
+                'video_url': video_content.get('video_url')
             })
         
         logger.info('module_lessons_retrieved', 
@@ -137,7 +164,8 @@ def get_module_lessons(module_id):
                 'id': module.id,
                 'title': module.title,
                 'description': module.description,
-                'total_lessons': len(lessons)
+                'total_lessons': len(lessons),
+                **build_module_metadata(module),
             },
             'lessons': lessons_data,
             'module_progress': serialize_module_progress(module_progress, lessons, progress_map),
@@ -211,8 +239,8 @@ def get_lesson_content(lesson_id):
 
         db.session.commit()
         
-        # Parse content JSON
-        content_data = json.loads(lesson.content) if lesson.content else {}
+        # Parse and normalize content JSON
+        content_data = normalize_lesson_content(lesson)
         
         # Build response
         lesson_data = {
@@ -431,4 +459,3 @@ def update_module_progress(user_id, module_id):
         
     except Exception as e:
         logger.exception('update_module_progress_failed', error=str(e))
-

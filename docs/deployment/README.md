@@ -1,185 +1,56 @@
 # Deployment Documentation
 
-This directory contains all deployment-related documentation for the LitmusAI platform.
+This directory contains the release configuration and deployment runbooks for LitmusAI.
 
-## 📁 Files
+## Recommended Production Path
 
-### Primary Guides
+1. Merge the branch to `main`.
+2. Let Netlify auto-deploy the frontend from `main`.
+3. Keep the Supabase `platform-api` Edge Function as the canonical API and Stripe webhook target.
+4. Validate the live site, backend health, and billing flow after deploy.
 
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment instructions
-  - Database migrations
-  - Environment variables
-  - Production deployment steps
-  - Post-deployment testing
+## Release Configuration
 
-- **[PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md)** - Quick start guide
-  - GitHub authentication options
-  - Push commands
-  - Netlify deployment
-  - Troubleshooting
+Production release config uses Supabase Auth with Google OAuth:
 
-### Setup Guides
+- Frontend build env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
+- Supabase Edge Function secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Stripe secrets, and frontend origin
+- Backend API base: `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
 
-- **[NETLIFY_SETUP.md](NETLIFY_SETUP.md)** - Netlify-specific setup
-- **[STRIPE_COMPLETE_SETUP.md](STRIPE_COMPLETE_SETUP.md)** - Stripe payment integration
-- **[ADD_ENV_VARS.md](ADD_ENV_VARS.md)** - Environment variables reference
-- **[SETUP_CHECKLIST.md](SETUP_CHECKLIST.md)** - Complete setup checklist
+Do not use the Supabase REST URL (`https://<project-ref>.supabase.co/rest/v1`) for `VITE_API_URL`. The browser calls `/api/*` routes, so the base URL must be the `platform-api` Edge Function.
 
-### Legacy/Alternative
+Local defaults:
 
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Original deployment guide
-- **[RENDER_DEPLOYMENT_CHECKLIST.md](RENDER_DEPLOYMENT_CHECKLIST.md)** - Render.com deployment
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:5001`
+- Start commands: `npm run dev` and `npm run backend`
 
-## 🚀 Quick Start
+The canonical Stripe webhook target is the Supabase Edge Function route:
 
-**First time deploying?**
-1. Read [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-2. Follow [PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md)
-3. Check [SETUP_CHECKLIST.md](SETUP_CHECKLIST.md)
+- `https://<project-ref>.supabase.co/functions/v1/platform-api/api/billing/webhooks/stripe`
 
-**Already deployed?**
-- Use [PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md) for updates
+Netlify billing functions remain legacy proxies and are not the source of truth.
 
-## 🔁 PR → main → Netlify workflow
+## What To Read
 
-Recommended production path:
+- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for the backend and database rollout steps
+- [PUSH_AND_DEPLOY_GUIDE.md](PUSH_AND_DEPLOY_GUIDE.md) for the PR-to-main workflow
+- [SETUP_CHECKLIST.md](SETUP_CHECKLIST.md) for release configuration verification
+- [ADD_ENV_VARS.md](ADD_ENV_VARS.md) for environment variable setup
+- [STRIPE_ENVIRONMENT_SETUP.md](STRIPE_ENVIRONMENT_SETUP.md) for billing and webhook setup
 
-1. Push a feature branch to GitHub.
-2. Open a pull request that targets `main`.
-3. Merge the PR after review and checks.
-4. Let Netlify auto-deploy from the linked `main` branch.
+## Validation
 
-## 🔐 Auth and Session Modes
+Use the release validation script from the repo root after updating production config:
 
-The frontend supports three authentication modes:
+```bash
+npm run validate:prod-env
+npm run check:supabase-config
+npm run build
+```
 
-- Supabase mode: set `VITE_AUTH_MODE=supabase` and keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set.
-- `auto` is not supported in production; always set `VITE_AUTH_MODE=backend`, `VITE_AUTH_MODE=supabase`, or `VITE_AUTH_MODE=auth0`.
-- Backend mode: set `VITE_AUTH_MODE=backend` and rely on `/api/auth/register`, `/api/auth/login`, and `/api/auth/profile`.
-  - Supabase variables can be unset in backend mode unless you still need OAuth/social behavior.
-- Auth0 mode: set `VITE_AUTH_MODE=auth0` and configure `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`, and `VITE_AUTH0_REDIRECT_URI`.
-  - Auth0 handles email/password and provider sign-in; frontend form routes defer to Auth0 flows.
+For production-style local checks, set `ENFORCE_PROD_ENV=1` and pass the
+production `VITE_*` values in the command environment. The validator follows
+Vite's env-file precedence, so `.env.local` can still override `.env`.
 
-In backend mode, configure:
-
-- `VITE_API_URL`
-- `SECRET_KEY`
-- `JWT_SECRET_KEY`
-- `DATABASE_URL`
-- `SUPABASE_JWT_SECRET` (required if your backend validates Supabase-issued tokens)
-
-In Auth0 mode, configure:
-
-- `VITE_API_URL`
-- `BACKEND_API_URL` (optional Netlify function proxy override; defaults to `VITE_API_URL`)
-- `VITE_AUTH0_DOMAIN`
-- `VITE_AUTH0_CLIENT_ID`
-- `VITE_AUTH0_AUDIENCE`
-- `VITE_AUTH0_REDIRECT_URI`
-- `AUTH0_DOMAIN`
-- `AUTH0_CLIENT_ID`
-- `AUTH0_AUDIENCE`
-- `AUTH0_REDIRECT_URI`
-- `JWT_SECRET_KEY` or `SUPABASE_JWT_SECRET`
-- `FRONTEND_URL`
-- `ALLOWED_ORIGINS`
-
-Alignment rules for Auth0 mode:
-
-- Keep `VITE_AUTH0_CLIENT_ID` and `AUTH0_CLIENT_ID` identical.
-- Keep `VITE_AUTH0_AUDIENCE` and `AUTH0_AUDIENCE` identical.
-- Keep `VITE_AUTH0_REDIRECT_URI` and `AUTH0_REDIRECT_URI` identical.
-- Keep `VITE_AUTH0_DOMAIN` and `AUTH0_DOMAIN` pointed at the same Auth0 tenant. The backend accepts either `your-tenant.us.auth0.com` or `https://your-tenant.us.auth0.com`.
-- The backend can fall back to `VITE_AUTH0_*`, but production deployments should still set the bare `AUTH0_*` variables explicitly on the backend runtime.
-
-### Auth0 config source of truth
-
-Production Auth0 settings are defined in the repo in `netlify.toml` (frontend build) and `render.yaml` (backend runtime). When changing one, update the other so they stay aligned, then run `npm run check:auth0-config`.
-
-### Production Auth0 verification
-
-If login or callback fails after deploy:
-
-1. Run `npm run check:auth0-config` locally to confirm in-repo alignment between `netlify.toml` and `render.yaml`.
-2. In Netlify (Site → Environment variables) and Render (Service → Environment), confirm values match the repo (or that deploys use the repo and have not been overridden in the dashboards).
-
-## Auth0 provider settings for production
-
-- When `VITE_AUTH_MODE=auth0`, confirm your Auth0 application is configured for this frontend domain before redeploying.
-  - Open the Auth0 dashboard and enable **Google** (`google-oauth2`) for the app/client used by this site.
-  - Add callback URL(s):
-    - `https://litmusai.netlify.app/auth/callback` (production)
-    - `http://localhost:5173/auth/callback` (local development)
-  - Add web origins:
-    - `https://litmusai.netlify.app`
-    - `http://localhost:5173`
-  - Verify `VITE_AUTH0_REDIRECT_URI` in Netlify and `AUTH0_REDIRECT_URI` on the backend are set to the same production callback URL.
-
-## Auth0 release verification
-
-For Auth0 releases, use the real redirect and callback flow as the release gate.
-
-1. Run `npm run check:auth0-config` before deploying if you changed Auth0-related config.
-2. Deploy a build that keeps `VITE_AUTH_MODE=auth0`, the production `VITE_AUTH0_*` values aligned with `netlify.toml`, and the backend `AUTH0_*` values aligned to the same Auth0 app settings.
-3. Open `/login`, submit an email, and confirm the browser leaves the app for Auth0 Universal Login instead of showing a local password form.
-4. Open `/register`, submit an email, and confirm the browser leaves the app for the Auth0 signup flow.
-5. Complete sign-in and verify Auth0 returns to `/auth/callback`, the backend exchange succeeds, and the app lands on `/dashboard`.
-6. Open at least one protected route after sign-in, such as `/training` or a module page, to confirm the session is usable beyond the dashboard.
-
-Legacy note:
-
-- Do not treat backend-form Playwright coverage as authoritative for Auth0 ship decisions.
-- `npm run e2e:smoke` and `npm run e2e:flow` need Auth0-aware specs before they can be used as production release gates.
-
-## 🌐 Netlify + backend API routing
-
-For Netlify-hosted frontend deployments, set `VITE_API_URL` to your public backend URL (for example `https://<your-backend-host>/`) so auth and billing requests go straight to Flask.
-
-- Ensure the backend host permits your Netlify origin in CORS (`ALLOWED_ORIGINS` or `FRONTEND_URL`).
-- Avoid relying on Netlify proxying for backend auth paths unless you explicitly add `/api/*` redirects in `netlify.toml`.
-- Verify `VITE_API_URL` and restart the frontend build whenever the backend URL changes.
-- Billing and Stripe state are canonical in Flask:
-  - Browser requests should use the backend billing routes such as `/api/billing/config`, `/api/billing/checkout-session`, and `/api/billing/customer-portal`.
-  - Stripe webhooks should target the backend route `https://<your-backend-host>/api/billing/webhooks/stripe`.
-  - The legacy Netlify billing functions now proxy to the backend and should not be treated as a second source of truth.
-
-## 🗄️ Database Providers and Migration Notes
-
-Recommended PostgreSQL options for constrained budgets:
-
-- Neon
-- Render PostgreSQL
-- Railway PostgreSQL
-- Supabase Postgres
-- Aiven
-- ElephantSQL (where available)
-
-A deployment migration checklist:
-
-1. Update `DATABASE_URL`
-2. Run `cd backend && FLASK_APP=app.py flask db upgrade`
-3. Re-run seeder scripts where required
-
-## 🔑 Key Topics
-
-### Authentication
-- GitHub authentication (Personal Access Token, SSH, Git Credential Manager)
-- Supabase setup
-- Backend auth mode (`VITE_AUTH_MODE=backend`)
-- Auth0 mode (`VITE_AUTH_MODE=auth0`)
-- Environment variables
-
-### Database
-- Running migrations
-- Seeding content
-- Production database setup
-
-### Hosting
-- Netlify deployment
-- Render.com deployment (alternative)
-- Custom domain setup
-
-### Payment
-- Stripe integration
-- Webhook configuration
-- Subscription management
+If you change release config in `netlify.toml` or `render.yaml`, run the Supabase config check and a production-style build before merging.
