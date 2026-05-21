@@ -14,14 +14,22 @@
 
 [context.production.environment]
   VITE_AUTH_MODE = "supabase"
-  # In production, VITE_API_URL must point directly at the Supabase Edge Function URL:
-  # https://<project-ref>.supabase.co/functions/v1/platform-api
+  # Browser-facing API calls stay same-origin on Netlify. The platform-api function
+  # forwards server-to-server to the Supabase Edge Function configured in BACKEND_API_URL.
   # Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Netlify environment variables.
   # Do not hard-code tenant-specific Supabase keys in this file.
 
 # Billing routes and Stripe webhook callbacks are canonical on the Supabase Edge Function API at `BACKEND_API_URL`.
 # Legacy Netlify billing functions are retained only for old deployments and should not be the source of truth.
 # Netlify continues to auto-deploy from `main` once the branch is merged.
+
+# Same-origin API proxy for browser auth calls. This avoids cross-origin preflight
+# failures while keeping the Supabase Edge Function as the canonical backend.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/platform-api/:splat"
+  status = 200
+
 # SPA fallback - must be last
 [[redirects]]
   from = "/*"

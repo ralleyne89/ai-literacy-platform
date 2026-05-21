@@ -2,7 +2,9 @@
 
 ## 1. Verify Release Env
 
-- `VITE_API_URL` points at the Supabase Edge Function: `https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `VITE_API_URL` points at the Netlify frontend origin: `https://litmusai.netlify.app`
+- `BACKEND_API_URL` points at the Supabase Edge Function: `https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `FRONTEND_URL=https://litmusai.netlify.app` is set for Netlify
 - `VITE_AUTH_MODE=supabase` is set for Netlify
 - `VITE_SUPABASE_URL` is set for Netlify
 - `VITE_SUPABASE_PUBLISHABLE_KEY` is set for Netlify

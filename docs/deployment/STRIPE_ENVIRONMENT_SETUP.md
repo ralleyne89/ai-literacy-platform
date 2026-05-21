@@ -4,12 +4,14 @@
 
 ### Netlify
 
-- `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `VITE_API_URL=https://litmusai.netlify.app`
+- `BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `FRONTEND_URL=https://litmusai.netlify.app`
 - `VITE_AUTH_MODE=supabase`
 - `VITE_SUPABASE_URL=<supabase-project-url>`
 - `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
 
-Netlify should not hold Stripe secrets for the current production path. It only needs the frontend build variables above, and `VITE_API_URL` should point at the Supabase `platform-api` Edge Function.
+Netlify should not hold Stripe secrets for the current production path. It only needs the public frontend variables and the backend proxy target.
 
 ### Supabase Edge Function Secrets
 

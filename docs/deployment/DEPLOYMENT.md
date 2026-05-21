@@ -13,7 +13,9 @@ LitmusAI deploys with this split:
 
 ### Netlify
 
-- `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `VITE_API_URL=https://litmusai.netlify.app`
+- `BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `FRONTEND_URL=https://litmusai.netlify.app`
 - `VITE_AUTH_MODE=supabase`
 - `VITE_SUPABASE_URL=<supabase-project-url>`
 - `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
@@ -35,12 +37,12 @@ LitmusAI deploys with this split:
 1. Apply the Supabase migrations.
 2. Deploy the function with `supabase functions deploy platform-api`.
 3. Set the secrets above with `supabase secrets set`.
-4. Confirm `GET /api/health` through `VITE_API_URL` returns `runtime: "supabase-edge"`.
+4. Confirm direct `GET /api/health` on the Supabase Edge Function returns `runtime: "supabase-edge"`.
 
 ## Update Netlify
 
 1. Add the Netlify env vars above.
-2. Confirm the production site points to the Supabase Edge Function through `VITE_API_URL`.
+2. Confirm the production site points `VITE_API_URL` to the Netlify frontend origin and `BACKEND_API_URL` to the Supabase Edge Function.
 3. Merge to `main` and let Netlify auto-deploy.
 
 ## Stripe Webhook
@@ -49,7 +51,7 @@ Configure Stripe to send events to:
 
 `https://<project-ref>.supabase.co/functions/v1/platform-api/api/billing/webhooks/stripe`
 
-Use that endpoint as the single production webhook target. The Netlify proxy functions are legacy only.
+Use that endpoint as the single production webhook target.
 
 ## Verification
 

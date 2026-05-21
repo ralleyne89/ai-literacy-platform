@@ -18,6 +18,14 @@ for (const key of [
   'VITE_SUPABASE_URL',
   'VITE_SUPABASE_PUBLISHABLE_KEY',
   'VITE_SUPABASE_ANON_KEY',
+  'BACKEND_API_URL',
+  'SUPABASE_PLATFORM_API_URL',
+  'VITE_PLATFORM_API_URL',
+  'FRONTEND_URL',
+  'URL',
+  'DEPLOY_PRIME_URL',
+  'NETLIFY',
+  'CONTEXT',
   'VITE_MODE',
   'VITE_BUILD_MODE',
 ]) {
@@ -81,14 +89,53 @@ test('explicit production environment values override local dotenv files', () =>
   })
 })
 
-test('production validation rejects same-origin frontend API values', () => {
+test('production validation rejects direct Supabase API URLs for Netlify production builds', () => {
   withTempProject((cwd) => {
     const result = runValidator(cwd, {
-      VITE_API_URL: 'https://litmusai.netlify.app',
+      NETLIFY: 'true',
+      CONTEXT: 'production',
     })
 
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /must point directly to the Supabase Edge Function URL/)
+    assert.match(result.stderr, /Netlify production VITE_API_URL must be the frontend origin/)
+  })
+})
+
+test('production validation supports same-origin Netlify proxy values', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://litmusai.netlify.app',
+      FRONTEND_URL: 'https://litmusai.netlify.app',
+      BACKEND_API_URL: 'https://project-ref.supabase.co/functions/v1/platform-api',
+    })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Production environment validation passed/)
+  })
+})
+
+test('production validation rejects same-origin proxy without a Supabase backend target', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://litmusai.netlify.app',
+      FRONTEND_URL: 'https://litmusai.netlify.app',
+    })
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /Same-origin VITE_API_URL requires/)
+  })
+})
+
+test('production validation rejects arbitrary non-Supabase API hosts', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://old-api.example.com',
+      FRONTEND_URL: 'https://litmusai.netlify.app',
+      BACKEND_API_URL: 'https://project-ref.supabase.co/functions/v1/platform-api',
+    })
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must either be the Supabase Edge Function URL/)
   })
 })
 
@@ -96,6 +143,20 @@ test('production validation requires the API and auth project refs to match', ()
   withTempProject((cwd) => {
     const result = runValidator(cwd, {
       VITE_API_URL: 'https://api-project.supabase.co/functions/v1/platform-api',
+      VITE_SUPABASE_URL: 'https://auth-project.supabase.co',
+    })
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /same Supabase project origin/)
+  })
+})
+
+test('production validation requires the proxy backend and auth project refs to match', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://litmusai.netlify.app',
+      FRONTEND_URL: 'https://litmusai.netlify.app',
+      BACKEND_API_URL: 'https://api-project.supabase.co/functions/v1/platform-api',
       VITE_SUPABASE_URL: 'https://auth-project.supabase.co',
     })
 

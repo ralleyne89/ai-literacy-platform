@@ -123,13 +123,14 @@ SUPABASE_JWT_AUDIENCE=authenticated
 
 ### Production API URL rule
 
-For Supabase-backed builds, `VITE_API_URL` must include the Edge Function path:
+For Netlify production, keep browser API calls same-origin and let Netlify forward them to Supabase:
 
 ```env
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
 ```
 
-Do not set `VITE_API_URL` to the Supabase project origin or `/rest/v1`. The frontend appends routes such as `/api/auth/profile`, so production API traffic must go through the `platform-api` Edge Function.
+Do not set `VITE_API_URL` to the Supabase project origin or `/rest/v1`. The frontend appends routes such as `/api/auth/profile`, so production browser traffic should hit Netlify `/api/*`; the Netlify `platform-api` function then forwards to the Supabase Edge Function.
 
 ## Local Data Setup
 
@@ -210,7 +211,9 @@ npm run test:e2e:record
 To force the same strict checks used for production builds:
 
 ```bash
-VITE_API_URL=https://your-project.supabase.co/functions/v1/platform-api \
+VITE_API_URL=https://litmusai.netlify.app \
+BACKEND_API_URL=https://your-project.supabase.co/functions/v1/platform-api \
+FRONTEND_URL=https://litmusai.netlify.app \
 VITE_AUTH_MODE=supabase \
 VITE_SUPABASE_URL=https://your-project.supabase.co \
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key \
@@ -227,7 +230,7 @@ values explicitly as shown above or remove local-only overrides first.
 After deploying `platform-api`, validate the live API contract:
 
 ```bash
-VITE_API_URL=https://your-project.supabase.co/functions/v1/platform-api npm run check:platform-api
+VITE_API_URL=https://litmusai.netlify.app npm run check:platform-api
 ```
 
 The smoke check calls:
@@ -266,7 +269,9 @@ supabase secrets set \
 4. Set Netlify build variables:
 
 ```env
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+FRONTEND_URL=https://litmusai.netlify.app
 VITE_AUTH_MODE=supabase
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
@@ -327,12 +332,13 @@ ai-literacy-platform/
 
 ## Troubleshooting
 
-### `VITE_API_URL` points to the wrong Supabase URL
+### `VITE_API_URL` points to the wrong production URL
 
-Use:
+Use the same-origin Netlify URL for browser builds:
 
 ```env
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
 ```
 
 Do not use:
@@ -340,6 +346,7 @@ Do not use:
 ```env
 VITE_API_URL=https://<project-ref>.supabase.co
 VITE_API_URL=https://<project-ref>.supabase.co/rest/v1
+VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
 ```
 
 ### `npm run build` fails during env validation
@@ -347,7 +354,7 @@ VITE_API_URL=https://<project-ref>.supabase.co/rest/v1
 Check for missing placeholders or release-blocking values:
 
 - `VITE_API_URL` must be absolute and cannot point to localhost in production mode.
-- Supabase API URLs must include `/functions/v1/platform-api`.
+- In Netlify proxy mode, `VITE_API_URL` must be the frontend origin and `BACKEND_API_URL` must include `/functions/v1/platform-api`.
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are required for release builds.
 - Legacy Clerk/Auth0 production variables should be removed from the release environment.
 

@@ -1,12 +1,13 @@
 # Supabase API Consolidation
 
-This project now supports a Supabase-native API target that preserves the existing frontend `/api/*` routes through one Edge Function:
+This project keeps Supabase as the canonical API while preserving browser-safe same-origin `/api/*` routes through Netlify:
 
 ```env
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
 ```
 
-Do not set `VITE_API_URL` to the plain Supabase project URL or the Supabase REST URL (`/rest/v1`). The frontend appends paths such as `/api/auth/profile`, so the API base must include `/functions/v1/platform-api`.
+Do not set `VITE_API_URL` to the plain Supabase project URL or the Supabase REST URL (`/rest/v1`). The frontend appends paths such as `/api/auth/profile`, so production browser traffic should hit Netlify `/api/*`; Netlify then forwards to the Supabase Edge Function.
 
 ## Supabase Setup
 
@@ -37,7 +38,9 @@ supabase secrets set \
 Set these in Netlify:
 
 ```env
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+FRONTEND_URL=https://litmusai.netlify.app
 VITE_AUTH_MODE=supabase
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
@@ -67,7 +70,7 @@ Keep Stripe as the billing provider. Supabase only replaces the custom backend r
 
 ## Cutover Checks
 
-- `GET /api/health` through the Supabase function returns `runtime: "supabase-edge"`.
+- `GET /api/health` through Netlify returns `runtime: "supabase-edge"`.
 - Google OAuth login loads `/api/auth/profile`.
 - Assessment submit/history/recommendations work for an authenticated user.
 - Training enrollment and lesson completion update Supabase rows.

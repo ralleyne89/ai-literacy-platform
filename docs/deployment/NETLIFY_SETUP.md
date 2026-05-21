@@ -7,17 +7,19 @@ Netlify hosts the LitmusAI frontend. Billing requests still start from the Netli
 Set these in Netlify production:
 
 ```txt
-VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+VITE_API_URL=https://litmusai.netlify.app
+BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api
+FRONTEND_URL=https://litmusai.netlify.app
 VITE_AUTH_MODE=supabase
 VITE_SUPABASE_URL=<supabase-project-url>
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 ```
 
-Do not put Stripe secret keys in Netlify for the current production path. Set Stripe values as Supabase Edge Function secrets instead.
+Do not put Stripe secret keys in Netlify for the current production path. Netlify only needs the public frontend variables and the non-secret backend proxy target.
 
 ## Billing Runtime
 
-The legacy Netlify billing functions are thin proxies only. They should forward to `VITE_API_URL`; they are not the source of truth for Stripe configuration.
+Netlify forwards `/api/*` to the `platform-api` function, and that function forwards to `BACKEND_API_URL`. Supabase remains the source of truth for Stripe configuration.
 
 Required Supabase secrets:
 

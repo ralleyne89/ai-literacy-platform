@@ -4,7 +4,9 @@
 
 Add these production frontend variables:
 
-- `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `VITE_API_URL=https://litmusai.netlify.app`
+- `BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- `FRONTEND_URL=https://litmusai.netlify.app`
 - `VITE_AUTH_MODE=supabase`
 - `VITE_SUPABASE_URL=<supabase-project-url>`
 - `VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>`
@@ -26,6 +28,6 @@ Set these with `supabase secrets set`:
 ## Notes
 
 - Keep Stripe as the billing provider; Supabase Edge Functions now host the webhook/API glue.
-- `VITE_API_URL` must be the `platform-api` Edge Function URL, not the Supabase REST URL (`/rest/v1`).
+- `VITE_API_URL` must be the Netlify frontend origin in production. `BACKEND_API_URL` must be the `platform-api` Edge Function URL, not the Supabase REST URL (`/rest/v1`).
 - Do not rely on legacy Clerk or Auth0 release variables for production.
 - After adding or changing values, redeploy Netlify and `supabase functions deploy platform-api`.

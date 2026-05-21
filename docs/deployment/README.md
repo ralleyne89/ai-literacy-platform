@@ -15,9 +15,10 @@ Production release config uses Supabase Auth with Google OAuth:
 
 - Frontend build env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
 - Supabase Edge Function secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, Stripe secrets, and frontend origin
-- Backend API base: `VITE_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
+- Browser API base: `VITE_API_URL=https://litmusai.netlify.app`
+- Netlify proxy backend: `BACKEND_API_URL=https://<project-ref>.supabase.co/functions/v1/platform-api`
 
-Do not use the Supabase REST URL (`https://<project-ref>.supabase.co/rest/v1`) for `VITE_API_URL`. The browser calls `/api/*` routes, so the base URL must be the `platform-api` Edge Function.
+Do not use the Supabase REST URL (`https://<project-ref>.supabase.co/rest/v1`) for `VITE_API_URL`. In production, browser calls go to Netlify `/api/*`, and Netlify forwards to the Supabase `platform-api` Edge Function server-to-server.
 
 Local defaults:
 
