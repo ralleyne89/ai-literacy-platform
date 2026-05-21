@@ -80,3 +80,26 @@ test('explicit production environment values override local dotenv files', () =>
     assert.match(result.stdout, /Production environment validation passed/)
   })
 })
+
+test('production validation rejects same-origin frontend API values', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://litmusai.netlify.app',
+    })
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must point directly to the Supabase Edge Function URL/)
+  })
+})
+
+test('production validation requires the API and auth project refs to match', () => {
+  withTempProject((cwd) => {
+    const result = runValidator(cwd, {
+      VITE_API_URL: 'https://api-project.supabase.co/functions/v1/platform-api',
+      VITE_SUPABASE_URL: 'https://auth-project.supabase.co',
+    })
+
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /same Supabase project origin/)
+  })
+})

@@ -66,26 +66,33 @@ const addWarning = (message) => {
 }
 
 const apiUrl = getEnv('VITE_API_URL')
+let parsedApi = null
 if (!apiUrl) {
   addError('VITE_API_URL is required and must be an absolute URL in production.')
 } else {
-  const parsedApi = parseUrl(apiUrl)
+  parsedApi = parseUrl(apiUrl)
   if (!parsedApi || !['http:', 'https:'].includes(parsedApi.protocol)) {
     addError('VITE_API_URL must be an absolute HTTP(S) URL (example: https://your-project.supabase.co/functions/v1/platform-api).')
   } else {
     if (localHostnames.has(parsedApi.hostname.toLowerCase())) {
       addError('VITE_API_URL cannot point to localhost in production.')
     }
+    if (!parsedApi.hostname.toLowerCase().endsWith('.supabase.co')) {
+      addError(`VITE_API_URL must point directly to the Supabase Edge Function URL: ${supabasePlatformApiExample}.`)
+    }
   }
 }
 
 const supabaseUrl = getEnv('VITE_SUPABASE_URL')
+let parsedSupabaseUrl = null
 if (!supabaseUrl) {
   addError('VITE_SUPABASE_URL is required in production.')
 } else if (!isValidHttpUrl(supabaseUrl)) {
   addError('VITE_SUPABASE_URL must be an absolute HTTP(S) Supabase project URL.')
 } else if (placeholderValues.has(supabaseUrl)) {
   addError('VITE_SUPABASE_URL is still set to a placeholder value.')
+} else {
+  parsedSupabaseUrl = parseUrl(supabaseUrl)
 }
 
 const supabasePublishableKey = getEnv('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnv('VITE_SUPABASE_ANON_KEY')
@@ -100,17 +107,17 @@ if (authMode && authMode.toLowerCase() !== 'supabase') {
   addError('VITE_AUTH_MODE must be "supabase" for release builds.')
 }
 
-const parsedApiForSupabase = parseUrl(apiUrl)
-if (
-  parsedApiForSupabase &&
-  parsedApiForSupabase.hostname.toLowerCase().endsWith('.supabase.co')
-) {
-  const normalizedApiPath = parsedApiForSupabase.pathname.replace(/\/+$/, '') || '/'
+if (parsedApi && parsedApi.hostname.toLowerCase().endsWith('.supabase.co')) {
+  const normalizedApiPath = parsedApi.pathname.replace(/\/+$/, '') || '/'
   if (normalizedApiPath === '/rest/v1' || normalizedApiPath.startsWith('/rest/v1/')) {
     addError(`VITE_API_URL points at Supabase REST (/rest/v1). Use the Edge Function URL instead: ${supabasePlatformApiExample}.`)
   } else if (normalizedApiPath !== supabasePlatformApiPath) {
     addError(`Supabase VITE_API_URL must be the Edge Function URL ${supabasePlatformApiExample}, not only the project origin.`)
   }
+}
+
+if (parsedApi && parsedSupabaseUrl && parsedApi.origin !== parsedSupabaseUrl.origin) {
+  addError('VITE_API_URL and VITE_SUPABASE_URL must use the same Supabase project origin so auth tokens validate against the platform-api deployment.')
 }
 
 for (const prefix of legacyAuthPrefixes) {

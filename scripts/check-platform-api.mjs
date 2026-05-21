@@ -1,8 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { loadEnv } from 'vite'
 
 const ROOT = process.cwd()
 const DOTENV_PATH = path.join(ROOT, '.env')
+const VITE_MODE = process.env.VITE_MODE || process.env.VITE_BUILD_MODE || 'production'
+const REQUEST_TIMEOUT_MS = Number(process.env.PLATFORM_API_CHECK_TIMEOUT_MS || 12000)
+const includeDeepChecks = process.env.PLATFORM_API_CHECK_DEEP === '1'
 
 const parseEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) {
@@ -24,8 +28,11 @@ const parseEnvFile = (filePath) => {
     }, {})
 }
 
-const fileEnv = parseEnvFile(DOTENV_PATH)
-const getEnv = (key) => (process.env[key] ?? fileEnv[key] ?? '').trim()
+const fileEnv = {
+  ...parseEnvFile(DOTENV_PATH),
+  ...loadEnv(VITE_MODE, ROOT, ''),
+}
+const getEnv = (key) => String(process.env[key] ?? fileEnv[key] ?? '').trim()
 const trimTrailingSlashes = (value) => String(value || '').trim().replace(/\/+$/, '')
 
 const DOMAINS = [
@@ -82,9 +89,18 @@ const validateAssessmentQuestions = (body) => {
 
 const routes = [
   { route: '/api/health', label: 'health' },
+  {
+    route: '/api/auth/profile',
+    label: 'auth profile guard',
+    expectedStatus: 401,
+    validate: (body) => body?.error === 'Unauthorized' ? '' : 'expected Unauthorized response',
+  },
   { route: '/api/training/modules', label: 'training catalog' },
   { route: '/api/certification/available', label: 'certification catalog' },
   { route: '/api/billing/config', label: 'billing config' },
+]
+
+const deepRoutes = [
   {
     route: '/api/assessment/questions?level=beginner',
     label: 'assessment questions',
@@ -141,19 +157,32 @@ const main = async () => {
 
   const failures = []
 
-  for (const { route, label, validate } of routes) {
+  const routesToCheck = includeDeepChecks ? [...routes, ...deepRoutes] : routes
+
+  for (const { route, label, validate, expectedStatus, timeoutMs } of routesToCheck) {
     const url = `${apiBaseUrl}${route}`
+    const controller = new AbortController()
+    const routeTimeoutMs = timeoutMs || REQUEST_TIMEOUT_MS
+    const timeoutId = setTimeout(() => controller.abort(), routeTimeoutMs)
     try {
       const response = await fetch(url, {
+        signal: controller.signal,
         headers: {
           Accept: 'application/json',
         },
       })
       const body = await parseJsonSafely(response)
 
-      if (!response.ok) {
-        failures.push(`${label}: ${response.status} ${response.statusText}.${formatBodyHint(body)}`)
+      if (expectedStatus && response.status !== expectedStatus) {
+        failures.push(`${label}: expected ${expectedStatus}, received ${response.status} ${response.statusText}.${formatBodyHint(body)}`)
         continue
+      }
+
+      if (!response.ok) {
+        if (!expectedStatus) {
+          failures.push(`${label}: ${response.status} ${response.statusText}.${formatBodyHint(body)}`)
+          continue
+        }
       }
 
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -168,7 +197,12 @@ const main = async () => {
         }
       }
     } catch (error) {
-      failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`)
+      const message = error?.name === 'AbortError'
+        ? `request timed out after ${routeTimeoutMs}ms`
+        : error instanceof Error ? error.message : String(error)
+      failures.push(`${label}: ${message}`)
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
