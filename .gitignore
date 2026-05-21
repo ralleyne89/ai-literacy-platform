@@ -78,6 +78,9 @@ Thumbs.db
 # Local Netlify folder
 .netlify/
 
+# Local Git worktrees should never be committed as gitlinks.
+.worktrees/
+
 # Supabase CLI local metadata
 supabase/.temp/
 
