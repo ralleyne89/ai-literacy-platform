@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { validateTrainingVideos } from './check-training-videos.mjs'
 
 const ROOT = process.cwd()
 const DOTENV_PATH = path.join(ROOT, '.env')
@@ -82,7 +83,7 @@ const validateAssessmentQuestions = (body) => {
 
 const routes = [
   { route: '/api/health', label: 'health' },
-  { route: '/api/training/modules', label: 'training catalog' },
+  { route: '/api/training/modules', label: 'training catalog', validate: (body) => validateTrainingVideos(body).join('; ') },
   { route: '/api/certification/available', label: 'certification catalog' },
   { route: '/api/billing/config', label: 'billing config' },
   {
