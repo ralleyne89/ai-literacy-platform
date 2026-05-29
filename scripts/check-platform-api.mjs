@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadEnv } from 'vite'
+import { validateTrainingVideos } from './check-training-videos.mjs'
 
 const ROOT = process.cwd()
 const DOTENV_PATH = path.join(ROOT, '.env')
@@ -95,7 +96,7 @@ const routes = [
     expectedStatus: 401,
     validate: (body) => body?.error === 'Unauthorized' ? '' : 'expected Unauthorized response',
   },
-  { route: '/api/training/modules', label: 'training catalog' },
+  { route: '/api/training/modules', label: 'training catalog', validate: (body) => validateTrainingVideos(body).join('; ') },
   { route: '/api/certification/available', label: 'certification catalog' },
   { route: '/api/billing/config', label: 'billing config' },
 ]

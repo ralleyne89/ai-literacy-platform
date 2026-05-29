@@ -135,6 +135,12 @@ def test_training_modules_include_safe_routing_metadata(client):
     assert sales_module['metadata']['video_title']
     assert sales_module['metadata']['attribution']
 
+    fundamentals_module = modules_by_id['module-ai-fundamentals-intro']
+    assert fundamentals_module['content_url'].startswith('https://www.youtube-nocookie.com/embed/')
+    assert_no_placeholder_video_url(fundamentals_module['content_url'])
+    assert fundamentals_module['metadata']['video_title']
+    assert fundamentals_module['metadata']['creator']
+
 
 def test_training_module_detail_returns_authenticated_progress(client, app, auth_headers):
     with app.app_context():
@@ -182,6 +188,13 @@ def test_training_module_serializers_expose_lesson_and_routing_metadata(client):
     assert sales_module['route_path'] == sales_module['learn_path']
     assert sales_module['routing']['route_type'] == 'internal_lessons'
     assert_no_placeholder_video_url(sales_module['content_url'])
+
+    fundamentals_module = modules_by_id['module-ai-fundamentals-intro']
+    assert fundamentals_module['lesson_count'] >= 1
+    assert fundamentals_module['has_internal_lessons'] is True
+    assert fundamentals_module['content_url'].startswith('https://www.youtube-nocookie.com/embed/')
+    assert fundamentals_module['metadata']['video_title'] == 'AI, Machine Learning, Deep Learning and Generative AI Explained'
+    assert_no_placeholder_video_url(fundamentals_module['content_url'])
 
     external_module = modules_by_id['module-google-ai-essentials']
     assert external_module['target_domains'] == ['AI Fundamentals', 'Practical Usage']
@@ -283,10 +296,12 @@ def test_course_video_lesson_returns_normalized_playable_url(client, app, auth_h
 
 def test_seeded_internal_video_modules_have_playable_video_lessons(client, app, auth_headers):
     module_ids = [
+        'module-ai-fundamentals-intro',
         'module-ai-sales',
         'module-ethical-hr',
         'module-marketing-ai',
         'module-ops-ai',
+        'module-prompt-master',
     ]
 
     with app.app_context():

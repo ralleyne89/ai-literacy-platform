@@ -447,6 +447,20 @@ AI_FUNDAMENTALS_INTRO_LESSONS = [
 ]
 
 AI_FOUNDATIONS_VIDEO = get_curated_video('module-ai-fundamentals-intro')
+AI_FOUNDATIONS_MODULE_PREREQUISITES = json.dumps({
+    'requirements': [],
+    'resources': [
+        {'label': 'Google AI Essentials', 'url': 'https://grow.google/ai-essentials/'}
+    ],
+    'sections': [],
+    'metadata': {
+        'provider': 'LitmusAI Originals',
+        'access_tier': 'free',
+        'format': 'interactive',
+        'accreditation': 'Internal certificate of completion',
+        **AI_FOUNDATIONS_VIDEO,
+    }
+})
 
 AI_FUNDAMENTALS_INTRO_LESSONS.append({
     'title': 'Video: AI Literacy Foundations',
@@ -1526,6 +1540,8 @@ def seed_course_content(force=False, silent=False):
                 'difficulty_level': 1,
                 'estimated_duration_minutes': 120,
                 'content_type': 'interactive',
+                'content_url': AI_FOUNDATIONS_VIDEO.get('video_url'),
+                'prerequisites': AI_FOUNDATIONS_MODULE_PREREQUISITES,
                 'is_premium': False,
                 'learning_objectives': json.dumps([
                     'Understand what AI is and how it differs from traditional programming',
@@ -1585,6 +1601,12 @@ def seed_course_content(force=False, silent=False):
             if not silent:
                 print(f"⚠️  Module {module_id} not found. Skipping...")
             continue
+        elif module_data and force:
+            for field, value in module_data.items():
+                setattr(module, field, value)
+            db.session.commit()
+            if not silent:
+                print(f"✅ Updated module: {module.title}")
 
         # Check if lessons already exist
         existing_lessons = Lesson.query.filter_by(module_id=module.id).count()
